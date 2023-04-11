@@ -11,10 +11,9 @@ import * as React from "react";
 import { useState } from "react";
 import { SpiffCommerceClient, WorkflowExperience } from "@spiffcommerce/core";
 import { SpiffCommerce3DPreviewService } from "@spiffcommerce/preview";
-import ReactDOM from "react-dom/client";
 
 console.log(
-  '👋 This message is being logged by "renderer.js", included via webpack'
+  '👋 This message is being logged by "App.tsx"'
 );
 
 /**
