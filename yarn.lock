@@ -195,13 +195,6 @@
   dependencies:
     "@babel/helper-plugin-utils" "^7.19.0"
 
-"@babel/runtime@^7.12.5":
-  version "7.21.0"
-  resolved "https://registry.npmjs.org/@babel/runtime/-/runtime-7.21.0.tgz"
-  integrity sha512-xwII0//EObnq89Ji5AKYQaRYiW/nZ3llSv29d49IuxPhKbtJoLP+9QUUZ4nVragQVtaVGeZrpB+ZtG/Pdy/POw==
-  dependencies:
-    regenerator-runtime "^0.13.11"
-
 "@babel/template@^7.20.7":
   version "7.20.7"
   resolved "https://registry.npmjs.org/@babel/template/-/template-7.20.7.tgz"
@@ -413,40 +406,41 @@
     semver "^7.3.5"
     tar "^6.1.11"
 
-"@spiffcommerce/core@^0.10.253":
-  version "0.10.253"
-  resolved "https://registry.npmjs.org/@spiffcommerce/core/-/core-0.10.253.tgz"
-  integrity sha512-H+4w3UYXjsDPfnRsT2eSh1HVn8JxdQ2nWicieKSoZSncUwoMlPc4nYSDOV+4vwdnlyxOmaP5JsAlqM+vT6mm3Q==
+"@spiffcommerce/core@^10.1.6":
+  version "10.1.6"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-10.1.6.tgz#02e736715e4dfb3137a015beab26f151b15724b4"
+  integrity sha512-t1kZIt4UiFPnpKvt2vpW7TGX/u38Kno4Ze3eKrjWPOUPiDeHkAJYV91gF8K6Fa1cKkIxwoeUJFga2kh+Z1U0YA==
   dependencies:
     "@apollo/client" "^3.7.0"
-    "@spiffcommerce/papyrus" "1.5.71"
-    canvg "https://github.com/spiffdev/canvg.git#03bcd151b12441e88ecb552bb658356f5bbe92c4"
+    "@spiffcommerce/papyrus" "^2.0.3"
     cross-fetch "^3.1.5"
     graphql "^16.6.0"
     lodash.clonedeep "^4.5.0"
     lodash.debounce "^4.0.8"
     lodash.isequal "^4.5.0"
+    pith "https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c"
     qrcode "^1.5.1"
     svg-path-bbox "^1.2.2"
+    unicode-default-word-boundary "^13.0.0"
 
-"@spiffcommerce/papyrus@1.5.71":
-  version "1.5.71"
-  resolved "https://registry.npmjs.org/@spiffcommerce/papyrus/-/papyrus-1.5.71.tgz"
-  integrity sha512-k77dMiTwRJl+DhX0VfquGQ/YUdCb7xEkd4vyWEvTNTuvZPWQxtKeRnrQeLTWMwq01FI98KJEATdywakK1QRk/g==
+"@spiffcommerce/papyrus@^2.0.3":
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/papyrus/-/papyrus-2.0.3.tgz#af5ef90750ea99abeeae987292799150faf29902"
+  integrity sha512-CbH2Kk4MGB/SWcHjQ3f2xkN0DcXCYmzIKdwMd2lIeFuQbwnAhKAVrgxKfh/ylTtJ2RzY8KQLBHBUuhVs0Rd39A==
   dependencies:
     axios "^0.21.4"
     canvas "^2.10.1"
-    canvg "https://github.com/spiffdev/canvg.git#03bcd151b12441e88ecb552bb658356f5bbe92c4"
     css "^3.0.0"
     exif "^0.6.0"
     file-type "^16.5.3"
     lodash.clonedeep "^4.5.0"
     opentype.js "^1.3.4"
+    pith "https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c"
 
-"@spiffcommerce/preview@^2.1.26":
-  version "2.1.26"
-  resolved "https://registry.npmjs.org/@spiffcommerce/preview/-/preview-2.1.26.tgz"
-  integrity sha512-hWCOm8TS7Y0ggFnb38v2OmQwGXByg/5f8xumWaTQjgYZ4tlEgWdxKotgCrSF2ziJqdhqTM4kbDaSqkn9ycPZMA==
+"@spiffcommerce/preview@^2.1.46":
+  version "2.1.46"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/preview/-/preview-2.1.46.tgz#1d4cd13a334f3267200c3e5f4bbaae7e26e95580"
+  integrity sha512-CaxBHXlViU0+Cq40nsvsP8HKvokxtqzKZT3mYuHM/xOfp52O3WjtozszZmrr2z45oHpozda0Gpn/lrwD/cRSAg==
   dependencies:
     "@babylonjs/core" "^5.51.0"
     "@babylonjs/loaders" "^5.51.0"
@@ -469,6 +463,11 @@
   version "18.15.11"
   resolved "https://registry.yarnpkg.com/@types/node/-/node-18.15.11.tgz#b3b790f09cb1696cffcec605de025b088fa4225f"
   integrity sha512-E5Kwq2n4SbMzQOn6wnmBjuK9ouqlURrcZDVfbo9ftDDTFt3nk7ZKK4GMOzoYgnpQJKcxwQw+lGaBvvlMo0qN/Q==
+
+"@types/offscreencanvas@^2019.6.4":
+  version "2019.7.0"
+  resolved "https://registry.yarnpkg.com/@types/offscreencanvas/-/offscreencanvas-2019.7.0.tgz#e4a932069db47bb3eabeb0b305502d01586fa90d"
+  integrity sha512-PGcyveRIpL1XIqK8eBsmRBt76eFgtzuPiSTyKHZxnGemp2yzGzWpjYKAfK3wIMiU7eH+851yEpiuP8JZerTmWg==
 
 "@types/prop-types@*":
   version "15.7.5"
@@ -677,19 +676,6 @@ canvas@^2.10.1:
     nan "^2.17.0"
     simple-get "^3.0.3"
 
-"canvg@https://github.com/spiffdev/canvg.git#03bcd151b12441e88ecb552bb658356f5bbe92c4":
-  version "3.0.9"
-  resolved "https://github.com/spiffdev/canvg.git#03bcd151b12441e88ecb552bb658356f5bbe92c4"
-  dependencies:
-    "@babel/runtime" "^7.12.5"
-    "@types/raf" "^3.4.0"
-    core-js "^3.8.3"
-    raf "^3.4.1"
-    regenerator-runtime "^0.13.7"
-    rgbcolor "^1.0.1"
-    stackblur-canvas "^2.0.0"
-    svg-pathdata "^6.0.3"
-
 chalk@^2.0.0:
   version "2.4.2"
   resolved "https://registry.npmjs.org/chalk/-/chalk-2.4.2.tgz"
@@ -756,11 +742,6 @@ convert-source-map@^1.7.0:
   version "1.9.0"
   resolved "https://registry.npmjs.org/convert-source-map/-/convert-source-map-1.9.0.tgz"
   integrity sha512-ASFBup0Mz1uyiIjANan1jzLQami9z1PoYSZCiiYW2FczPbenXc45FZdBZLzOT+r6+iciuEModtmCti+hjaAk0A==
-
-core-js@^3.8.3:
-  version "3.30.0"
-  resolved "https://registry.npmjs.org/core-js/-/core-js-3.30.0.tgz"
-  integrity sha512-hQotSSARoNh1mYPi9O2YaWeiq/cEB95kOrFb4NCrO4RIFt1qqNpKsaE+vy/L3oiqvND5cThqXzUU3r9F7Efztg==
 
 cross-fetch@^3.1.5:
   version "3.1.5"
@@ -1408,6 +1389,17 @@ picocolors@^1.0.0:
   resolved "https://registry.npmjs.org/picocolors/-/picocolors-1.0.0.tgz"
   integrity sha512-1fygroTLlHu66zi26VoTDv8yRgm0Fccecssto+MhsZ0D/DGW2sm8E8AjW7NU5VVTRt5GxbeZ5qBuJr+HyLYkjQ==
 
+"pith@git+https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c":
+  version "4.0.1"
+  resolved "git+https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c"
+  dependencies:
+    "@types/offscreencanvas" "^2019.6.4"
+    "@types/raf" "^3.4.0"
+    raf "^3.4.1"
+    rgbcolor "^1.0.1"
+    stackblur-canvas "^2.0.0"
+    svg-pathdata "^6.0.3"
+
 pngjs@^5.0.0:
   version "5.0.0"
   resolved "https://registry.npmjs.org/pngjs/-/pngjs-5.0.0.tgz"
@@ -1498,11 +1490,6 @@ readable-web-to-node-stream@^3.0.0:
   integrity sha512-ePeK6cc1EcKLEhJFt/AebMCLL+GgSKhuygrZ/GLaKZYEecIgIECf4UaUuaByiGtzckwR4ain9VzUh95T1exYGw==
   dependencies:
     readable-stream "^3.6.0"
-
-regenerator-runtime@^0.13.11, regenerator-runtime@^0.13.7:
-  version "0.13.11"
-  resolved "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz"
-  integrity sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==
 
 require-directory@^2.1.1:
   version "2.1.1"
@@ -1749,6 +1736,11 @@ typescript@^4.9.3:
   version "4.9.5"
   resolved "https://registry.npmjs.org/typescript/-/typescript-4.9.5.tgz"
   integrity sha512-1FXk9E2Hm+QzZQ7z+McJiHL4NW1F2EzMu9Nq9i3zAaGqibafqYwCVU6WyWAuyQRRzOlxou8xZSyXLEN8oKj24g==
+
+unicode-default-word-boundary@^13.0.0:
+  version "13.0.0"
+  resolved "https://registry.yarnpkg.com/unicode-default-word-boundary/-/unicode-default-word-boundary-13.0.0.tgz#351bf6bfea04df07a0bbd58b9136b8dc52c35a5d"
+  integrity sha512-rrprpnghnC/4tgfp9NhP6nEg+Ra0WAJJ2gOtELQE01zopVRYh/7esHOkq3ZdTaqsR/xl9RlsMbJY/+eyiQQYOQ==
 
 update-browserslist-db@^1.0.10:
   version "1.0.10"
