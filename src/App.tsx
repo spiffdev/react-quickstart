@@ -37,7 +37,6 @@ const App: React.FunctionComponent<{
         if (!canvasRef.current) return;
         const init = async () => {
             const client = new SpiffCommerceClient({});
-            await client.initFromIntegrationProduct(integrationProductId);
             const experience = await client.getWorkflowExperience(
                 undefined,
                 undefined,
