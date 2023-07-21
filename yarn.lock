@@ -406,13 +406,13 @@
     semver "^7.3.5"
     tar "^6.1.11"
 
-"@spiffcommerce/core@^10.1.6":
-  version "10.1.6"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-10.1.6.tgz#02e736715e4dfb3137a015beab26f151b15724b4"
-  integrity sha512-t1kZIt4UiFPnpKvt2vpW7TGX/u38Kno4Ze3eKrjWPOUPiDeHkAJYV91gF8K6Fa1cKkIxwoeUJFga2kh+Z1U0YA==
+"@spiffcommerce/core@^11.5.0":
+  version "11.5.0"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-11.5.0.tgz#05cc08208925238f79cf96156b9ebd84ea4e0bf8"
+  integrity sha512-9BBH6WFsZHRz4kTtTwtM0lHygpc5wUzFCnPxGLLK/607gniwIdYbrAQ3zXHnRPMwsIdSxwosY1SKlhEbMtDNMg==
   dependencies:
     "@apollo/client" "^3.7.0"
-    "@spiffcommerce/papyrus" "^2.0.3"
+    "@spiffcommerce/papyrus" "^2.0.4"
     cross-fetch "^3.1.5"
     graphql "^16.6.0"
     lodash.clonedeep "^4.5.0"
@@ -423,10 +423,10 @@
     svg-path-bbox "^1.2.2"
     unicode-default-word-boundary "^13.0.0"
 
-"@spiffcommerce/papyrus@^2.0.3":
-  version "2.0.3"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/papyrus/-/papyrus-2.0.3.tgz#af5ef90750ea99abeeae987292799150faf29902"
-  integrity sha512-CbH2Kk4MGB/SWcHjQ3f2xkN0DcXCYmzIKdwMd2lIeFuQbwnAhKAVrgxKfh/ylTtJ2RzY8KQLBHBUuhVs0Rd39A==
+"@spiffcommerce/papyrus@^2.0.4":
+  version "2.0.4"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/papyrus/-/papyrus-2.0.4.tgz#e13f6489f8d2a97b23e90ea4cafd12c039b4e32e"
+  integrity sha512-mu9a8guiL5VdsnZqV+p2MCqBMfZElZvihp5L8xWYooeFMQGEkUlVri4Fzr6KMkjsziHz7XnVhTix0xC3IGOp/A==
   dependencies:
     axios "^0.21.4"
     canvas "^2.10.1"
@@ -1389,9 +1389,9 @@ picocolors@^1.0.0:
   resolved "https://registry.npmjs.org/picocolors/-/picocolors-1.0.0.tgz"
   integrity sha512-1fygroTLlHu66zi26VoTDv8yRgm0Fccecssto+MhsZ0D/DGW2sm8E8AjW7NU5VVTRt5GxbeZ5qBuJr+HyLYkjQ==
 
-"pith@https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c":
+"pith@git+https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c":
   version "4.0.1"
-  resolved "https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c"
+  resolved "git+https://github.com/spiffdev/pith.git#6fba0bf988b239967cfbcea91eba6fa0cc26631c"
   dependencies:
     "@types/offscreencanvas" "^2019.6.4"
     "@types/raf" "^3.4.0"
