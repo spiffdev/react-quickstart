@@ -43,6 +43,7 @@ if (import.meta.env.DEV) {
         };
         const bundleId = import.meta.env.VITE_BUNDLE_ID;
         let bundleOptions: ThemeContextBundleOptions;
+
         if (bundleId) {
             bundleOptions = {
                 type: "existing",
@@ -55,6 +56,7 @@ if (import.meta.env.DEV) {
                 integrationProductId: import.meta.env.VITE_INTEGRATION_PRODUCT_ID,
             };
         }
+
         const devOptions: SpiffDevOptions = {
             ...baseOptions,
             queryParams,
