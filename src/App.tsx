@@ -1,6 +1,6 @@
 import { FunctionComponent, useEffect, useState } from "react";
-import { SpiffThemeLoader, ThemeContext } from "@spiffcommerce/theme-bridge";
-import { Bundle, SpiffCommerceClient } from "@spiffcommerce/core";
+import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommerce/theme-bridge";
+import { Bundle, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
 
 const App: FunctionComponent<{
     context: ThemeContext;
@@ -26,12 +26,29 @@ const App: FunctionComponent<{
 
     useEffect(() => {
         const loadBundle = async () => {
-            const bundle = await client.getNewBundle(import.meta.env.VITE_PRODUCT_COLLECTION_ID);
-            const productCollection = bundle.getProductCollection();
-            if (productCollection) {
-                await productCollection.fetchProducts();
-                const products = productCollection.getProducts();
-                console.log("Products: ", products);
+            const c = context as ThemeContextBundle;
+            if (c.bundleOptions.type === "existing") {
+                const bundle = await client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {});
+                setBundle(bundle);
+            } else {
+                const bundle = await client.getNewBundle(c.bundleOptions.productCollectionId, undefined, {});
+                const productCollection = bundle.getProductCollection();
+                if (productCollection) {
+                    await productCollection.fetchProducts();
+                    const products = productCollection.getProducts();
+                    console.log("Products: ", products);
+                    setBundle(bundle);
+
+                    const exampleProduct = products[0].getIntegrationByType(IntegrationType.Hub);
+                    bundle.addWorkflowExperience(
+                        await client.getWorkflowExperience({
+                            type: "integration",
+                            integrationProductId: exampleProduct?.id,
+                            workflowId: products[0].getDefaultWorkflow().getId(),
+                        }),
+                    );
+                }
+
                 setBundle(bundle);
             }
         };
@@ -40,7 +57,18 @@ const App: FunctionComponent<{
 
     if (!bundle) return <div>Loading...</div>;
 
-    return <div className="app-body">Hello</div>;
+    return (
+        <div className="app-body">
+            <ol>
+                {bundle
+                    .getProductCollection()
+                    ?.getProducts()
+                    .map((p) => (
+                        <li>{p.getName()}</li>
+                    ))}
+            </ol>
+        </div>
+    );
 };
 
 export default App;
