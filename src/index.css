@@ -1,8 +1,27 @@
-html,
-head,
-body,
-#root {
-  margin: 0;
-  width: 100%;
-  height: 100%;
+body {
+    margin: 0;
+    min-height: 100vh;
+    overflow-y: hidden;
+    background: var(--CLR-Page-Bg);
+}
+
+#spiffThemeWrapper {
+    width: 100%;
+    height: 100%;
+}
+
+#app {
+    height: 100vh;
+}
+
+.app-body {
+    height: 100%;
+    overflow: hidden;
+    box-sizing: unset;
+}
+
+.app-body * {
+    box-sizing: unset;
+    font-family: var(--Default-Font);
+    font-weight: var(--FW-Normal);
 }

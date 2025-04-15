@@ -1,18 +1,45 @@
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-import path from 'path';
+import { defineConfig, splitVendorChunkPlugin } from "vite";
+import svgr from "vite-plugin-svgr";
+import { spiffThemePlugin } from "@spiffcommerce/theme-bridge";
+import { configurationSchema } from "./src/configurationSchema";
+import { existsSync, readFileSync } from "fs";
 
 // https://vitejs.dev/config/
-export default defineConfig({
-    plugins: [react()],
-    resolve: {
-        alias: {
-            https: path.resolve(__dirname, './node_modules/https-browserify/index.js'),
-            util: path.resolve(__dirname, './node_modules/util/util.js'),
-            assert: path.resolve(__dirname, './node_modules/assert/build/assert.js'),
-            path: path.resolve(__dirname, './node_modules/path-browserify/index.js'),
-            url: path.resolve(__dirname, './node_modules/url/url.js'),
-            http: path.resolve(__dirname, './node_modules/stream-http/index.js'),
+export default defineConfig((env) => {
+    const configurationPath = `./.env.${env.mode}.json`;
+    const themeConfiguration = existsSync(configurationPath) ? readFileSync(configurationPath, "utf-8") : undefined;
+    return {
+        base: "",
+        define: {
+            __DEV_CONFIGURATION__: themeConfiguration,
+            "globalThis.__DEV__": JSON.stringify(false),
         },
-    },
+        plugins: [
+            svgr(),
+            splitVendorChunkPlugin(),
+            spiffThemePlugin({ configurationSchema, includePreloadChunks: false }),
+        ],
+        build: {
+            emptyOutDir: true,
+            rollupOptions: {
+                output: {
+                    entryFileNames: "assets/[name].js",
+                    chunkFileNames: "assets/[name].chunk.js",
+                    assetFileNames: "assets/[name].[ext]",
+                    manualChunks(id, _meta) {
+                        if (!id.includes("node_modules")) return;
+                        if (id.includes("@spiffcommerce/preview")) return "vendor-spiffcommerce-preview";
+                        if (id.includes("@spiffcommerce")) return "vendor-spiffcommerce";
+                        return;
+                    },
+                },
+            },
+        },
+        server: {
+            port: 3333,
+        },
+        preview: {
+            port: 3334,
+        },
+    };
 });

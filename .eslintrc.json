@@ -1,0 +1,23 @@
+{
+    "root": true,
+    "extends": ["react", "plugin:@typescript-eslint/recommended"],
+    "plugins": ["@typescript-eslint"],
+    "parser": "@typescript-eslint/parser",
+    "parserOptions": {
+        "project": ["./tsconfig.json"]
+    },
+    "settings": {
+        "jest": { "version": 27 }
+    },
+    "rules": {
+        "@typescript-eslint/no-unused-vars": [
+            "warn",
+            {
+                "argsIgnorePattern": "^_"
+            }
+        ],
+        "@typescript-eslint/no-explicit-any": "off",
+        "no-lonely-if": "off"
+    },
+    "ignorePatterns": ["dist/", "node_modules/", "vite.config.ts", "*.html"]
+}

@@ -1,16 +1,15 @@
-# README #
+# React Quickstart
 
-This repository contains a pristine boilerplate with recommended settings for a new browser application. It is intended to 
-be forked and used as a starting point for new applications. Any tweaks to configuration can then be pulled from upstream if required.
+This template gives you everything you need to develop a theme for spiff commerce locally.
 
-This template uses Vite to manage building and configuring the application. You can read more about Vite here: https://vitejs.dev/guide/
+# Local Entrypoint
 
-### How do I get set up? ###
+The local entrypoint is `src/index.tsx`. This is the file that Vite will use to start the development server. The file is responsible for rendering the main application component and setting up the theme configuration.
 
-* Fork the repository
-* Run 'yarn dev' to run the project in your new repo.
-* From that point on you may build out the application you need.
+The following env vars are required to run locally.
 
-### Contribution guidelines ###
+VITE_APPLICATION_KEY: This is the application key from spiff hub. Please reach out when you're setting up and we'll help you find this.
 
-* Ensure any changes are very targeted and do not affect the boilerplate too much. (Consider the impact on other projects that may be using this boilerplate.)
+# Exposing Theme Configuration
+
+Please refer to the file `src/configurationSchema.ts` for reading existing theme configuration and for extending with more.

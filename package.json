@@ -1,33 +1,36 @@
 {
     "name": "react-quickstart",
-    "private": true,
-    "version": "0.0.0",
+    "version": "1.0.0",
+    "description": "This is a template for use in generate themes for the SpiffCommerce platform.",
+    "main": "index.tsx",
     "type": "module",
     "scripts": {
         "dev": "vite",
-        "build": "tsc && vite build",
-        "preview": "vite preview"
+        "preview": "vite preview",
+        "build": "tsc && vite build && cd dist && bestzip dist.zip *",
+        "lint": "eslint ./"
     },
     "dependencies": {
-        "@spiffcommerce/core": "^11.5.0",
-        "@spiffcommerce/preview": "^2.1.46",
-        "assert": "^2.0.0",
-        "buffer": "^6.0.3",
-        "https-browserify": "^1.0.0",
-        "path-browserify": "^1.0.1",
-        "react": "^18.2.0",
-        "react-dom": "^18.2.0",
-        "stream-http": "^3.2.0",
-        "url": "^0.11.0",
-        "util": "^0.12.5"
+        "@spiffcommerce/core": "26.23.1",
+        "@spiffcommerce/preview": "5.11.0",
+        "@spiffcommerce/theme-bridge": "1.20.0",
+        "react": "^19.0.0",
+        "react-dom": "^19.0.0"
     },
     "devDependencies": {
-        "@types/node": "^18.15.11",
-        "@types/react": "^18.0.28",
-        "@types/react-dom": "^18.0.11",
-        "@vitejs/plugin-react": "^3.1.0",
-        "prettier": "^2.8.8",
-        "typescript": "^4.9.3",
-        "vite": "^4.2.3"
-    }
+        "@types/react": "^19.0.10",
+        "@types/react-dom": "^19.0.4",
+        "@types/node": "^20.11.19",
+        "@typescript-eslint/eslint-plugin": "^6.21.0",
+        "@typescript-eslint/parser": "^6.21.0",
+        "bestzip": "^2.2.1",
+        "eslint": "^8.56.0",
+        "eslint-plugin-react-hooks": "^5.2.0",
+        "eslint-plugin-react-refresh": "^0.4.19",
+        "typescript": "^5.2.2",
+        "vite": "^5.1.7",
+        "vite-plugin-svgr": "^4.2.0"
+    },
+    "author": "",
+    "license": "ISC"
 }
