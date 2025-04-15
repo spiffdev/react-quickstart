@@ -1,11 +1,11 @@
-import { FunctionComponent, useState } from "react";
+import { FunctionComponent, useEffect, useState } from "react";
 import { SpiffThemeLoader, ThemeContext } from "@spiffcommerce/theme-bridge";
-import { SpiffCommerceClient } from "@spiffcommerce/core";
+import { Bundle, SpiffCommerceClient } from "@spiffcommerce/core";
 
 const App: FunctionComponent<{
     context: ThemeContext;
 }> = ({ context }) => {
-    const [client] = useState<SpiffCommerceClient | null>(() => {
+    const [client] = useState<SpiffCommerceClient>(() => {
         const client = new SpiffCommerceClient({
             applicationKey: context.applicationKey,
         });
@@ -22,7 +22,23 @@ const App: FunctionComponent<{
         return client;
     });
 
-    console.log(client);
+    const [bundle, setBundle] = useState<Bundle | undefined>(undefined);
+
+    useEffect(() => {
+        const loadBundle = async () => {
+            const bundle = await client.getNewBundle(import.meta.env.VITE_PRODUCT_COLLECTION_ID);
+            const productCollection = bundle.getProductCollection();
+            if (productCollection) {
+                await productCollection.fetchProducts();
+                const products = productCollection.getProducts();
+                console.log("Products: ", products);
+                setBundle(bundle);
+            }
+        };
+        loadBundle();
+    }, []);
+
+    if (!bundle) return <div>Loading...</div>;
 
     return <div className="app-body">Hello</div>;
 };
