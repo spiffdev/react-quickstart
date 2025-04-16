@@ -67,7 +67,6 @@ const loadDevConfiguration = async (themeBridge: any) => {
     };
     let devOptions: SpiffDevOptions;
     const contextType = import.meta.env.VITE_CONTEXT_TYPE || "transaction";
-    console.log(contextType);
     if (contextType === "transaction") {
         devOptions = {
             ...baseOptions,
