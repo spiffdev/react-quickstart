@@ -1,1 +1,1 @@
-declare const __DEV_CONFIGURATION__: any | undefined;
+declare const __LOCAL_DEV_CONFIGURATION__: any | undefined;

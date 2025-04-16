@@ -11,7 +11,7 @@ export default defineConfig((env) => {
     return {
         base: "",
         define: {
-            __DEV_CONFIGURATION__: themeConfiguration,
+            __LOCAL_DEV_CONFIGURATION__: themeConfiguration,
             "globalThis.__DEV__": JSON.stringify(false),
         },
         plugins: [

@@ -38,17 +38,14 @@ const App: FunctionComponent<{
                     const products = productCollection.getProducts();
                     console.log("Products: ", products);
                     setBundle(bundle);
-
                     const exampleProduct = products[0].getIntegrationByType(IntegrationType.Hub);
-                    bundle.addWorkflowExperience(
-                        await client.getWorkflowExperience({
-                            type: "integration",
-                            integrationProductId: exampleProduct?.id,
-                            workflowId: products[0].getDefaultWorkflow().getId(),
-                        }),
-                    );
+                    const workflow = await client.getWorkflowExperience({
+                        type: "integration",
+                        integrationProductId: exampleProduct?.id,
+                        workflowId: products[0].getAllWorkflows()[0].getId(),
+                    });
+                    bundle.addWorkflowExperience(workflow);
                 }
-
                 setBundle(bundle);
             }
         };
