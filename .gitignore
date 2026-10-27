@@ -6,3 +6,4 @@ dist/
 vite.config.ts.*
 tsconfig.tsbuildinfo
 yarn-error.log
+.claude

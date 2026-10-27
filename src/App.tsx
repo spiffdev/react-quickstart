@@ -1,6 +1,29 @@
 import { FunctionComponent, useEffect, useState } from "react";
 import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommerce/theme-bridge";
-import { Bundle, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
+import { ActivationData, Bundle, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
+import { BundleProvider } from "./hooks/useBundle";
+import PageHandler from "./Pages/PageHandler";
+import { ActivationProvider } from "./hooks/useActivation";
+
+function getProductCollectionForNewBundle(context: ThemeContext): string | null {
+    const c = context as ThemeContextBundle;
+    if (c.bundleOptions.type !== "new") {
+        return null;
+    }
+    if (c.bundleOptions.productCollectionId) {
+        return c.bundleOptions.productCollectionId;
+    }
+    // Exports in theme bridge which reference items in core are not exported correctly in the d.ts files.
+    // This must be fixed internally.
+    // For now, we're just manually casting since we can visit the file and see the correct type.
+    const data = c.activation as ActivationData;
+    if (!data.activationProductCollections || data.activationProductCollections.length !== 1) {
+        // Either nothing is connected, or the activation has more than one collection linked.
+        // Note: In single product mode this is undefined behaviour.
+        return null;
+    }
+    return data.activationProductCollections[0].productCollection.id;
+}
 
 const App: FunctionComponent<{
     context: ThemeContext;
@@ -31,7 +54,9 @@ const App: FunctionComponent<{
                 const bundle = await client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {});
                 setBundle(bundle);
             } else {
-                const bundle = await client.getNewBundle(c.bundleOptions.productCollectionId, undefined, {});
+                const collectionId = getProductCollectionForNewBundle(context);
+                console.log(`Creating new bundle with product collection: ${collectionId}`);
+                const bundle = await client.getNewBundle(collectionId || undefined, undefined, {});
                 const productCollection = bundle.getProductCollection();
                 if (productCollection) {
                     await productCollection.fetchProducts();
@@ -52,18 +77,18 @@ const App: FunctionComponent<{
         loadBundle();
     }, []);
 
-    if (!bundle) return <div>Loading...</div>;
+    if (!bundle) {
+        // TODO: spinner
+        return <div>Loading...</div>;
+    }
 
     return (
         <div className="app-body">
-            <ol>
-                {bundle
-                    .getProductCollection()
-                    ?.getProducts()
-                    .map((p) => (
-                        <li>{p.getName()}</li>
-                    ))}
-            </ol>
+            <ActivationProvider activation={context.activation}>
+                <BundleProvider bundle={bundle}>
+                    <PageHandler />
+                </BundleProvider>
+            </ActivationProvider>
         </div>
     );
 };
