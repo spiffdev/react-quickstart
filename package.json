@@ -11,7 +11,7 @@
         "lint": "eslint ./"
     },
     "dependencies": {
-        "@spiffcommerce/core": "44.16.2",
+        "@spiffcommerce/core": "44.16.3-alpha.0",
         "@spiffcommerce/preview": "5.12.0",
         "@spiffcommerce/theme-bridge": "1.28.0",
         "react": "^19.3.1",

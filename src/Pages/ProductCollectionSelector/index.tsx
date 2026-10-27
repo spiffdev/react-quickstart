@@ -1,18 +1,23 @@
-import { FunctionComponent, useEffect, useState } from "react";
+import { FunctionComponent, useEffect, useMemo, useState } from "react";
 import Text from "../../components/text";
 import useActivation from "../../hooks/useActivation";
 import { getProductCollections, ProductCollection } from "@spiffcommerce/core";
 import Card from "../../components/card";
+import Button from "../../components/button";
 
 const ProductCollectionCard: FunctionComponent<{
     collection: ProductCollection;
     onClick: () => void;
 }> = ({ collection, onClick }) => {
     // TODO: make basic "card" component to keep this stuff shared
+    const image = useMemo(() => collection.getImage()?.fileLink, [collection]);
     return (
-        <Card onClick={() => onClick()}>
-            {collection.getImage()?.fileLink ? <img src={collection.getImage()!.fileLink!} width="150px" /> : undefined}
+        <Card>
+            {image ? <img src={image} width="150px" /> : undefined}
             <Text>{collection.getName()}</Text>
+            <Button onClick={() => onClick()}>
+                <Text>Select</Text>
+            </Button>
         </Card>
     );
 };
