@@ -1,5 +1,7 @@
 import { ThemeConfigurationSchema } from "@spiffcommerce/theme-bridge";
 
+// TODO: fill these out with stuff like colors and fonts for basic configuration.
+
 export interface ThemeConfiguration {
     /**
      * TODO: Place configuration typing here.
@@ -15,3 +17,5 @@ export const configurationSchema: ThemeConfigurationSchema = {
          */
     ],
 };
+
+// TODO: pages example
