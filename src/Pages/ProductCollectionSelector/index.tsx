@@ -2,17 +2,18 @@ import { FunctionComponent, useEffect, useState } from "react";
 import Text from "../../components/text";
 import useActivation from "../../hooks/useActivation";
 import { getProductCollections, ProductCollection } from "@spiffcommerce/core";
+import Card from "../../components/card";
 
 const ProductCollectionCard: FunctionComponent<{
     collection: ProductCollection;
     onClick: () => void;
 }> = ({ collection, onClick }) => {
-    // TODO: shared card component
-    // TODO: card image
+    // TODO: make basic "card" component to keep this stuff shared
     return (
-        <div>
-            <Text onClick={() => onClick()}>{collection.getName()}</Text>
-        </div>
+        <Card onClick={() => onClick()}>
+            {collection.getImage()?.fileLink ? <img src={collection.getImage()!.fileLink!} width="150px" /> : undefined}
+            <Text>{collection.getName()}</Text>
+        </Card>
     );
 };
 
@@ -29,7 +30,7 @@ const ProductCollectionSelector: FunctionComponent<{
             .finally(() => setLoading(false));
     }, [activation.activationProductCollections]);
 
-    if (loading) {
+    if (loading && !collections) {
         // TODO: spinner
         return <div>Loading...</div>;
     }
@@ -41,11 +42,16 @@ const ProductCollectionSelector: FunctionComponent<{
 
     return (
         <div>
+            {/* TODO: spinner and prevent clicking */}
+            {loading && <div>Loading...</div>}
             {collections.map((collection) => (
                 <ProductCollectionCard
                     key={collection.getId()}
                     collection={collection}
-                    onClick={() => onCollectionSelected(collection)}
+                    onClick={() => {
+                        setLoading(true);
+                        onCollectionSelected(collection);
+                    }}
                 />
             ))}
         </div>
