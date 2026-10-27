@@ -6,6 +6,7 @@ import { CollectionProduct, ProductCollection, ProductWorkflow, WorkflowExperien
 import ProductSelector from "./ProductSelector";
 import useClient from "../hooks/useClient";
 import WorkflowSelector from "./WorkflowSelector";
+import Customization from "./Customization";
 
 type PageType = "collection" | "product" | "workflow" | "experience";
 
@@ -79,9 +80,12 @@ const PageHandler: FunctionComponent<{}> = () => {
             return <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />;
         case "experience":
             return (
-                <div>
-                    <Typography>{bundle.getProductCollection()?.getId()}</Typography>
-                </div>
+                <Customization
+                    workflowExperience={experience!}
+                    onNext={() => {
+                        /* TODO: close */
+                    }}
+                />
             );
     }
 };

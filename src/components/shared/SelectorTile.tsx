@@ -4,7 +4,7 @@ import Card from "../card";
 import Typography from "../typography";
 
 const SelectorTile: FunctionComponent<{
-    imageUrl: string | undefined;
+    imageUrl?: string;
     title: string;
     onClick: () => void;
 }> = ({ imageUrl, title, onClick }) => {
