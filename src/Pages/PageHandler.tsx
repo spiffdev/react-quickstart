@@ -51,9 +51,10 @@ const PageHandler: FunctionComponent<{}> = () => {
                 },
             ]);
             setExperience(experience);
+            await bundle.addWorkflowExperience(experience);
             setPage("experience");
         },
-        [client, product],
+        [bundle, client, product],
     );
 
     const handleProductSelected = useCallback(
