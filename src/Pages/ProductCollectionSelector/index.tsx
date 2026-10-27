@@ -1,26 +1,7 @@
-import { FunctionComponent, useEffect, useMemo, useState } from "react";
-import Text from "../../components/text";
+import { FunctionComponent, useEffect, useState } from "react";
 import useActivation from "../../hooks/useActivation";
 import { getProductCollections, ProductCollection } from "@spiffcommerce/core";
-import Card from "../../components/card";
-import Button from "../../components/button";
-
-const ProductCollectionCard: FunctionComponent<{
-    collection: ProductCollection;
-    onClick: () => void;
-}> = ({ collection, onClick }) => {
-    // TODO: make basic "card" component to keep this stuff shared
-    const image = useMemo(() => collection.getImage()?.fileLink, [collection]);
-    return (
-        <Card>
-            {image ? <img src={image} width="150px" /> : undefined}
-            <Text>{collection.getName()}</Text>
-            <Button onClick={() => onClick()}>
-                <Text>Select</Text>
-            </Button>
-        </Card>
-    );
-};
+import SelectorTile from "../../components/shared/SelectorTile";
 
 const ProductCollectionSelector: FunctionComponent<{
     onCollectionSelected: (collection: ProductCollection) => void;
@@ -50,9 +31,10 @@ const ProductCollectionSelector: FunctionComponent<{
             {/* TODO: spinner and prevent clicking */}
             {loading && <div>Loading...</div>}
             {collections.map((collection) => (
-                <ProductCollectionCard
+                <SelectorTile
                     key={collection.getId()}
-                    collection={collection}
+                    imageUrl={collection.getImage()?.fileLink}
+                    title={collection.getName()}
                     onClick={() => {
                         setLoading(true);
                         onCollectionSelected(collection);

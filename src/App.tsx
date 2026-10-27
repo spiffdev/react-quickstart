@@ -4,6 +4,7 @@ import { ActivationData, Bundle, IntegrationType, SpiffCommerceClient } from "@s
 import { BundleProvider } from "./hooks/useBundle";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
+import { ClientProvider } from "./hooks/useClient";
 
 function getProductCollectionForNewBundle(context: ThemeContext): string | null {
     const c = context as ThemeContextBundle;
@@ -84,11 +85,13 @@ const App: FunctionComponent<{
 
     return (
         <div className="app-body">
-            <ActivationProvider activation={context.activation}>
-                <BundleProvider bundle={bundle}>
-                    <PageHandler />
-                </BundleProvider>
-            </ActivationProvider>
+            <ClientProvider client={client}>
+                <ActivationProvider activation={context.activation}>
+                    <BundleProvider bundle={bundle}>
+                        <PageHandler />
+                    </BundleProvider>
+                </ActivationProvider>
+            </ClientProvider>
         </div>
     );
 };

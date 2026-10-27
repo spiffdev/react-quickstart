@@ -1,3 +1,4 @@
+import "./reset.css";
 import "./index.css"; // Ensure this is at top of file so its css data is imported before all others
 import {
     // type ThemeContextTransaction,

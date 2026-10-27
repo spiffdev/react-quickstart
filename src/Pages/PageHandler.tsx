@@ -1,17 +1,21 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import useBundle from "../hooks/useBundle";
-import Text from "../components/text";
+import Typography from "../components/typography";
 import ProductCollectionSelector from "./ProductCollectionSelector";
-import { CollectionProduct, ProductCollection } from "@spiffcommerce/core";
+import { CollectionProduct, ProductCollection, ProductWorkflow, WorkflowExperience } from "@spiffcommerce/core";
 import ProductSelector from "./ProductSelector";
+import useClient from "../hooks/useClient";
+import WorkflowSelector from "./WorkflowSelector";
 
 type PageType = "collection" | "product" | "workflow" | "experience";
 
 const PageHandler: FunctionComponent<{}> = () => {
+    const client = useClient();
     const bundle = useBundle();
     const [page, setPage] = useState<PageType>("collection");
     const [collection, setCollection] = useState<ProductCollection | undefined>(undefined);
     const [product, setProduct] = useState<CollectionProduct | undefined>(undefined);
+    const [experience, setExperience] = useState<WorkflowExperience | undefined>(undefined);
 
     useEffect(() => {
         // Whenever the bundle changes (i.e. a new bundle is loaded) we need to reset
@@ -37,28 +41,45 @@ const PageHandler: FunctionComponent<{}> = () => {
         [bundle],
     );
 
-    const handleProductSelected = useCallback(async (collectionProduct: CollectionProduct) => {
-        setProduct(collectionProduct);
-        setPage("workflow");
-    }, []);
+    const handleWorkflowSelected = useCallback(
+        async (workflow: ProductWorkflow) => {
+            const [experience] = await client.getWorkflowExperiences([
+                {
+                    type: "integration",
+                    workflowId: workflow.getId(),
+                    integrationProductId: product!.getCurrentIntegration().id,
+                },
+            ]);
+            setExperience(experience);
+            setPage("experience");
+        },
+        [client, product],
+    );
+
+    const handleProductSelected = useCallback(
+        async (collectionProduct: CollectionProduct) => {
+            setProduct(collectionProduct);
+            const workflows = collectionProduct.getAllWorkflows();
+            if (workflows.length === 1) {
+                handleWorkflowSelected(workflows[0]);
+            } else {
+                setPage("workflow");
+            }
+        },
+        [handleWorkflowSelected],
+    );
 
     switch (page) {
         case "collection":
-            return (
-                <div>
-                    <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />
-                </div>
-            );
+            return <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />;
         case "product":
-            return (
-                <div>
-                    <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />
-                </div>
-            );
+            return <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />;
         case "workflow":
+            return <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />;
+        case "experience":
             return (
                 <div>
-                    <Text>{bundle.getProductCollection()?.getId()}</Text>
+                    <Typography>{bundle.getProductCollection()?.getId()}</Typography>
                 </div>
             );
     }
