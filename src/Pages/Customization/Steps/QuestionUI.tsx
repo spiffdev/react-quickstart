@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData, WorkflowExperience, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -33,32 +33,71 @@ const Option = styled.option`
 
 const QuestionUI: FunctionComponent<{
     step: Step<AnyStepData>;
+    workflowExperience: WorkflowExperience;
     onActivation?: () => void;
-}> = ({ step, onActivation }) => {
+}> = ({ step, workflowExperience, onActivation }) => {
     const [selectedValue, setSelectedValue] = useState("");
-    const [options] = useState<Array<{ id: string; name: string; enabled: boolean }>>([]);
+    const [variants, setVariants] = useState<Variant[]>([]);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        // TODO: Load variants/options from step when API is available
-    }, [step]);
+        const loadData = async () => {
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const allVariants = await stepHandle.getAllVariants();
+                setVariants(allVariants || []);
+
+                const currentVariant = stepHandle.getCurrentVariant();
+                if (currentVariant) {
+                    setSelectedValue(currentVariant.getId());
+                }
+            } catch (error) {
+                console.error("Error loading question variants:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [step.stepName, workflowExperience]);
 
     const handleChange = useCallback(
-        (event: React.ChangeEvent<HTMLSelectElement>) => {
+        async (event: React.ChangeEvent<HTMLSelectElement>) => {
             const value = event.target.value;
             setSelectedValue(value);
             onActivation?.();
-            // TODO: Implement variant selection logic
+
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) return;
+
+            const variant = variants.find((v) => v.getId() === value);
+            if (variant) {
+                try {
+                    await stepHandle.selectVariant(variant);
+                } catch (error) {
+                    console.error("Error selecting variant:", error);
+                }
+            }
         },
-        [onActivation],
+        [onActivation, step.stepName, variants, workflowExperience],
     );
+
+    if (loading) {
+        return <Container data-test-step-type="question">Loading...</Container>;
+    }
 
     return (
         <Container data-test-step-type="question">
             <Select value={selectedValue} onChange={handleChange}>
                 <option value="">Select an option...</option>
-                {options.map((option) => (
-                    <Option key={option.id} value={option.id} disabled={!option.enabled}>
-                        {option.name}
+                {variants.map((variant) => (
+                    <Option key={variant.getId()} value={variant.getId()} disabled={!variant.isEnabled()}>
+                        {variant.getName()}
                     </Option>
                 ))}
             </Select>

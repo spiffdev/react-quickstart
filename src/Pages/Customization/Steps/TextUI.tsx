@@ -1,5 +1,5 @@
-import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData } from "@spiffcommerce/core";
+import { FunctionComponent, useCallback, useEffect, useState, useRef } from "react";
+import { Step, AnyStepData, WorkflowExperience } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
 
@@ -7,36 +7,24 @@ const Container = styled.div`
     padding: 16px;
 `;
 
-const TextField = styled.input`
+const TextField = styled.input<{ error?: boolean }>`
     width: 100%;
     padding: 12px;
-    border: 1px solid #ccc;
+    border: 1px solid ${(props) => (props.error ? "#d32f2f" : "#ccc")};
     border-radius: 4px;
     font-size: 16px;
     box-sizing: border-box;
 
     &:focus {
         outline: none;
-        border-color: #007bff;
+        border-color: ${(props) => (props.error ? "#d32f2f" : "#007bff")};
     }
 `;
 
-const CheckboxContainer = styled.div`
-    margin-top: 12px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-`;
-
-const Checkbox = styled.input`
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-`;
-
-const Label = styled.label`
-    font-size: 14px;
-    cursor: pointer;
+const HelperText = styled(Typography)<{ error?: boolean }>`
+    margin-top: 4px;
+    font-size: 12px;
+    color: ${(props) => (props.error ? "#d32f2f" : "#666")};
 `;
 
 const ColorSection = styled.div`
@@ -68,34 +56,81 @@ const ColorInput = styled.input`
 
 const TextUI: FunctionComponent<{
     step: Step<AnyStepData>;
+    workflowExperience: WorkflowExperience;
     onActivation?: () => void;
-}> = ({ step, onActivation }) => {
+}> = ({ step, workflowExperience, onActivation }) => {
     const [text, setText] = useState("");
-    const [isCurved, setIsCurved] = useState(false);
     const [textColor, setTextColor] = useState("#000000");
+    const [helperText, setHelperText] = useState("");
+    const [error, setError] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        // TODO: Load text data from step when API is available
-    }, [step]);
+        const loadData = async () => {
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const currentText = (stepHandle as any).getText?.();
+                if (currentText !== undefined) {
+                    setText(currentText);
+                }
+
+                const fillColor = (stepHandle as any).getFillColor?.();
+                if (fillColor) {
+                    setTextColor(fillColor);
+                }
+
+                const charsRemaining = (stepHandle as any).getCharactersRemaining?.();
+                if (charsRemaining !== undefined) {
+                    setHelperText(`${charsRemaining} characters remaining`);
+                }
+            } catch (error) {
+                console.error("Error loading text data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [step.stepName, workflowExperience]);
 
     const handleTextChange = useCallback(
         (event: React.ChangeEvent<HTMLInputElement>) => {
             const value = event.target.value;
             setText(value);
             onActivation?.();
-            // TODO: Implement text update logic
-        },
-        [onActivation],
-    );
 
-    const handleCurvedChange = useCallback(
-        (event: React.ChangeEvent<HTMLInputElement>) => {
-            const checked = event.target.checked;
-            setIsCurved(checked);
-            onActivation?.();
-            // TODO: Implement curved text logic
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) return;
+
+            try {
+                const result = (stepHandle as any).setText?.(value);
+                if (result) {
+                    if (result.valid === false) {
+                        setError(true);
+                        setHelperText(result.message || "Invalid text");
+                    } else {
+                        setError(false);
+                        const charsRemaining = (stepHandle as any).getCharactersRemaining?.();
+                        if (charsRemaining !== undefined) {
+                            setHelperText(`${charsRemaining} characters remaining`);
+                        } else {
+                            setHelperText("");
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error("Error setting text:", error);
+                setError(true);
+                setHelperText("Error updating text");
+            }
         },
-        [onActivation],
+        [onActivation, step.stepName, workflowExperience],
     );
 
     const handleColorChange = useCallback(
@@ -103,24 +138,39 @@ const TextUI: FunctionComponent<{
             const color = event.target.value;
             setTextColor(color);
             onActivation?.();
-            // TODO: Implement color update logic
+
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) return;
+
+            try {
+                (stepHandle as any).setFillColor?.({ fill: color, variant: { color } });
+            } catch (error) {
+                console.error("Error setting text color:", error);
+            }
         },
-        [onActivation],
+        [onActivation, step.stepName, workflowExperience],
     );
+
+    if (loading) {
+        return <Container data-test-step-type="text">Loading...</Container>;
+    }
 
     return (
         <Container data-test-step-type="text">
             <TextField
+                ref={inputRef}
                 type="text"
                 value={text}
                 onChange={handleTextChange}
                 onFocus={onActivation}
                 placeholder="Enter text..."
+                error={error}
             />
-            <CheckboxContainer>
-                <Checkbox type="checkbox" id="curved-text" checked={isCurved} onChange={handleCurvedChange} />
-                <Label htmlFor="curved-text">Curved text</Label>
-            </CheckboxContainer>
+            {helperText && (
+                <HelperText variant="span" error={error}>
+                    {helperText}
+                </HelperText>
+            )}
             <ColorSection>
                 <ColorTitle variant="h3">Text Color</ColorTitle>
                 <ColorInput type="color" value={textColor} onChange={handleColorChange} />

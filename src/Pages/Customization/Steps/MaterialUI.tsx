@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData, WorkflowExperience, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -13,19 +13,20 @@ const VariantGrid = styled.div`
     width: 100%;
 `;
 
-const VariantCard = styled.div<{ selected?: boolean }>`
+const VariantCard = styled.div<{ selected?: boolean; disabled?: boolean }>`
     position: relative;
     aspect-ratio: 1;
     border: 2px solid ${(props) => (props.selected ? "#007bff" : "#e0e0e0")};
     border-radius: 8px;
-    cursor: pointer;
+    cursor: ${(props) => (props.disabled ? "not-allowed" : "pointer")};
     overflow: hidden;
     transition: all 0.2s;
+    opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 
     &:hover {
-        border-color: #007bff;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-color: ${(props) => (props.disabled ? "#e0e0e0" : "#007bff")};
+        transform: ${(props) => (props.disabled ? "none" : "translateY(-2px)")};
+        box-shadow: ${(props) => (props.disabled ? "none" : "0 4px 8px rgba(0, 0, 0, 0.1)")};
     }
 `;
 
@@ -47,31 +48,70 @@ const VariantName = styled.div`
     text-align: center;
 `;
 
-interface Variant {
-    id: string;
-    name: string;
-    thumbnail?: string;
-}
-
 const MaterialUI: FunctionComponent<{
     step: Step<AnyStepData>;
+    workflowExperience: WorkflowExperience;
     onActivation?: () => void;
-}> = ({ step, onActivation }) => {
-    const [variants] = useState<Variant[]>([]);
+}> = ({ step, workflowExperience, onActivation }) => {
+    const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [applying, setApplying] = useState(false);
 
     useEffect(() => {
-        // TODO: Load variants from step when API is available
-    }, [step]);
+        const loadData = async () => {
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const allVariants = await stepHandle.getAllVariants();
+                setVariants(allVariants || []);
+
+                const currentVariant = stepHandle.getCurrentVariant();
+                if (currentVariant) {
+                    setSelectedVariantId(currentVariant.getId());
+                }
+            } catch (error) {
+                console.error("Error loading material variants:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [step.stepName, workflowExperience]);
 
     const handleVariantClick = useCallback(
-        (variantId: string) => {
-            setSelectedVariantId(variantId);
+        async (variant: Variant) => {
+            if (applying || !variant.isEnabled()) return;
+
+            setSelectedVariantId(variant.getId());
+            setApplying(true);
             onActivation?.();
-            // TODO: Implement variant selection logic
+
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) {
+                setApplying(false);
+                return;
+            }
+
+            try {
+                await stepHandle.selectVariant(variant);
+            } catch (error) {
+                console.error("Error selecting material variant:", error);
+            } finally {
+                setApplying(false);
+            }
         },
-        [onActivation],
+        [applying, onActivation, step.stepName, workflowExperience],
     );
+
+    if (loading) {
+        return <Container data-test-step-type="material">Loading...</Container>;
+    }
 
     if (variants.length === 0) {
         return null;
@@ -82,12 +122,15 @@ const MaterialUI: FunctionComponent<{
             <VariantGrid>
                 {variants.map((variant) => (
                     <VariantCard
-                        key={variant.id}
-                        selected={selectedVariantId === variant.id}
-                        onClick={() => handleVariantClick(variant.id)}
+                        key={variant.getId()}
+                        selected={selectedVariantId === variant.getId()}
+                        disabled={applying || !variant.isEnabled()}
+                        onClick={() => handleVariantClick(variant)}
                     >
-                        {variant.thumbnail && <VariantImage src={variant.thumbnail} alt={variant.name} />}
-                        <VariantName>{variant.name}</VariantName>
+                        {variant.getThumbnail() && (
+                            <VariantImage src={variant.getThumbnail()} alt={variant.getName()} />
+                        )}
+                        <VariantName>{variant.getName()}</VariantName>
                     </VariantCard>
                 ))}
             </VariantGrid>

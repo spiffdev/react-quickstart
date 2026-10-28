@@ -18,7 +18,10 @@ import {
     FinishUI,
 } from "./Steps";
 
-const StepHandler: FunctionComponent<{ step: Step<AnyStepData> }> = ({ step }) => {
+const StepHandler: FunctionComponent<{
+    step: Step<AnyStepData>;
+    workflowExperience: WorkflowExperience;
+}> = ({ step, workflowExperience }) => {
     const renderStepComponent = () => {
         switch (step.type) {
             case StepType.Information:
@@ -26,24 +29,24 @@ const StepHandler: FunctionComponent<{ step: Step<AnyStepData> }> = ({ step }) =
             case StepType.Module:
                 return <ModuleUI step={step} />;
             case StepType.Question:
-                return <QuestionUI step={step} />;
+                return <QuestionUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Material:
-                return <MaterialUI step={step} />;
+                return <MaterialUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Model:
-                return <ModelUI step={step} />;
+                return <ModelUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Picture:
-                return <PictureUI step={step} />;
+                return <PictureUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Illustration:
-                return <IllustrationUI step={step} />;
+                return <IllustrationUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Shape:
-                return <ShapeUI step={step} />;
+                return <ShapeUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Text:
-                return <TextUI step={step} />;
+                return <TextUI step={step} workflowExperience={workflowExperience} />;
             case StepType.DigitalContent:
                 return <DigitalContentUI step={step} />;
             case StepType.Frame:
             case StepType.Photo: // Photo is deprecated, use Frame
-                return <FrameUI step={step} />;
+                return <FrameUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Finish:
                 return <FinishUI step={step} />;
             default:
@@ -87,7 +90,7 @@ const Customization: FunctionComponent<{
                 <Card key={scene.name}>
                     <Typography variant="h2">{scene.title}</Typography>
                     {scene.renderableSteps.map((step) => (
-                        <StepHandler key={step.stepName} step={step} />
+                        <StepHandler key={step.stepName} step={step} workflowExperience={workflowExperience} />
                     ))}
                 </Card>
             ))}
