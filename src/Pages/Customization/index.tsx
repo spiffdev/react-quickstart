@@ -20,6 +20,7 @@ import {
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 import LoadingOverlay from "../components/LoadingOverlay";
+import ThreeDPreview from "./components/ThreeDPreview";
 import {
     InformationUI,
     ModuleUI,
@@ -94,13 +95,16 @@ const Customization: FunctionComponent<{
 
     return (
         <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "row" }}>
-            {/* TODO: 3D preview */}
+            <div style={{ flex: "0 0 70%", minWidth: 0, height: "100%" }}>
+                <ThreeDPreview workflowExperience={workflowExperience} />
+            </div>
             <div
                 style={{
                     position: "relative",
                     height: "100%",
                     overflow: "auto",
-                    flexGrow: "1",
+                    flex: "1 1 0",
+                    minWidth: 0,
                     gap: "5px",
                     display: "flex",
                     flexDirection: "column",

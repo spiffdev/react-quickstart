@@ -73,13 +73,15 @@ const PageHandler: FunctionComponent<{}> = () => {
     return (
         <div style={{ height: "100%", overflow: "hidden", position: "relative" }}>
             {page === "collection" && <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />}
-            {page === "product" && <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />}
+            {page === "product" && (
+                <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />
+            )}
             {page === "workflow" && <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />}
             {page === "experience" && (
                 <Customization
                     workflowExperience={experience!}
                     onNext={() => {
-                        /* TODO: close */
+                        /* TODO: finalize the bundle and then call exit, just like Beeline */
                     }}
                 />
             )}
