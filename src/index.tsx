@@ -1,3 +1,4 @@
+import "./reset.css";
 import "./index.css"; // Ensure this is at top of file so its css data is imported before all others
 import {
     // type ThemeContextTransaction,
@@ -6,10 +7,17 @@ import {
     type ThemeContextBundleOptions,
     themeInstallConfigurationGraphQlToResource,
     ThemeInstallConfigurationResource,
+    ThemeContextBundleOptionsNew,
 } from "@spiffcommerce/theme-bridge";
 import { createRoot } from "react-dom/client";
-import App from "./app";
-import { getIntegration, getOverrideThemeConfiguration, spiffCoreConfiguration } from "@spiffcommerce/core";
+import App from "./App";
+import {
+    ActivationData,
+    getActivation,
+    getIntegration,
+    getOverrideThemeConfiguration,
+    spiffCoreConfiguration,
+} from "@spiffcommerce/core";
 
 const getQueryParams = () => {
     const hash = window.location.hash;
@@ -66,48 +74,53 @@ const loadDevConfiguration = async (themeBridge: any) => {
             : await loadFromSpiffCommerce(),
     };
     let devOptions: SpiffDevOptions;
-    const contextType = import.meta.env.VITE_CONTEXT_TYPE || "transaction";
-    if (contextType === "transaction") {
-        devOptions = {
-            ...baseOptions,
-            currency: "AUD",
-            queryParams,
-            type: "transaction",
-            workflowOptions: {
-                ...(import.meta.env.VITE_TRANSACTION_ID
-                    ? {
-                          type: "transaction",
-                          transactionId: import.meta.env.VITE_TRANSACTION_ID,
-                      }
-                    : {
-                          workflowId: import.meta.env.VITE_WORKFLOW_ID || "",
-                          integrationProductId: import.meta.env.VITE_INTEGRATION_PRODUCT_ID || "",
-                          type: "integration",
-                      }),
-            },
+    const bundleId = import.meta.env.VITE_BUNDLE_ID;
+    const activationId = import.meta.env.VITE_ACTIVATION_ID;
+    let activation: ActivationData | undefined;
+    let bundleOptions: ThemeContextBundleOptions;
+    if (bundleId) {
+        bundleOptions = {
+            type: "existing",
+            bundleId,
         };
-    } else {
-        const bundleId = import.meta.env.VITE_BUNDLE_ID;
-        let bundleOptions: ThemeContextBundleOptions;
-        if (bundleId) {
+    } else if (activationId) {
+        activation = await getActivation(activationId);
+        if (!activation) {
+            throw new Error(`Failed to find activation ${activationId}`);
+        }
+        if (activation.singleProductMode) {
+            const productCollectionId =
+                activation.activationProductCollections?.[0]?.productCollection.id ||
+                import.meta.env.VITE_PRODUCT_COLLECTION_ID;
+
+            if (!productCollectionId) {
+                throw new Error(
+                    `Unable to resolve a product collection for Activation "${activation.name}" (${activation.id}) which is in Single Product Mode.`,
+                );
+            }
+
             bundleOptions = {
-                type: "existing",
-                bundleId,
-            };
+                type: "new",
+                productCollectionId,
+                singleProductMode: activation.singleProductMode,
+            } as ThemeContextBundleOptionsNew;
         } else {
             bundleOptions = {
                 type: "new",
-                productCollectionId: import.meta.env.VITE_PRODUCT_COLLECTION_ID,
-            };
+                singleProductMode: false,
+            } as ThemeContextBundleOptionsNew;
         }
-        devOptions = {
-            ...baseOptions,
-            currency: "AUD",
-            queryParams,
-            type: "bundle",
-            bundleOptions,
-        };
+    } else {
+        throw new Error("You must provide either a VITE_BUNDLE_ID or VITE_ACTIVATION_ID");
     }
+    devOptions = {
+        ...baseOptions,
+        currency: "AUD",
+        queryParams,
+        type: "bundle",
+        bundleOptions,
+        activation,
+    };
     themeBridge.setSpiffDevOptions("app", devOptions);
 };
 

@@ -1,6 +1,7 @@
-import { defineConfig, splitVendorChunkPlugin } from "vite";
+import { defineConfig } from "vite";
 import svgr from "vite-plugin-svgr";
-import { spiffThemePlugin } from "@spiffcommerce/theme-bridge";
+// @ts-expect-error - spiffThemePlugin export may not be in type definitions yet
+import { spiffThemePlugin } from "@spiffcommerce/theme-bridge/plugin";
 import { configurationSchema } from "./src/configurationSchema";
 import { existsSync, readFileSync } from "fs";
 
@@ -14,11 +15,7 @@ export default defineConfig((env) => {
             __LOCAL_DEV_CONFIGURATION__: themeConfiguration,
             "globalThis.__DEV__": JSON.stringify(false),
         },
-        plugins: [
-            svgr(),
-            splitVendorChunkPlugin(),
-            spiffThemePlugin({ configurationSchema, includePreloadChunks: false }),
-        ],
+        plugins: [svgr(), spiffThemePlugin({ configurationSchema, includePreloadChunks: false })],
         build: {
             emptyOutDir: true,
             rollupOptions: {
