@@ -5,6 +5,8 @@ import Typography from "../../../components/typography";
 
 const Container = styled.div`
     padding: 16px;
+    box-sizing: border-box;
+    width: 100%;
 `;
 
 const TextField = styled.input<{ $error?: boolean }>`
@@ -29,30 +31,56 @@ const HelperText = styled(Typography)<{ $error?: boolean }>`
 
 const ColorSection = styled.div`
     margin-top: 16px;
+    padding: 16px;
+    background: #f5f5f5;
+    border-radius: 8px;
 `;
 
 const ColorTitle = styled(Typography)`
-    margin: 0 0 8px 0;
+    margin: 0 0 12px 0;
     font-size: 14px;
     font-weight: 600;
 `;
 
-const ColorInput = styled.input`
+const ColorGrid = styled.div`
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+    gap: 12px;
     width: 100%;
-    height: 48px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
+    margin-bottom: 16px;
+`;
+
+const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
+    aspect-ratio: 1;
+    background-color: ${(props) => props.$color};
+    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
+    border-radius: 8px;
     cursor: pointer;
+    transition: all 0.2s;
 
-    &::-webkit-color-swatch-wrapper {
-        padding: 0;
-    }
-
-    &::-webkit-color-swatch {
-        border: none;
-        border-radius: 4px;
+    &:hover {
+        border-color: #007bff;
+        transform: scale(1.05);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
 `;
+
+const StrokeSection = styled.div`
+    margin-top: 16px;
+`;
+
+const StrokeTitle = styled(Typography)`
+    margin: 0 0 8px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #616161;
+`;
+
+interface ColorOptionDisplay {
+    fill?: string;
+    stroke?: string;
+    variant: { id?: string; color?: string };
+}
 
 const TextUI: FunctionComponent<{
     step: Step<AnyStepData>;
@@ -60,10 +88,13 @@ const TextUI: FunctionComponent<{
     onActivation?: () => void;
 }> = ({ step, workflowExperience, onActivation }) => {
     const [text, setText] = useState("");
-    const [textColor, setTextColor] = useState("#000000");
     const [helperText, setHelperText] = useState("");
     const [error, setError] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [fillColors, setFillColors] = useState<ColorOptionDisplay[]>([]);
+    const [strokeColors, setStrokeColors] = useState<ColorOptionDisplay[]>([]);
+    const [selectedFillColorId, setSelectedFillColorId] = useState<string | null>(null);
+    const [selectedStrokeColorId, setSelectedStrokeColorId] = useState<string | null>(null);
     const inputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -80,14 +111,49 @@ const TextUI: FunctionComponent<{
                     setText(currentText);
                 }
 
-                const fillColor = (stepHandle as any).getFillColor?.();
-                if (fillColor) {
-                    setTextColor(fillColor);
-                }
-
                 const charsRemaining = (stepHandle as any).getCharactersRemaining?.();
                 if (charsRemaining !== undefined) {
                     setHelperText(`${charsRemaining} characters remaining`);
+                }
+
+                // Load available fill colors
+                const availableFillColors = await (stepHandle as any).getAvailableFillColors?.();
+                if (availableFillColors && availableFillColors.length > 0) {
+                    setFillColors(availableFillColors);
+
+                    // Get current fill color
+                    const currentFillColor = (stepHandle as any).getFillColor?.();
+                    if (currentFillColor) {
+                        const foundColor = availableFillColors.find(
+                            (c: ColorOptionDisplay) =>
+                                c.fill === currentFillColor ||
+                                c.variant?.color === currentFillColor ||
+                                c.stroke === currentFillColor,
+                        );
+                        if (foundColor && foundColor.variant?.id) {
+                            setSelectedFillColorId(foundColor.variant.id);
+                        }
+                    }
+                }
+
+                // Load available stroke colors
+                const availableStrokeColors = await (stepHandle as any).getAvailableStrokeColors?.();
+                if (availableStrokeColors && availableStrokeColors.length > 0) {
+                    setStrokeColors(availableStrokeColors);
+
+                    // Get current stroke color
+                    const currentStrokeColor = (stepHandle as any).getStrokeColor?.();
+                    if (currentStrokeColor) {
+                        const foundColor = availableStrokeColors.find(
+                            (c: ColorOptionDisplay) =>
+                                c.stroke === currentStrokeColor ||
+                                c.variant?.color === currentStrokeColor ||
+                                c.fill === currentStrokeColor,
+                        );
+                        if (foundColor && foundColor.variant?.id) {
+                            setSelectedStrokeColorId(foundColor.variant.id);
+                        }
+                    }
                 }
             } catch (error) {
                 console.error("Error loading text data:", error);
@@ -133,19 +199,35 @@ const TextUI: FunctionComponent<{
         [onActivation, step.stepName, workflowExperience],
     );
 
-    const handleColorChange = useCallback(
-        (event: React.ChangeEvent<HTMLInputElement>) => {
-            const color = event.target.value;
-            setTextColor(color);
+    const handleFillColorClick = useCallback(
+        async (colorOption: ColorOptionDisplay) => {
+            setSelectedFillColorId(colorOption.variant.id || null);
             onActivation?.();
 
             const stepHandle = workflowExperience.getStepById(step.stepName);
             if (!stepHandle) return;
 
             try {
-                (stepHandle as any).setFillColor?.({ fill: color, variant: { color } });
+                await (stepHandle as any).setFillColor?.(colorOption);
             } catch (error) {
-                console.error("Error setting text color:", error);
+                console.error("Error setting fill color:", error);
+            }
+        },
+        [onActivation, step.stepName, workflowExperience],
+    );
+
+    const handleStrokeColorClick = useCallback(
+        async (colorOption: ColorOptionDisplay) => {
+            setSelectedStrokeColorId(colorOption.variant.id || null);
+            onActivation?.();
+
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) return;
+
+            try {
+                await (stepHandle as any).setStrokeColor?.(colorOption);
+            } catch (error) {
+                console.error("Error setting stroke color:", error);
             }
         },
         [onActivation, step.stepName, workflowExperience],
@@ -154,6 +236,9 @@ const TextUI: FunctionComponent<{
     if (loading) {
         return <Container data-test-step-type="text">Loading...</Container>;
     }
+
+    const hasFillColors = fillColors.length > 0;
+    const hasStrokeColors = strokeColors.length > 0;
 
     return (
         <Container data-test-step-type="text">
@@ -171,10 +256,36 @@ const TextUI: FunctionComponent<{
                     {helperText}
                 </HelperText>
             )}
-            <ColorSection>
-                <ColorTitle variant="h3">Text Color</ColorTitle>
-                <ColorInput type="color" value={textColor} onChange={handleColorChange} />
-            </ColorSection>
+            {hasFillColors && (
+                <ColorSection>
+                    <ColorTitle variant="h3">Text Color</ColorTitle>
+                    <ColorGrid>
+                        {fillColors.map((color, index) => (
+                            <ColorSwatch
+                                key={color.variant.id || index}
+                                $color={color.fill || color.stroke || "#000000"}
+                                $selected={selectedFillColorId === color.variant.id}
+                                onClick={() => handleFillColorClick(color)}
+                            />
+                        ))}
+                    </ColorGrid>
+                </ColorSection>
+            )}
+            {hasStrokeColors && (
+                <StrokeSection>
+                    <StrokeTitle variant="h3">Text Stroke</StrokeTitle>
+                    <ColorGrid>
+                        {strokeColors.map((color, index) => (
+                            <ColorSwatch
+                                key={color.variant.id || index}
+                                $color={color.stroke || color.fill || "#000000"}
+                                $selected={selectedStrokeColorId === color.variant.id}
+                                onClick={() => handleStrokeColorClick(color)}
+                            />
+                        ))}
+                    </ColorGrid>
+                </StrokeSection>
+            )}
         </Container>
     );
 };
