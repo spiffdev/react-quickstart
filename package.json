@@ -16,6 +16,7 @@
         "@spiffcommerce/theme-bridge": "1.28.0",
         "react": "^19.3.1",
         "react-dom": "^19.3.1",
+        "react-markdown": "^10.1.0",
         "styled-components": "^6.6.0"
     },
     "devDependencies": {

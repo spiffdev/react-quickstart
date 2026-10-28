@@ -1,5 +1,22 @@
 import { FunctionComponent, useEffect, useState } from "react";
-import { AnyStepData, Step, StepType, WorkflowExperience, WorkflowScene } from "@spiffcommerce/core";
+import {
+    AnyStepData,
+    DigitalContentStepHandle,
+    FrameStepHandle,
+    IllustrationStepHandle,
+    InformationStepHandle,
+    MaterialStepHandle,
+    ModelStepHandle,
+    ModuleStepHandle,
+    PictureStepHandle,
+    QuestionStepHandle,
+    ShapeStepHandle,
+    Step,
+    StepType,
+    TextStepHandle,
+    WorkflowExperience,
+    WorkflowScene,
+} from "@spiffcommerce/core";
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 import LoadingOverlay from "../components/LoadingOverlay";
@@ -23,39 +40,29 @@ const StepHandler: FunctionComponent<{
     workflowExperience: WorkflowExperience;
 }> = ({ step, workflowExperience }) => {
     const renderStepComponent = () => {
-        switch (step.type) {
-            case StepType.Information:
-                return <InformationUI step={step} />;
-            case StepType.Module:
-                return <ModuleUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Question:
-                return <QuestionUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Material:
-                return <MaterialUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Model:
-                return <ModelUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Picture:
-                return <PictureUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Illustration:
-                return <IllustrationUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Shape:
-                return <ShapeUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Text:
-                return <TextUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.DigitalContent:
-                return <DigitalContentUI step={step} />;
-            case StepType.Frame:
-            case StepType.Photo: // Photo is deprecated, use Frame
-                return <FrameUI step={step} workflowExperience={workflowExperience} />;
-            case StepType.Finish:
-                return <FinishUI step={step} />;
-            default:
-                return (
-                    <div>
-                        <Typography>Unsupported step type: {step.type}</Typography>
-                    </div>
-                );
+        // The finish step has no handle.
+        if (step.type === StepType.Finish) {
+            return <FinishUI />;
         }
+
+        const handle = workflowExperience.getStepById(step.stepName);
+        if (handle instanceof InformationStepHandle) return <InformationUI step={handle} />;
+        if (handle instanceof ModuleStepHandle) return <ModuleUI step={handle} />;
+        if (handle instanceof QuestionStepHandle) return <QuestionUI step={handle} />;
+        if (handle instanceof MaterialStepHandle) return <MaterialUI step={handle} />;
+        if (handle instanceof ModelStepHandle) return <ModelUI step={handle} />;
+        if (handle instanceof PictureStepHandle) return <PictureUI step={handle} />;
+        if (handle instanceof IllustrationStepHandle) return <IllustrationUI step={handle} />;
+        if (handle instanceof ShapeStepHandle) return <ShapeUI step={handle} />;
+        if (handle instanceof TextStepHandle) return <TextUI step={handle} />;
+        if (handle instanceof DigitalContentStepHandle) return <DigitalContentUI step={handle} />;
+        if (handle instanceof FrameStepHandle) return <FrameUI step={handle} />;
+
+        return (
+            <div>
+                <Typography>Unsupported step type: {step.type}</Typography>
+            </div>
+        );
     };
 
     const isFinishStep = step.type === StepType.Finish;

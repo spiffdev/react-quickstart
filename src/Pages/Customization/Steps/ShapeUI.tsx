@@ -1,9 +1,11 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData, WorkflowExperience, Variant } from "@spiffcommerce/core";
+import { ShapeStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
     padding: 16px;
+    box-sizing: border-box;
+    width: 100%;
 `;
 
 const ColorGrid = styled.div`
@@ -52,78 +54,42 @@ const ColorInput = styled.input`
     }
 `;
 
-interface ColorOptionDisplay {
-    fill?: string;
-    stroke?: string;
-    variant: { id?: string; color?: string };
-}
+type ShapeColor = Awaited<ReturnType<ShapeStepHandle["getColors"]>>[number];
+
+const isCustomVariant = (variant: Variant | undefined) => variant?.getColor()?.toLowerCase() === "#custom";
 
 const ShapeUI: FunctionComponent<{
-    step: Step<AnyStepData>;
-    workflowExperience: WorkflowExperience;
+    step: ShapeStepHandle;
     onActivation?: () => void;
-}> = ({ step, workflowExperience, onActivation }) => {
-    const [colors, setColors] = useState<ColorOptionDisplay[]>([]);
-    const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
-    const [customColor, setCustomColor] = useState("#000000");
+}> = ({ step, onActivation }) => {
+    const [colors, setColors] = useState<ShapeColor[]>([]);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
+        step.getCurrentVariant()?.getId(),
+    );
+    const [isCustom, setIsCustom] = useState(() => isCustomVariant(step.getCurrentVariant()));
+    const [customColor, setCustomColor] = useState(() => step.getCustomColor());
     const [loading, setLoading] = useState(true);
-    const [isCustom, setIsCustom] = useState(false);
 
     useEffect(() => {
-        const loadData = async () => {
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const availableColors = await (stepHandle as any).getColors?.();
-                if (availableColors) {
-                    setColors(availableColors);
-                }
-
-                const currentVariant = stepHandle.getCurrentVariant();
-                if (currentVariant) {
-                    setSelectedColorId(currentVariant.getId());
-                    const color = currentVariant.getColor();
-                    if (color?.toLowerCase() === "#custom") {
-                        setIsCustom(true);
-                        const customColorValue = (stepHandle as any).getCustomColor?.();
-                        if (customColorValue) {
-                            setCustomColor(customColorValue);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Error loading shape colors:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [step.stepName, workflowExperience]);
+        step.getColors()
+            .then(setColors)
+            .catch((error) => console.error("Error loading shape colors:", error))
+            .finally(() => setLoading(false));
+    }, [step]);
 
     const handleColorClick = useCallback(
-        async (colorOption: ColorOptionDisplay) => {
-            setSelectedColorId(colorOption.variant.id || null);
+        async (colorOption: ShapeColor) => {
+            setSelectedVariantId(colorOption.variant.id);
             onActivation?.();
 
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle || !colorOption.variant) return;
-
             try {
-                if (colorOption.variant.id || colorOption.variant.color) {
-                    await stepHandle.selectVariant(new Variant(colorOption.variant as any));
-                    const color = colorOption.variant.color;
-                    setIsCustom(color?.toLowerCase() === "#custom");
-                }
+                await step.selectVariant(new Variant(colorOption.variant));
+                setIsCustom(isCustomVariant(step.getCurrentVariant()));
             } catch (error) {
                 console.error("Error selecting color:", error);
             }
         },
-        [onActivation, step.stepName, workflowExperience],
+        [onActivation, step],
     );
 
     const handleCustomColorChange = useCallback(
@@ -131,17 +97,9 @@ const ShapeUI: FunctionComponent<{
             const color = event.target.value;
             setCustomColor(color);
             onActivation?.();
-
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) return;
-
-            try {
-                (stepHandle as any).setCustomColor?.(color);
-            } catch (error) {
-                console.error("Error setting custom color:", error);
-            }
+            step.setCustomColor(color);
         },
-        [onActivation, step.stepName, workflowExperience],
+        [onActivation, step],
     );
 
     if (loading) {
@@ -159,7 +117,7 @@ const ShapeUI: FunctionComponent<{
                     <ColorSwatch
                         key={color.variant.id || index}
                         $color={color.fill || color.stroke || "#cccccc"}
-                        $selected={selectedColorId === color.variant.id}
+                        $selected={selectedVariantId === color.variant.id}
                         onClick={() => handleColorClick(color)}
                     />
                 ))}

@@ -1,5 +1,4 @@
 import { FunctionComponent, useState } from "react";
-import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
@@ -73,7 +72,6 @@ const ButtonGroup = styled.div`
 `;
 
 const FinishUI: FunctionComponent<{
-    step: Step<AnyStepData>;
     onFinished?: () => void;
 }> = ({ onFinished }) => {
     const [isConfirmed, setIsConfirmed] = useState(false);

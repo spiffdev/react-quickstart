@@ -1,5 +1,6 @@
 import { FunctionComponent } from "react";
-import { Step, AnyStepData, InformationStepData } from "@spiffcommerce/core";
+import ReactMarkdown from "react-markdown";
+import { InformationStepHandle } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -12,12 +13,11 @@ const Container = styled.div`
 `;
 
 const InformationUI: FunctionComponent<{
-    step: Step<AnyStepData>;
+    step: InformationStepHandle;
 }> = ({ step }) => {
-    const data = step.data as InformationStepData;
     return (
         <Container data-test-step-type="information">
-            <div dangerouslySetInnerHTML={{ __html: data.content || "" }} />
+            <ReactMarkdown>{step.getContent()}</ReactMarkdown>
         </Container>
     );
 };

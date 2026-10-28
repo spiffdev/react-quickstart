@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useState } from "react";
-import { Step, AnyStepData } from "@spiffcommerce/core";
+import { DigitalContentStepHandle } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 
@@ -64,12 +64,12 @@ const HiddenInput = styled.input`
 `;
 
 const DigitalContentUI: FunctionComponent<{
-    step: Step<AnyStepData>;
+    step: DigitalContentStepHandle;
     onActivation?: () => void;
-}> = ({ onActivation }) => {
+}> = ({ step, onActivation }) => {
     const [uploading, setUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
-    const [previewUrl, setPreviewUrl] = useState("");
+    const [previewUrl, setPreviewUrl] = useState(() => step.getPreviewURL());
     const [error, setError] = useState("");
     const fileInputRef = useCallback((node: HTMLInputElement | null) => {
         if (node) {

@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData, WorkflowExperience, Variant } from "@spiffcommerce/core";
+import { ColorDefinition, IllustrationStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
 
@@ -65,6 +65,12 @@ const ColorPickerTitle = styled(Typography)`
     font-weight: 600;
 `;
 
+const ColorRowTitle = styled(Typography)`
+    margin: 8px 0;
+    font-size: 12px;
+    color: #616161;
+`;
+
 const ColorGrid = styled.div`
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
@@ -86,55 +92,40 @@ const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     }
 `;
 
-interface ColorOptionDisplay {
-    fill?: string;
-    stroke?: string;
-    variant: { id?: string; color?: string };
-}
+type AvailableColor = NonNullable<Awaited<ReturnType<IllustrationStepHandle["getAvailableColors"]>>>[number];
+
+const availableColorValue = (color: AvailableColor) => color.fill ?? color.stroke ?? color.variant.color;
 
 const IllustrationUI: FunctionComponent<{
-    step: Step<AnyStepData>;
-    workflowExperience: WorkflowExperience;
+    step: IllustrationStepHandle;
     onActivation?: () => void;
-}> = ({ step, workflowExperience, onActivation }) => {
+}> = ({ step, onActivation }) => {
     const [variants, setVariants] = useState<Variant[]>([]);
-    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
-    const [colors, setColors] = useState<ColorOptionDisplay[]>([]);
-    const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
+        step.getCurrentVariant()?.getId(),
+    );
+    const [availableColors, setAvailableColors] = useState<AvailableColor[]>([]);
+    const [existingColors, setExistingColors] = useState<{ [key: string]: ColorDefinition } | undefined>(() =>
+        step.getColors(),
+    );
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
         const loadData = async () => {
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) {
-                setLoading(false);
-                return;
-            }
-
             try {
-                const allVariants = await stepHandle.getAllVariants();
+                const [allVariants, colors] = await Promise.all([step.getAllVariants(), step.getAvailableColors()]);
                 setVariants(allVariants || []);
-
-                const currentVariant = stepHandle.getCurrentVariant();
-                if (currentVariant) {
-                    setSelectedVariantId(currentVariant.getId());
-                }
-
-                // Try to load available colors if the step supports it
-                const availableColors = await (stepHandle as any).getAvailableColors?.();
-                if (availableColors && availableColors.length > 0) {
-                    setColors(availableColors);
-                }
+                setAvailableColors(colors || []);
             } catch (error) {
-                console.error("Error loading illustration data:", error);
+                console.error("Error loading illustration step:", error);
             } finally {
                 setLoading(false);
             }
         };
 
         loadData();
-    }, [step.stepName, workflowExperience]);
+    }, [step]);
 
     const handleVariantClick = useCallback(
         async (variant: Variant) => {
@@ -144,61 +135,48 @@ const IllustrationUI: FunctionComponent<{
             setUpdating(true);
             onActivation?.();
 
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) {
-                setUpdating(false);
-                return;
-            }
-
             try {
-                await stepHandle.selectVariant(variant);
+                await step.selectVariant(variant);
+                setExistingColors(step.getColors());
             } catch (error) {
                 console.error("Error selecting illustration variant:", error);
             } finally {
                 setUpdating(false);
             }
         },
-        [updating, onActivation, step.stepName, workflowExperience],
+        [updating, onActivation, step],
     );
 
     const handleColorClick = useCallback(
-        async (colorOption: ColorOptionDisplay, colorClass: string) => {
-            if (updating) return;
+        async (key: string, color: AvailableColor) => {
+            const value = availableColorValue(color);
+            if (updating || !value) return;
 
-            setSelectedColorId(colorOption.variant.id || null);
             setUpdating(true);
             onActivation?.();
 
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) {
-                setUpdating(false);
-                return;
-            }
-
             try {
-                const color = colorOption.fill || colorOption.stroke;
-                if (color) {
-                    await (stepHandle as any).setColor?.(colorClass, color);
-                }
+                await step.setColor(key, value, color.pmsValue);
+                setExistingColors(step.getColors());
             } catch (error) {
                 console.error("Error setting illustration color:", error);
             } finally {
                 setUpdating(false);
             }
         },
-        [updating, onActivation, step.stepName, workflowExperience],
+        [updating, onActivation, step],
     );
 
     if (loading) {
         return <Container data-test-step-type="illustration">Loading...</Container>;
     }
 
-    const hasMultipleVariants = variants.length > 1;
-    const hasColorPicker = colors.length > 0;
+    const colorKeys = Object.keys(existingColors ?? {});
+    const showColorPicker = step.isColorPickerEnabled() && colorKeys.length > 0 && availableColors.length > 0;
 
     return (
         <Container data-test-step-type="illustration">
-            {hasMultipleVariants && (
+            {variants.length > 1 && (
                 <VariantGrid>
                     {variants.map((variant) => (
                         <VariantCard
@@ -215,19 +193,31 @@ const IllustrationUI: FunctionComponent<{
                     ))}
                 </VariantGrid>
             )}
-            {hasColorPicker && (
+            {showColorPicker && (
                 <ColorPickerSection>
                     <ColorPickerTitle variant="h3">Color Options</ColorPickerTitle>
-                    <ColorGrid>
-                        {colors.map((color, index) => (
-                            <ColorSwatch
-                                key={color.variant.id || index}
-                                $color={color.fill || color.stroke || "#cccccc"}
-                                $selected={selectedColorId === color.variant.id}
-                                onClick={() => handleColorClick(color, "fill")}
-                            />
-                        ))}
-                    </ColorGrid>
+                    {colorKeys.map((key, index) => (
+                        <div key={key}>
+                            {colorKeys.length > 1 && <ColorRowTitle variant="p">Color {index + 1}</ColorRowTitle>}
+                            <ColorGrid>
+                                {availableColors.map((color, colorIndex) => {
+                                    const value = availableColorValue(color);
+                                    return (
+                                        <ColorSwatch
+                                            key={color.variant.id || colorIndex}
+                                            $color={value || "#cccccc"}
+                                            $selected={
+                                                !!value &&
+                                                existingColors?.[key]?.browserValue.toLowerCase() ===
+                                                    value.toLowerCase()
+                                            }
+                                            onClick={() => handleColorClick(key, color)}
+                                        />
+                                    );
+                                })}
+                            </ColorGrid>
+                        </div>
+                    ))}
                 </ColorPickerSection>
             )}
         </Container>

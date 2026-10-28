@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData, WorkflowExperience } from "@spiffcommerce/core";
+import { FrameStepHandle } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
@@ -86,8 +86,7 @@ interface Variant {
 }
 
 const FrameUI: FunctionComponent<{
-    step: Step<AnyStepData>;
-    workflowExperience: WorkflowExperience;
+    step: FrameStepHandle;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
     const [variants] = useState<Variant[]>([]);

@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData, WorkflowExperience, Variant } from "@spiffcommerce/core";
+import { PictureStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -51,40 +51,22 @@ const VariantName = styled.div`
 `;
 
 const PictureUI: FunctionComponent<{
-    step: Step<AnyStepData>;
-    workflowExperience: WorkflowExperience;
+    step: PictureStepHandle;
     onActivation?: () => void;
-}> = ({ step, workflowExperience, onActivation }) => {
+}> = ({ step, onActivation }) => {
     const [variants, setVariants] = useState<Variant[]>([]);
-    const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
+        step.getCurrentVariant()?.getId(),
+    );
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
-        const loadData = async () => {
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const allVariants = await stepHandle.getAllVariants();
-                setVariants(allVariants || []);
-
-                const currentVariant = stepHandle.getCurrentVariant();
-                if (currentVariant) {
-                    setSelectedVariantId(currentVariant.getId());
-                }
-            } catch (error) {
-                console.error("Error loading picture variants:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [step.stepName, workflowExperience]);
+        step.getAllVariants()
+            .then((allVariants) => setVariants(allVariants || []))
+            .catch((error) => console.error("Error loading picture variants:", error))
+            .finally(() => setLoading(false));
+    }, [step]);
 
     const handleVariantClick = useCallback(
         async (variant: Variant) => {
@@ -94,21 +76,15 @@ const PictureUI: FunctionComponent<{
             setUpdating(true);
             onActivation?.();
 
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) {
-                setUpdating(false);
-                return;
-            }
-
             try {
-                await stepHandle.selectVariant(variant);
+                await step.selectVariant(variant);
             } catch (error) {
                 console.error("Error selecting picture variant:", error);
             } finally {
                 setUpdating(false);
             }
         },
-        [updating, onActivation, step.stepName, workflowExperience],
+        [updating, onActivation, step],
     );
 
     if (loading) {

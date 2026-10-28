@@ -1,5 +1,5 @@
-import { FunctionComponent, useCallback, useEffect, useState, useRef } from "react";
-import { Step, AnyStepData, WorkflowExperience } from "@spiffcommerce/core";
+import { FunctionComponent, useCallback, useEffect, useState } from "react";
+import { ColorOption, TextChangeResult, TextStepHandle } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
 
@@ -76,94 +76,43 @@ const StrokeTitle = styled(Typography)`
     color: #616161;
 `;
 
-interface ColorOptionDisplay {
-    fill?: string;
-    stroke?: string;
-    variant: { id?: string; color?: string };
-}
+const fillValue = (color: ColorOption) => color.fill ?? color.variant?.color ?? color.stroke;
+const strokeValue = (color: ColorOption) => color.stroke ?? color.variant?.color ?? color.fill;
+
+const errorMessage = (result: TextChangeResult) => {
+    const errors = result.errorData;
+    if (!errors) return undefined;
+    if (errors.blockedProfanity) return "Text contains blocked words";
+    if (errors.unsupportedCharacters) return "Text contains unsupported characters";
+    if (errors.illegalMultipleLines) return "New lines are not supported";
+    if (errors.doesNotFit) return "Text does not fit";
+    if (errors.hitCharacterLimit) return "Character limit reached";
+    return undefined;
+};
+
+const remainingText = (remaining: number | undefined) =>
+    remaining !== undefined ? `${remaining} characters remaining` : "";
 
 const TextUI: FunctionComponent<{
-    step: Step<AnyStepData>;
-    workflowExperience: WorkflowExperience;
+    step: TextStepHandle;
     onActivation?: () => void;
-}> = ({ step, workflowExperience, onActivation }) => {
-    const [text, setText] = useState("");
-    const [helperText, setHelperText] = useState("");
+}> = ({ step, onActivation }) => {
+    const [text, setText] = useState(() => step.getText());
+    const [helperText, setHelperText] = useState(() => remainingText(step.getCharactersRemaining()));
     const [error, setError] = useState(false);
-    const [loading, setLoading] = useState(true);
-    const [fillColors, setFillColors] = useState<ColorOptionDisplay[]>([]);
-    const [strokeColors, setStrokeColors] = useState<ColorOptionDisplay[]>([]);
-    const [selectedFillColorId, setSelectedFillColorId] = useState<string | null>(null);
-    const [selectedStrokeColorId, setSelectedStrokeColorId] = useState<string | null>(null);
-    const inputRef = useRef<HTMLInputElement>(null);
+    const [fillColors, setFillColors] = useState<ColorOption[]>([]);
+    const [strokeColors, setStrokeColors] = useState<ColorOption[]>([]);
+    const [selectedFill, setSelectedFill] = useState<string | undefined>(() => step.getFillColor());
+    const [selectedStroke, setSelectedStroke] = useState<string | undefined>(() => step.getStrokeColor());
 
     useEffect(() => {
-        const loadData = async () => {
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) {
-                setLoading(false);
-                return;
-            }
-
-            try {
-                const currentText = (stepHandle as any).getText?.();
-                if (currentText !== undefined) {
-                    setText(currentText);
-                }
-
-                const charsRemaining = (stepHandle as any).getCharactersRemaining?.();
-                if (charsRemaining !== undefined) {
-                    setHelperText(`${charsRemaining} characters remaining`);
-                }
-
-                // Load available fill colors
-                const availableFillColors = await (stepHandle as any).getAvailableFillColors?.();
-                if (availableFillColors && availableFillColors.length > 0) {
-                    setFillColors(availableFillColors);
-
-                    // Get current fill color
-                    const currentFillColor = (stepHandle as any).getFillColor?.();
-                    if (currentFillColor) {
-                        const foundColor = availableFillColors.find(
-                            (c: ColorOptionDisplay) =>
-                                c.fill === currentFillColor ||
-                                c.variant?.color === currentFillColor ||
-                                c.stroke === currentFillColor,
-                        );
-                        if (foundColor && foundColor.variant?.id) {
-                            setSelectedFillColorId(foundColor.variant.id);
-                        }
-                    }
-                }
-
-                // Load available stroke colors
-                const availableStrokeColors = await (stepHandle as any).getAvailableStrokeColors?.();
-                if (availableStrokeColors && availableStrokeColors.length > 0) {
-                    setStrokeColors(availableStrokeColors);
-
-                    // Get current stroke color
-                    const currentStrokeColor = (stepHandle as any).getStrokeColor?.();
-                    if (currentStrokeColor) {
-                        const foundColor = availableStrokeColors.find(
-                            (c: ColorOptionDisplay) =>
-                                c.stroke === currentStrokeColor ||
-                                c.variant?.color === currentStrokeColor ||
-                                c.fill === currentStrokeColor,
-                        );
-                        if (foundColor && foundColor.variant?.id) {
-                            setSelectedStrokeColorId(foundColor.variant.id);
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Error loading text data:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [step.stepName, workflowExperience]);
+        step.getAvailableFillColors()
+            .then(setFillColors)
+            .catch((error) => console.error("Error loading fill colors:", error));
+        step.getAvailableStrokeColors()
+            .then(setStrokeColors)
+            .catch((error) => console.error("Error loading stroke colors:", error));
+    }, [step]);
 
     const handleTextChange = useCallback(
         (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -171,79 +120,48 @@ const TextUI: FunctionComponent<{
             setText(value);
             onActivation?.();
 
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) return;
-
-            try {
-                const result = (stepHandle as any).setText?.(value);
-                if (result) {
-                    if (result.valid === false) {
-                        setError(true);
-                        setHelperText(result.message || "Invalid text");
-                    } else {
-                        setError(false);
-                        const charsRemaining = (stepHandle as any).getCharactersRemaining?.();
-                        if (charsRemaining !== undefined) {
-                            setHelperText(`${charsRemaining} characters remaining`);
-                        } else {
-                            setHelperText("");
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error("Error setting text:", error);
-                setError(true);
-                setHelperText("Error updating text");
-            }
+            const result = step.setText(value);
+            const message = errorMessage(result);
+            setError(!!message);
+            setHelperText(message ?? remainingText(result.helperData.charactersRemaining));
         },
-        [onActivation, step.stepName, workflowExperience],
+        [onActivation, step],
     );
 
     const handleFillColorClick = useCallback(
-        async (colorOption: ColorOptionDisplay) => {
-            setSelectedFillColorId(colorOption.variant.id || null);
+        async (color: ColorOption) => {
+            setSelectedFill(fillValue(color));
             onActivation?.();
 
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) return;
-
             try {
-                await (stepHandle as any).setFillColor?.(colorOption);
+                await step.setFillColor(color);
             } catch (error) {
                 console.error("Error setting fill color:", error);
             }
         },
-        [onActivation, step.stepName, workflowExperience],
+        [onActivation, step],
     );
 
     const handleStrokeColorClick = useCallback(
-        async (colorOption: ColorOptionDisplay) => {
-            setSelectedStrokeColorId(colorOption.variant.id || null);
+        async (color: ColorOption) => {
+            setSelectedStroke(strokeValue(color));
             onActivation?.();
 
-            const stepHandle = workflowExperience.getStepById(step.stepName);
-            if (!stepHandle) return;
-
             try {
-                await (stepHandle as any).setStrokeColor?.(colorOption);
+                await step.setStrokeColor(color);
             } catch (error) {
                 console.error("Error setting stroke color:", error);
             }
         },
-        [onActivation, step.stepName, workflowExperience],
+        [onActivation, step],
     );
 
-    if (loading) {
-        return <Container data-test-step-type="text">Loading...</Container>;
-    }
-
-    const hasFillColors = fillColors.length > 0;
-    const hasStrokeColors = strokeColors.length > 0;
+    const showFillColors = !!step.hasColorPicker() && fillColors.length > 0;
+    const showStrokeColors = strokeColors.length > 0;
 
     return (
         <Container data-test-step-type="text">
             <TextField
-                ref={inputRef}
                 type="text"
                 value={text}
                 onChange={handleTextChange}
@@ -256,30 +174,30 @@ const TextUI: FunctionComponent<{
                     {helperText}
                 </HelperText>
             )}
-            {hasFillColors && (
+            {showFillColors && (
                 <ColorSection>
                     <ColorTitle variant="h3">Text Color</ColorTitle>
                     <ColorGrid>
                         {fillColors.map((color, index) => (
                             <ColorSwatch
-                                key={color.variant.id || index}
-                                $color={color.fill || color.stroke || "#000000"}
-                                $selected={selectedFillColorId === color.variant.id}
+                                key={color.variant?.id || index}
+                                $color={fillValue(color) || "#000000"}
+                                $selected={selectedFill !== undefined && selectedFill === fillValue(color)}
                                 onClick={() => handleFillColorClick(color)}
                             />
                         ))}
                     </ColorGrid>
                 </ColorSection>
             )}
-            {hasStrokeColors && (
+            {showStrokeColors && (
                 <StrokeSection>
                     <StrokeTitle variant="h3">Text Stroke</StrokeTitle>
                     <ColorGrid>
                         {strokeColors.map((color, index) => (
                             <ColorSwatch
-                                key={color.variant.id || index}
-                                $color={color.stroke || color.fill || "#000000"}
-                                $selected={selectedStrokeColorId === color.variant.id}
+                                key={color.variant?.id || index}
+                                $color={strokeValue(color) || "#000000"}
+                                $selected={selectedStroke !== undefined && selectedStroke === strokeValue(color)}
                                 onClick={() => handleStrokeColorClick(color)}
                             />
                         ))}
