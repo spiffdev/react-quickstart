@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { ColorDefinition, IllustrationStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
+import useVariantPrice from "../../../hooks/usePricing";
 import Typography from "../../../components/typography";
 
 const Container = styled.div`
@@ -38,6 +39,12 @@ const VariantImage = styled.img`
     width: 100%;
     height: 100%;
     object-fit: cover;
+`;
+
+const VariantPrice = styled.span`
+    display: block;
+    font-size: 11px;
+    opacity: 0.8;
 `;
 
 const VariantName = styled.div`
@@ -100,6 +107,7 @@ const IllustrationUI: FunctionComponent<{
     step: IllustrationStepHandle;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
+    const getVariantPrice = useVariantPrice();
     const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
         step.getCurrentVariant()?.getId(),
@@ -188,7 +196,10 @@ const IllustrationUI: FunctionComponent<{
                             {variant.getThumbnail() && (
                                 <VariantImage src={variant.getThumbnail()} alt={variant.getName()} />
                             )}
-                            <VariantName>{variant.getName()}</VariantName>
+                            <VariantName>
+                                {variant.getName()}
+                                {getVariantPrice(variant) && <VariantPrice>{getVariantPrice(variant)}</VariantPrice>}
+                            </VariantName>
                         </VariantCard>
                     ))}
                 </VariantGrid>

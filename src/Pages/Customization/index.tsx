@@ -1,7 +1,11 @@
 import { FunctionComponent, useEffect, useState } from "react";
+import styled from "styled-components";
+import useCurrency from "../../hooks/useCurrency";
+import { PricingProvider } from "../../hooks/usePricing";
 import {
     AnyStepData,
     DigitalContentStepHandle,
+    ExportedStepData,
     FrameStepHandle,
     IllustrationStepHandle,
     InformationStepHandle,
@@ -36,17 +40,36 @@ import {
     FinishUI,
 } from "./Steps";
 
+const TotalBar = styled.div`
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background-color: #fff;
+    border-bottom: 1px solid #e0e0e0;
+    font-weight: 600;
+`;
+
 const StepHandler: FunctionComponent<{
     step: Step<AnyStepData>;
     workflowExperience: WorkflowExperience;
+    selectionCost: number;
+    exportedData: ExportedStepData[];
     onFinished: () => void | Promise<void>;
-}> = ({ step, workflowExperience, onFinished }) => {
+}> = ({ step, workflowExperience, selectionCost, exportedData, onFinished }) => {
     const renderStepComponent = () => {
         // The finish step has no handle.
         if (step.type === StepType.Finish) {
+            const workflow = workflowExperience.getWorkflow();
             return (
                 <FinishUI
-                    termsMarkdown={workflowExperience.getWorkflow()?.finalizeStepConfig?.termsMarkdown}
+                    termsMarkdown={workflow?.finalizeStepConfig?.termsMarkdown}
+                    exportedData={exportedData}
+                    basePrice={workflowExperience.getProduct()?.basePrice || 0}
+                    selectionCost={selectionCost}
+                    showPricing={workflow?.showPricing !== false}
                     onFinished={onFinished}
                 />
             );
@@ -86,11 +109,37 @@ const Customization: FunctionComponent<{
     workflowExperience: WorkflowExperience;
     onNext: () => void | Promise<void>;
 }> = ({ workflowExperience, onNext }) => {
+    const [selectionCost, setSelectionCost] = useState(0);
+    const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
+    const formatPrice = useCurrency();
+
+    const workflow = workflowExperience.getWorkflow();
+    // An unset (null) flag counts as enabled; only an explicit false hides pricing.
+    const showPricing = workflow?.showPricing !== false;
+    const showPlus = workflow?.showPlusInVariantPrices !== false;
+    const totalPrice = (workflowExperience.getProduct()?.basePrice || 0) + selectionCost;
+
+    // TEMPORARY pricing diagnostics - remove once the pricing display is confirmed working.
+    useEffect(() => {
+        console.log("[pricing-debug]", {
+            workflowShowPricing: workflow?.showPricing,
+            showPricing,
+            hasCurrencyFormatter: !!formatPrice,
+            productBasePrice: workflowExperience.getProduct()?.basePrice,
+            selectionCost,
+            totalPrice,
+        });
+    }, [workflow, showPricing, formatPrice, workflowExperience, selectionCost, totalPrice]);
 
     useEffect(() => {
         workflowExperience.getWorkflowManager().addSelectionCallback((callbackOptions) => {
+            setSelectionCost(callbackOptions.selectionCost || 0);
             setTraversableScenes(callbackOptions.traversableScenes);
+            workflowExperience
+                .getExportedStepData()
+                .then(setExportedData)
+                .catch((error) => console.error("Error loading exported step data:", error));
         });
     }, [workflowExperience]);
 
@@ -100,40 +149,50 @@ const Customization: FunctionComponent<{
     }
 
     return (
-        <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "row" }}>
-            <div style={{ flex: "0 0 70%", minWidth: 0, height: "100%" }}>
-                <ThreeDPreview workflowExperience={workflowExperience} />
+        <PricingProvider showPricing={showPricing} showPlus={showPlus}>
+            <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "row" }}>
+                <div style={{ flex: "0 0 70%", minWidth: 0, height: "100%" }}>
+                    <ThreeDPreview workflowExperience={workflowExperience} />
+                </div>
+                <div
+                    style={{
+                        position: "relative",
+                        height: "100%",
+                        overflow: "auto",
+                        flex: "1 1 0",
+                        minWidth: 0,
+                        gap: "5px",
+                        display: "flex",
+                        flexDirection: "column",
+                    }}
+                >
+                    {showPricing && formatPrice && totalPrice > 0 && (
+                        <TotalBar>
+                            <Typography variant="span">Total</Typography>
+                            <Typography variant="span">{formatPrice(totalPrice)}</Typography>
+                        </TotalBar>
+                    )}
+                    {traversableScenes.map((scene) => {
+                        const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
+                        return (
+                            <Card key={scene.name}>
+                                {!isFinishScene && <Typography variant="h2">{scene.title}</Typography>}
+                                {scene.renderableSteps.map((step) => (
+                                    <StepHandler
+                                        key={step.stepName}
+                                        step={step}
+                                        workflowExperience={workflowExperience}
+                                        selectionCost={selectionCost}
+                                        exportedData={exportedData}
+                                        onFinished={onNext}
+                                    />
+                                ))}
+                            </Card>
+                        );
+                    })}
+                </div>
             </div>
-            <div
-                style={{
-                    position: "relative",
-                    height: "100%",
-                    overflow: "auto",
-                    flex: "1 1 0",
-                    minWidth: 0,
-                    gap: "5px",
-                    display: "flex",
-                    flexDirection: "column",
-                }}
-            >
-                {traversableScenes.map((scene) => {
-                    const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
-                    return (
-                        <Card key={scene.name}>
-                            {!isFinishScene && <Typography variant="h2">{scene.title}</Typography>}
-                            {scene.renderableSteps.map((step) => (
-                                <StepHandler
-                                    key={step.stepName}
-                                    step={step}
-                                    workflowExperience={workflowExperience}
-                                    onFinished={onNext}
-                                />
-                            ))}
-                        </Card>
-                    );
-                })}
-            </div>
-        </div>
+        </PricingProvider>
     );
 };
 

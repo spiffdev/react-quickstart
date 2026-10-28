@@ -1,7 +1,8 @@
 import { FunctionComponent, useEffect, useState } from "react";
 import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommerce/theme-bridge";
-import { ActivationData, Bundle, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
+import { ActivationData, Bundle, CurrencyContext, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
+import { CurrencyProvider } from "./hooks/useCurrency";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
 import { ClientProvider } from "./hooks/useClient";
@@ -48,6 +49,18 @@ const App: FunctionComponent<{
     });
 
     const [bundle, setBundle] = useState<Bundle | undefined>(undefined);
+    const [currencyContext, setCurrencyContext] = useState<CurrencyContext | undefined>(undefined);
+
+    useEffect(() => {
+        if (!context.currency) {
+            console.warn("No presentment currency was provided by the theme context; prices will not be displayed.");
+            return;
+        }
+        client
+            .getCurrencyContext(context.currency)
+            .then(setCurrencyContext)
+            .catch((error) => console.error("Error loading currency context:", error));
+    }, [client, context.currency]);
 
     useEffect(() => {
         const loadBundle = async () => {
@@ -92,7 +105,9 @@ const App: FunctionComponent<{
             <ClientProvider client={client}>
                 <ActivationProvider activation={context.activation}>
                     <BundleProvider bundle={bundle}>
-                        <PageHandler />
+                        <CurrencyProvider currencyContext={currencyContext}>
+                            <PageHandler />
+                        </CurrencyProvider>
                     </BundleProvider>
                 </ActivationProvider>
             </ClientProvider>

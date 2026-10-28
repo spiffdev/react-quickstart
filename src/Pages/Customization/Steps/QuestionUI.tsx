@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { QuestionStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
+import useVariantPrice from "../../../hooks/usePricing";
 
 const Container = styled.div`
     padding: 16px;
@@ -63,6 +64,12 @@ const VariantImage = styled.img`
     object-fit: cover;
 `;
 
+const VariantPrice = styled.span`
+    display: block;
+    font-size: 11px;
+    opacity: 0.8;
+`;
+
 const VariantName = styled.div`
     position: absolute;
     bottom: 0;
@@ -79,6 +86,7 @@ const QuestionUI: FunctionComponent<{
     step: QuestionStepHandle;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
+    const getVariantPrice = useVariantPrice();
     const [selectedValue, setSelectedValue] = useState(() => step.getCurrentVariant()?.getId() ?? "");
     const [variants, setVariants] = useState<Variant[]>([]);
     const [loading, setLoading] = useState(true);
@@ -150,7 +158,10 @@ const QuestionUI: FunctionComponent<{
                             {variant.getThumbnail() && (
                                 <VariantImage src={variant.getThumbnail()} alt={variant.getName()} />
                             )}
-                            <VariantName>{variant.getName()}</VariantName>
+                            <VariantName>
+                                {variant.getName()}
+                                {getVariantPrice(variant) && <VariantPrice>{getVariantPrice(variant)}</VariantPrice>}
+                            </VariantName>
                         </VariantCard>
                     ))}
                 </VariantGrid>
@@ -160,6 +171,7 @@ const QuestionUI: FunctionComponent<{
                     {variants.map((variant) => (
                         <Option key={variant.getId()} value={variant.getId()} disabled={!variant.isEnabled()}>
                             {variant.getName()}
+                            {getVariantPrice(variant) && ` (${getVariantPrice(variant)})`}
                         </Option>
                     ))}
                 </Select>

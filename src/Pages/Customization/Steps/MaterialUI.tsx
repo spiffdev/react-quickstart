@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { MaterialStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
+import useVariantPrice from "../../../hooks/usePricing";
 
 const Container = styled.div`
     padding: 16px;
@@ -38,6 +39,12 @@ const VariantImage = styled.img`
     object-fit: cover;
 `;
 
+const VariantPrice = styled.span`
+    display: block;
+    font-size: 11px;
+    opacity: 0.8;
+`;
+
 const VariantName = styled.div`
     position: absolute;
     bottom: 0;
@@ -54,6 +61,7 @@ const MaterialUI: FunctionComponent<{
     step: MaterialStepHandle;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
+    const getVariantPrice = useVariantPrice();
     const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
         step.getCurrentVariant()?.getId(),
@@ -108,7 +116,10 @@ const MaterialUI: FunctionComponent<{
                         {variant.getThumbnail() && (
                             <VariantImage src={variant.getThumbnail()} alt={variant.getName()} />
                         )}
-                        <VariantName>{variant.getName()}</VariantName>
+                        <VariantName>
+                            {variant.getName()}
+                            {getVariantPrice(variant) && <VariantPrice>{getVariantPrice(variant)}</VariantPrice>}
+                        </VariantName>
                     </VariantCard>
                 ))}
             </VariantGrid>

@@ -1,6 +1,8 @@
 import { FunctionComponent, useCallback, useState } from "react";
+import { ExportedStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
+import useCurrency from "../../../hooks/useCurrency";
 import Typography from "../../../components/typography";
 import TermsScreen from "../components/TermsScreen";
 
@@ -38,6 +40,11 @@ const SummaryItem = styled.div`
     }
 `;
 
+const SummaryValue = styled.div`
+    display: flex;
+    gap: 12px;
+`;
+
 const CheckboxContainer = styled.div`
     display: flex;
     align-items: center;
@@ -72,10 +79,35 @@ const ButtonGroup = styled.div`
     margin-top: 16px;
 `;
 
+const formatValue = (value: string) =>
+    value.startsWith("http") ? (
+        <a href={value} target="_blank" rel="noopener noreferrer">
+            Link
+        </a>
+    ) : (
+        value
+    );
+
 const FinishUI: FunctionComponent<{
     termsMarkdown?: string;
+    exportedData: ExportedStepData[];
+    basePrice: number;
+    selectionCost: number;
+    showPricing: boolean;
     onFinished?: () => void | Promise<void>;
-}> = ({ termsMarkdown, onFinished }) => {
+}> = ({ termsMarkdown, exportedData, basePrice, selectionCost, showPricing, onFinished }) => {
+    const currencyFormatter = useCurrency();
+    const totalPrice = basePrice + selectionCost;
+    // Prices are only shown when enabled, chargeable, and a presentment currency is available.
+    const formatPrice = showPricing && totalPrice > 0 ? currencyFormatter : undefined;
+    const rows = exportedData.flatMap((step) =>
+        step.properties.map((property, index) => ({
+            ...property,
+            key: `${step.stepId}-${index}`,
+            title: index === 0 ? step.title : "",
+        })),
+    );
+
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [showTerms, setShowTerms] = useState(false);
     const [finishing, setFinishing] = useState(false);
@@ -99,25 +131,40 @@ const FinishUI: FunctionComponent<{
     return (
         <Container data-test-step-type="finish">
             <Title variant="h2">Review Your Design</Title>
-            <OrderSummary>
-                <SummaryTitle variant="h3">Order Summary</SummaryTitle>
-                <SummaryItem>
-                    <Typography variant="span">Base Price</Typography>
-                    <Typography variant="span">$0.00</Typography>
-                </SummaryItem>
-                <SummaryItem>
-                    <Typography variant="span">Customization</Typography>
-                    <Typography variant="span">$0.00</Typography>
-                </SummaryItem>
-                <SummaryItem>
-                    <Typography variant="span" style={{ fontWeight: "bold" }}>
-                        Total
-                    </Typography>
-                    <Typography variant="span" style={{ fontWeight: "bold" }}>
-                        $0.00
-                    </Typography>
-                </SummaryItem>
-            </OrderSummary>
+            {(rows.length > 0 || formatPrice) && (
+                <OrderSummary>
+                    <SummaryTitle variant="h3">Order Summary</SummaryTitle>
+                    {rows.map((row) => (
+                        <SummaryItem key={row.key}>
+                            <Typography variant="span">{row.title}</Typography>
+                            <SummaryValue>
+                                <Typography variant="span">{formatValue(row.value)}</Typography>
+                                {formatPrice && row.priceModifier > 0 && (
+                                    <Typography variant="span">{formatPrice(row.priceModifier)}</Typography>
+                                )}
+                            </SummaryValue>
+                        </SummaryItem>
+                    ))}
+                    {formatPrice && (
+                        <>
+                            {basePrice > 0 && (
+                                <SummaryItem>
+                                    <Typography variant="span">Base Price</Typography>
+                                    <Typography variant="span">{formatPrice(basePrice)}</Typography>
+                                </SummaryItem>
+                            )}
+                            <SummaryItem>
+                                <Typography variant="span" style={{ fontWeight: "bold" }}>
+                                    Total
+                                </Typography>
+                                <Typography variant="span" style={{ fontWeight: "bold" }}>
+                                    {formatPrice(totalPrice)}
+                                </Typography>
+                            </SummaryItem>
+                        </>
+                    )}
+                </OrderSummary>
+            )}
             <ButtonGroup>
                 <Button fullWidth>Download Preview</Button>
             </ButtonGroup>
