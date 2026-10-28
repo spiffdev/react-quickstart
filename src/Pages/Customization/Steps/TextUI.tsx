@@ -7,24 +7,24 @@ const Container = styled.div`
     padding: 16px;
 `;
 
-const TextField = styled.input<{ error?: boolean }>`
+const TextField = styled.input<{ $error?: boolean }>`
     width: 100%;
     padding: 12px;
-    border: 1px solid ${(props) => (props.error ? "#d32f2f" : "#ccc")};
+    border: 1px solid ${(props) => (props.$error ? "#d32f2f" : "#ccc")};
     border-radius: 4px;
     font-size: 16px;
     box-sizing: border-box;
 
     &:focus {
         outline: none;
-        border-color: ${(props) => (props.error ? "#d32f2f" : "#007bff")};
+        border-color: ${(props) => (props.$error ? "#d32f2f" : "#007bff")};
     }
 `;
 
-const HelperText = styled(Typography)<{ error?: boolean }>`
+const HelperText = styled(Typography)<{ $error?: boolean }>`
     margin-top: 4px;
     font-size: 12px;
-    color: ${(props) => (props.error ? "#d32f2f" : "#666")};
+    color: ${(props) => (props.$error ? "#d32f2f" : "#666")};
 `;
 
 const ColorSection = styled.div`
@@ -164,10 +164,10 @@ const TextUI: FunctionComponent<{
                 onChange={handleTextChange}
                 onFocus={onActivation}
                 placeholder="Enter text..."
-                error={error}
+                $error={error}
             />
             {helperText && (
-                <HelperText variant="span" error={error}>
+                <HelperText variant="span" $error={error}>
                     {helperText}
                 </HelperText>
             )}

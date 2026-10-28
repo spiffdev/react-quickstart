@@ -13,20 +13,20 @@ const VariantGrid = styled.div`
     width: 100%;
 `;
 
-const VariantCard = styled.div<{ selected?: boolean; disabled?: boolean }>`
+const VariantCard = styled.div<{ $selected?: boolean; $disabled?: boolean }>`
     position: relative;
     aspect-ratio: 1;
-    border: 2px solid ${(props) => (props.selected ? "#007bff" : "#e0e0e0")};
+    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
     border-radius: 8px;
-    cursor: ${(props) => (props.disabled ? "not-allowed" : "pointer")};
+    cursor: ${(props) => (props.$disabled ? "not-allowed" : "pointer")};
     overflow: hidden;
     transition: all 0.2s;
-    opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+    opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
 
     &:hover {
-        border-color: ${(props) => (props.disabled ? "#e0e0e0" : "#007bff")};
-        transform: ${(props) => (props.disabled ? "none" : "translateY(-2px)")};
-        box-shadow: ${(props) => (props.disabled ? "none" : "0 4px 8px rgba(0, 0, 0, 0.1)")};
+        border-color: ${(props) => (props.$disabled ? "#e0e0e0" : "#007bff")};
+        transform: ${(props) => (props.$disabled ? "none" : "translateY(-2px)")};
+        box-shadow: ${(props) => (props.$disabled ? "none" : "0 4px 8px rgba(0, 0, 0, 0.1)")};
     }
 `;
 
@@ -123,8 +123,8 @@ const MaterialUI: FunctionComponent<{
                 {variants.map((variant) => (
                     <VariantCard
                         key={variant.getId()}
-                        selected={selectedVariantId === variant.getId()}
-                        disabled={applying || !variant.isEnabled()}
+                        $selected={selectedVariantId === variant.getId()}
+                        $disabled={applying || !variant.isEnabled()}
                         onClick={() => handleVariantClick(variant)}
                     >
                         {variant.getThumbnail() && (

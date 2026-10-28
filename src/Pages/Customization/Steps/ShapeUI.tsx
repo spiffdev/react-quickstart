@@ -13,10 +13,10 @@ const ColorGrid = styled.div`
     width: 100%;
 `;
 
-const ColorSwatch = styled.div<{ color: string; selected?: boolean }>`
+const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     aspect-ratio: 1;
-    background-color: ${(props) => props.color};
-    border: 2px solid ${(props) => (props.selected ? "#007bff" : "#e0e0e0")};
+    background-color: ${(props) => props.$color};
+    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
@@ -158,8 +158,8 @@ const ShapeUI: FunctionComponent<{
                 {colors.map((color, index) => (
                     <ColorSwatch
                         key={color.variant.id || index}
-                        color={color.fill || color.stroke || "#cccccc"}
-                        selected={selectedColorId === color.variant.id}
+                        $color={color.fill || color.stroke || "#cccccc"}
+                        $selected={selectedColorId === color.variant.id}
                         onClick={() => handleColorClick(color)}
                     />
                 ))}
