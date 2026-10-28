@@ -39,11 +39,17 @@ import {
 const StepHandler: FunctionComponent<{
     step: Step<AnyStepData>;
     workflowExperience: WorkflowExperience;
-}> = ({ step, workflowExperience }) => {
+    onFinished: () => void | Promise<void>;
+}> = ({ step, workflowExperience, onFinished }) => {
     const renderStepComponent = () => {
         // The finish step has no handle.
         if (step.type === StepType.Finish) {
-            return <FinishUI />;
+            return (
+                <FinishUI
+                    termsMarkdown={workflowExperience.getWorkflow()?.finalizeStepConfig?.termsMarkdown}
+                    onFinished={onFinished}
+                />
+            );
         }
 
         const handle = workflowExperience.getStepById(step.stepName);
@@ -78,8 +84,8 @@ const StepHandler: FunctionComponent<{
 
 const Customization: FunctionComponent<{
     workflowExperience: WorkflowExperience;
-    onNext: () => void;
-}> = ({ workflowExperience }) => {
+    onNext: () => void | Promise<void>;
+}> = ({ workflowExperience, onNext }) => {
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
 
     useEffect(() => {
@@ -116,7 +122,12 @@ const Customization: FunctionComponent<{
                         <Card key={scene.name}>
                             {!isFinishScene && <Typography variant="h2">{scene.title}</Typography>}
                             {scene.renderableSteps.map((step) => (
-                                <StepHandler key={step.stepName} step={step} workflowExperience={workflowExperience} />
+                                <StepHandler
+                                    key={step.stepName}
+                                    step={step}
+                                    workflowExperience={workflowExperience}
+                                    onFinished={onNext}
+                                />
                             ))}
                         </Card>
                     );

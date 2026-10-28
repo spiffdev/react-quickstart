@@ -6,6 +6,7 @@ import ProductSelector from "./ProductSelector";
 import useClient from "../hooks/useClient";
 import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
+import type { SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
 
 type PageType = "collection" | "product" | "workflow" | "experience";
 
@@ -70,6 +71,17 @@ const PageHandler: FunctionComponent<{}> = () => {
         [handleWorkflowSelected],
     );
 
+    const handleFinish = useCallback(async () => {
+        // A screenshot can only be taken from the live preview when there is a single experience.
+        const takeScreenshot =
+            bundle.getWorkflowExperienceCount() === 1
+                ? (wfe: WorkflowExperience, use3D?: boolean) => wfe.createPreviewImage(use3D, 1024)
+                : undefined;
+        const result = await bundle.finish(undefined, takeScreenshot);
+        const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
+        spiffThemeLoader.addToEcommerceCart(result);
+    }, [bundle]);
+
     return (
         <div style={{ height: "100%", overflow: "hidden", position: "relative" }}>
             {page === "collection" && <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />}
@@ -78,12 +90,7 @@ const PageHandler: FunctionComponent<{}> = () => {
             )}
             {page === "workflow" && <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />}
             {page === "experience" && (
-                <Customization
-                    workflowExperience={experience!}
-                    onNext={() => {
-                        /* TODO: finalize the bundle and then call exit, just like Beeline */
-                    }}
-                />
+                <Customization workflowExperience={experience!} onNext={handleFinish} />
             )}
         </div>
     );

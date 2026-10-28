@@ -1,7 +1,8 @@
-import { FunctionComponent, useState } from "react";
+import { FunctionComponent, useCallback, useState } from "react";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
+import TermsScreen from "../components/TermsScreen";
 
 const Container = styled.div`
     padding: 16px;
@@ -72,9 +73,28 @@ const ButtonGroup = styled.div`
 `;
 
 const FinishUI: FunctionComponent<{
-    onFinished?: () => void;
-}> = ({ onFinished }) => {
+    termsMarkdown?: string;
+    onFinished?: () => void | Promise<void>;
+}> = ({ termsMarkdown, onFinished }) => {
     const [isConfirmed, setIsConfirmed] = useState(false);
+    const [showTerms, setShowTerms] = useState(false);
+    const [finishing, setFinishing] = useState(false);
+
+    const handleFinish = useCallback(async () => {
+        setFinishing(true);
+        try {
+            await onFinished?.();
+        } catch (error) {
+            console.error("Error finishing design:", error);
+            setFinishing(false);
+        }
+    }, [onFinished]);
+
+    const handleAgree = useCallback(() => {
+        setIsConfirmed(true);
+        setShowTerms(false);
+        handleFinish();
+    }, [handleFinish]);
 
     return (
         <Container data-test-step-type="finish">
@@ -101,19 +121,38 @@ const FinishUI: FunctionComponent<{
             <ButtonGroup>
                 <Button fullWidth>Download Preview</Button>
             </ButtonGroup>
-            <CheckboxContainer>
-                <Checkbox
-                    type="checkbox"
-                    id="confirm-design"
-                    checked={isConfirmed}
-                    onChange={(e) => setIsConfirmed(e.target.checked)}
-                />
-                <Label htmlFor="confirm-design">
-                    I agree to the <TermsLink variant="span">terms and conditions</TermsLink>
-                </Label>
-            </CheckboxContainer>
-            <Button fullWidth disabled={!isConfirmed} onClick={onFinished}>
-                Complete Design
+            {termsMarkdown && (
+                <>
+                    <CheckboxContainer>
+                        <Checkbox
+                            type="checkbox"
+                            id="confirm-design"
+                            checked={isConfirmed}
+                            onChange={(e) => setIsConfirmed(e.target.checked)}
+                        />
+                        <Label htmlFor="confirm-design">
+                            I agree to the{" "}
+                            <TermsLink
+                                variant="span"
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    setShowTerms(true);
+                                }}
+                            >
+                                terms and conditions
+                            </TermsLink>
+                        </Label>
+                    </CheckboxContainer>
+                    <TermsScreen
+                        visible={showTerms}
+                        source={termsMarkdown}
+                        onAgree={handleAgree}
+                        onBack={() => setShowTerms(false)}
+                    />
+                </>
+            )}
+            <Button fullWidth disabled={(!!termsMarkdown && !isConfirmed) || finishing} onClick={handleFinish}>
+                {finishing ? "Adding to cart..." : "Complete Design"}
             </Button>
         </Container>
     );
