@@ -14,6 +14,7 @@ const StyledButton = styled.button<{ $fullWidth?: boolean }>`
     cursor: pointer;
     transition: all 0.2s;
     width: ${(props) => (props.$fullWidth ? "100%" : "auto")};
+    box-sizing: border-box;
 
     &:hover:not(:disabled) {
         background-color: #0056b3;

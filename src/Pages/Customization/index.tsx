@@ -84,16 +84,28 @@ const Customization: FunctionComponent<{
     }
 
     return (
-        <div>
+        <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "row" }}>
             {/* TODO: 3D preview */}
-            {traversableScenes.map((scene) => (
-                <Card key={scene.name}>
-                    <Typography variant="h2">{scene.title}</Typography>
-                    {scene.renderableSteps.map((step) => (
-                        <StepHandler key={step.stepName} step={step} workflowExperience={workflowExperience} />
-                    ))}
-                </Card>
-            ))}
+            <div
+                style={{
+                    position: "relative",
+                    height: "100%",
+                    overflow: "auto",
+                    flexGrow: "1",
+                    gap: "5px",
+                    display: "flex",
+                    flexDirection: "column",
+                }}
+            >
+                {traversableScenes.map((scene) => (
+                    <Card key={scene.name}>
+                        <Typography variant="h2">{scene.title}</Typography>
+                        {scene.renderableSteps.map((step) => (
+                            <StepHandler key={step.stepName} step={step} workflowExperience={workflowExperience} />
+                        ))}
+                    </Card>
+                ))}
+            </div>
         </div>
     );
 };

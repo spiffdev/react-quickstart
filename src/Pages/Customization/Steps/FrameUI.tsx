@@ -6,6 +6,9 @@ import Typography from "../../../components/typography";
 
 const Container = styled.div`
     padding: 16px;
+    box-sizing: border-box;
+    width: 100%;
+    overflow: hidden;
 `;
 
 // Unused styled component - reserved for future use
