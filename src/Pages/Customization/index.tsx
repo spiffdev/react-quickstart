@@ -58,9 +58,11 @@ const StepHandler: FunctionComponent<{
         }
     };
 
+    const isFinishStep = step.type === StepType.Finish;
+
     return (
         <div>
-            <Typography variant="h3">{step.stepTitle}</Typography>
+            {!isFinishStep && <Typography variant="h3">{step.stepTitle}</Typography>}
             {renderStepComponent()}
         </div>
     );
@@ -97,14 +99,17 @@ const Customization: FunctionComponent<{
                     flexDirection: "column",
                 }}
             >
-                {traversableScenes.map((scene) => (
-                    <Card key={scene.name}>
-                        <Typography variant="h2">{scene.title}</Typography>
-                        {scene.renderableSteps.map((step) => (
-                            <StepHandler key={step.stepName} step={step} workflowExperience={workflowExperience} />
-                        ))}
-                    </Card>
-                ))}
+                {traversableScenes.map((scene) => {
+                    const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
+                    return (
+                        <Card key={scene.name}>
+                            {!isFinishScene && <Typography variant="h2">{scene.title}</Typography>}
+                            {scene.renderableSteps.map((step) => (
+                                <StepHandler key={step.stepName} step={step} workflowExperience={workflowExperience} />
+                            ))}
+                        </Card>
+                    );
+                })}
             </div>
         </div>
     );
