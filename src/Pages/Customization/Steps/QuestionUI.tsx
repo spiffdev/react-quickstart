@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, QuestionStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -32,7 +32,7 @@ const Option = styled.option`
 `;
 
 const QuestionUI: FunctionComponent<{
-    step: Step<QuestionStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
     const [selectedValue, setSelectedValue] = useState("");

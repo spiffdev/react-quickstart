@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import svgr from "vite-plugin-svgr";
+// @ts-expect-error - spiffThemePlugin export may not be in type definitions yet
 import { spiffThemePlugin } from "@spiffcommerce/theme-bridge/plugin";
 import { configurationSchema } from "./src/configurationSchema";
 import { existsSync, readFileSync } from "fs";

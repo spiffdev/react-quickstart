@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, ShapeStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -59,10 +59,10 @@ interface ColorOption {
 }
 
 const ShapeUI: FunctionComponent<{
-    step: Step<ShapeStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
-    const [colors, setColors] = useState<ColorOption[]>([]);
+    const [colors] = useState<ColorOption[]>([]);
     const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
     const [customColor, setCustomColor] = useState("#000000");
 

@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useState } from "react";
-import { Step, ModuleStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -35,7 +35,7 @@ const HelperText = styled.div<{ error?: boolean }>`
 `;
 
 const ModuleUI: FunctionComponent<{
-    step: Step<ModuleStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ onActivation }) => {
     const [text, setText] = useState("");

@@ -1,28 +1,30 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, FrameStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
+import Typography from "../../../components/typography";
 
 const Container = styled.div`
     padding: 16px;
 `;
 
-const UploadSection = styled.div`
-    border: 2px dashed #ccc;
-    border-radius: 8px;
-    padding: 32px;
-    text-align: center;
-    cursor: pointer;
-    margin-bottom: 16px;
-    transition: all 0.2s;
+// Unused styled component - reserved for future use
+// const UploadSection = styled.div`
+//     border: 2px dashed #ccc;
+//     border-radius: 8px;
+//     padding: 32px;
+//     text-align: center;
+//     cursor: pointer;
+//     margin-bottom: 16px;
+//     transition: all 0.2s;
 
-    &:hover {
-        border-color: #007bff;
-        background-color: #f5f5f5;
-    }
-`;
+//     &:hover {
+//         border-color: #007bff;
+//         background-color: #f5f5f5;
+//     }
+// `;
 
-const UploadText = styled.p`
+const UploadText = styled(Typography)`
     margin: 8px 0;
     color: #666;
 `;
@@ -68,7 +70,7 @@ const ColorSection = styled.div`
     border-radius: 8px;
 `;
 
-const ColorTitle = styled.h4`
+const ColorTitle = styled(Typography)`
     margin: 0 0 12px 0;
     font-size: 14px;
     font-weight: 600;
@@ -81,10 +83,10 @@ interface Variant {
 }
 
 const FrameUI: FunctionComponent<{
-    step: Step<FrameStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
-    const [variants, setVariants] = useState<Variant[]>([]);
+    const [variants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
     const [uploading, setUploading] = useState(false);
     const [hasColorPicker] = useState(false);
@@ -140,7 +142,7 @@ const FrameUI: FunctionComponent<{
             </Button>
             {variants.length > 0 && (
                 <>
-                    <UploadText>Or choose from templates:</UploadText>
+                    <UploadText variant="p">Or choose from templates:</UploadText>
                     <VariantGrid>
                         {variants.map((variant) => (
                             <VariantCard
@@ -156,7 +158,7 @@ const FrameUI: FunctionComponent<{
             )}
             {hasColorPicker && (
                 <ColorSection>
-                    <ColorTitle>Color Options</ColorTitle>
+                    <ColorTitle variant="h3">Color Options</ColorTitle>
                     {/* TODO: Implement SVG color picker */}
                 </ColorSection>
             )}

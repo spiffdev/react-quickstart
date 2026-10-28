@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, IllustrationStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
+import Typography from "../../../components/typography";
 
 const Container = styled.div`
     padding: 16px;
@@ -55,7 +56,7 @@ const ColorPickerSection = styled.div`
     border-radius: 8px;
 `;
 
-const ColorPickerTitle = styled.h3`
+const ColorPickerTitle = styled(Typography)`
     margin: 0 0 12px 0;
     font-size: 14px;
     font-weight: 600;
@@ -68,10 +69,10 @@ interface Variant {
 }
 
 const IllustrationUI: FunctionComponent<{
-    step: Step<IllustrationStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
-    const [variants, setVariants] = useState<Variant[]>([]);
+    const [variants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
     const [hasColorPicker] = useState(false);
 
@@ -107,7 +108,7 @@ const IllustrationUI: FunctionComponent<{
             )}
             {hasColorPicker && (
                 <ColorPickerSection>
-                    <ColorPickerTitle>Color Options</ColorPickerTitle>
+                    <ColorPickerTitle variant="h3">Color Options</ColorPickerTitle>
                     {/* TODO: Implement SVG color picker */}
                 </ColorPickerSection>
             )}

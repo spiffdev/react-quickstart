@@ -20,7 +20,7 @@ import {
 
 const StepHandler: FunctionComponent<{ step: Step<AnyStepData> }> = ({ step }) => {
     const renderStepComponent = () => {
-        switch (step.stepType) {
+        switch (step.type) {
             case StepType.Information:
                 return <InformationUI step={step} />;
             case StepType.Module:
@@ -49,7 +49,7 @@ const StepHandler: FunctionComponent<{ step: Step<AnyStepData> }> = ({ step }) =
             default:
                 return (
                     <div>
-                        <Typography>Unsupported step type: {step.stepType}</Typography>
+                        <Typography>Unsupported step type: {step.type}</Typography>
                     </div>
                 );
         }

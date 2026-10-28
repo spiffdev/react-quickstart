@@ -2,12 +2,13 @@ import { FunctionComponent, useState } from "react";
 import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
+import Typography from "../../../components/typography";
 
 const Container = styled.div`
     padding: 16px;
 `;
 
-const Title = styled.h2`
+const Title = styled(Typography)`
     margin: 0 0 16px 0;
     font-size: 24px;
     font-weight: 600;
@@ -20,7 +21,7 @@ const OrderSummary = styled.div`
     margin-bottom: 16px;
 `;
 
-const SummaryTitle = styled.h3`
+const SummaryTitle = styled(Typography)`
     margin: 0 0 12px 0;
     font-size: 18px;
     font-weight: 600;
@@ -55,7 +56,7 @@ const Label = styled.label`
     cursor: pointer;
 `;
 
-const TermsLink = styled.span`
+const TermsLink = styled(Typography)`
     color: #007bff;
     text-decoration: underline;
     cursor: pointer;
@@ -79,20 +80,24 @@ const FinishUI: FunctionComponent<{
 
     return (
         <Container data-test-step-type="finish">
-            <Title>Review Your Design</Title>
+            <Title variant="h2">Review Your Design</Title>
             <OrderSummary>
-                <SummaryTitle>Order Summary</SummaryTitle>
+                <SummaryTitle variant="h3">Order Summary</SummaryTitle>
                 <SummaryItem>
-                    <span>Base Price</span>
-                    <span>$0.00</span>
+                    <Typography variant="span">Base Price</Typography>
+                    <Typography variant="span">$0.00</Typography>
                 </SummaryItem>
                 <SummaryItem>
-                    <span>Customization</span>
-                    <span>$0.00</span>
+                    <Typography variant="span">Customization</Typography>
+                    <Typography variant="span">$0.00</Typography>
                 </SummaryItem>
                 <SummaryItem>
-                    <strong>Total</strong>
-                    <strong>$0.00</strong>
+                    <Typography variant="span" style={{ fontWeight: "bold" }}>
+                        Total
+                    </Typography>
+                    <Typography variant="span" style={{ fontWeight: "bold" }}>
+                        $0.00
+                    </Typography>
                 </SummaryItem>
             </OrderSummary>
             <ButtonGroup>
@@ -106,7 +111,7 @@ const FinishUI: FunctionComponent<{
                     onChange={(e) => setIsConfirmed(e.target.checked)}
                 />
                 <Label htmlFor="confirm-design">
-                    I agree to the <TermsLink>terms and conditions</TermsLink>
+                    I agree to the <TermsLink variant="span">terms and conditions</TermsLink>
                 </Label>
             </CheckboxContainer>
             <Button fullWidth disabled={!isConfirmed} onClick={onFinished}>

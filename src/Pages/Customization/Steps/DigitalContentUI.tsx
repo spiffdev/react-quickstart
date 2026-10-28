@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useState } from "react";
-import { Step, DigitalContentStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 
@@ -7,29 +7,30 @@ const Container = styled.div`
     padding: 16px;
 `;
 
-const UploadArea = styled.div`
-    border: 2px dashed #ccc;
-    border-radius: 8px;
-    padding: 32px;
-    text-align: center;
-    cursor: pointer;
-    transition: all 0.2s;
+// Unused styled components - reserved for future use
+// const UploadArea = styled.div`
+//     border: 2px dashed #ccc;
+//     border-radius: 8px;
+//     padding: 32px;
+//     text-align: center;
+//     cursor: pointer;
+//     transition: all 0.2s;
 
-    &:hover {
-        border-color: #007bff;
-        background-color: #f5f5f5;
-    }
-`;
+//     &:hover {
+//         border-color: #007bff;
+//         background-color: #f5f5f5;
+//     }
+// `;
 
-const UploadIcon = styled.div`
-    font-size: 48px;
-    margin-bottom: 12px;
-`;
+// const UploadIcon = styled.div`
+//     font-size: 48px;
+//     margin-bottom: 12px;
+// `;
 
-const UploadText = styled.p`
-    margin: 8px 0;
-    color: #666;
-`;
+// const UploadText = styled.p`
+//     margin: 8px 0;
+//     color: #666;
+// `;
 
 const ProgressBar = styled.div`
     width: 100%;
@@ -63,7 +64,7 @@ const HiddenInput = styled.input`
 `;
 
 const DigitalContentUI: FunctionComponent<{
-    step: Step<DigitalContentStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ onActivation }) => {
     const [uploading, setUploading] = useState(false);

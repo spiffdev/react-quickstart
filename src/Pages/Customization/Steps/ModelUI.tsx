@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, ModelStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
 
 const Container = styled.div`
@@ -54,10 +54,10 @@ interface Variant {
 }
 
 const ModelUI: FunctionComponent<{
-    step: Step<ModelStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
-    const [variants, setVariants] = useState<Variant[]>([]);
+    const [variants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
 
     useEffect(() => {

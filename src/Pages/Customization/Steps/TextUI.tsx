@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, TextStepData } from "@spiffcommerce/core";
+import { Step, AnyStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
+import Typography from "../../../components/typography";
 
 const Container = styled.div`
     padding: 16px;
@@ -42,7 +43,7 @@ const ColorSection = styled.div`
     margin-top: 16px;
 `;
 
-const ColorTitle = styled.h4`
+const ColorTitle = styled(Typography)`
     margin: 0 0 8px 0;
     font-size: 14px;
     font-weight: 600;
@@ -66,7 +67,7 @@ const ColorInput = styled.input`
 `;
 
 const TextUI: FunctionComponent<{
-    step: Step<TextStepData>;
+    step: Step<AnyStepData>;
     onActivation?: () => void;
 }> = ({ step, onActivation }) => {
     const [text, setText] = useState("");
@@ -121,7 +122,7 @@ const TextUI: FunctionComponent<{
                 <Label htmlFor="curved-text">Curved text</Label>
             </CheckboxContainer>
             <ColorSection>
-                <ColorTitle>Text Color</ColorTitle>
+                <ColorTitle variant="h3">Text Color</ColorTitle>
                 <ColorInput type="color" value={textColor} onChange={handleColorChange} />
             </ColorSection>
         </Container>
