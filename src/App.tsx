@@ -5,6 +5,7 @@ import { BundleProvider } from "./hooks/useBundle";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
 import { ClientProvider } from "./hooks/useClient";
+import LoadingOverlay from "./Pages/components/LoadingOverlay";
 
 function getProductCollectionForNewBundle(context: ThemeContext): string | null {
     const c = context as ThemeContextBundle;
@@ -76,11 +77,14 @@ const App: FunctionComponent<{
             }
         };
         loadBundle();
-    }, []);
+    }, [client, context]);
 
     if (!bundle) {
-        // TODO: spinner
-        return <div>Loading...</div>;
+        return (
+            <div className="app-body">
+                <LoadingOverlay />
+            </div>
+        );
     }
 
     return (

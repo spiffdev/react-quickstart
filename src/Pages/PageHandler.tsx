@@ -1,6 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import useBundle from "../hooks/useBundle";
-import Typography from "../components/typography";
 import ProductCollectionSelector from "./ProductCollectionSelector";
 import { CollectionProduct, ProductCollection, ProductWorkflow, WorkflowExperience } from "@spiffcommerce/core";
 import ProductSelector from "./ProductSelector";
@@ -71,23 +70,21 @@ const PageHandler: FunctionComponent<{}> = () => {
         [handleWorkflowSelected],
     );
 
-    switch (page) {
-        case "collection":
-            return <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />;
-        case "product":
-            return <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />;
-        case "workflow":
-            return <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />;
-        case "experience":
-            return (
+    return (
+        <div style={{ height: "100%", overflow: "hidden", position: "relative" }}>
+            {page === "collection" && <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />}
+            {page === "product" && <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />}
+            {page === "workflow" && <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />}
+            {page === "experience" && (
                 <Customization
                     workflowExperience={experience!}
                     onNext={() => {
                         /* TODO: close */
                     }}
                 />
-            );
-    }
+            )}
+        </div>
+    );
 };
 
 export default PageHandler;

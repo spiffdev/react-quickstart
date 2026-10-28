@@ -1,6 +1,7 @@
 import { FunctionComponent, useEffect, useState } from "react";
 import { CollectionProduct, ProductWorkflow } from "@spiffcommerce/core";
-import SelectorTile from "../../components/shared/SelectorTile";
+import SelectorTile from "../components/SelectorTile";
+import SelectorContainer from "../components/SelectorContainer";
 
 const WorkflowSelector: FunctionComponent<{
     product: CollectionProduct;
@@ -28,9 +29,7 @@ const WorkflowSelector: FunctionComponent<{
     }
 
     return (
-        <div>
-            {/* TODO: spinner and prevent clicking */}
-            {loading && <div>Loading...</div>}
+        <SelectorContainer loading={loading}>
             {workflows.map((workflow) => (
                 <SelectorTile
                     key={workflow.getId()}
@@ -42,7 +41,7 @@ const WorkflowSelector: FunctionComponent<{
                     }}
                 />
             ))}
-        </div>
+        </SelectorContainer>
     );
 };
 

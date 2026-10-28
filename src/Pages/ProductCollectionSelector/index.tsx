@@ -1,10 +1,12 @@
 import { FunctionComponent, useEffect, useState } from "react";
 import useActivation from "../../hooks/useActivation";
 import { getProductCollections, ProductCollection } from "@spiffcommerce/core";
-import SelectorTile from "../../components/shared/SelectorTile";
+import SelectorTile from "../components/SelectorTile";
+import SelectorContainer from "../components/SelectorContainer";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 const ProductCollectionSelector: FunctionComponent<{
-    onCollectionSelected: (collection: ProductCollection) => void;
+    onCollectionSelected: (collection: ProductCollection) => Promise<void>;
 }> = ({ onCollectionSelected }) => {
     const activation = useActivation();
     const [loading, setLoading] = useState<boolean>(true);
@@ -17,8 +19,7 @@ const ProductCollectionSelector: FunctionComponent<{
     }, [activation.activationProductCollections]);
 
     if (loading && !collections) {
-        // TODO: spinner
-        return <div>Loading...</div>;
+        return <LoadingOverlay />;
     }
 
     if (!collections) {
@@ -27,9 +28,7 @@ const ProductCollectionSelector: FunctionComponent<{
     }
 
     return (
-        <div>
-            {/* TODO: spinner and prevent clicking */}
-            {loading && <div>Loading...</div>}
+        <SelectorContainer loading={loading}>
             {collections.map((collection) => (
                 <SelectorTile
                     key={collection.getId()}
@@ -41,7 +40,7 @@ const ProductCollectionSelector: FunctionComponent<{
                     }}
                 />
             ))}
-        </div>
+        </SelectorContainer>
     );
 };
 

@@ -2,6 +2,7 @@ import { FunctionComponent, useEffect, useState } from "react";
 import { AnyStepData, Step, WorkflowExperience, WorkflowScene } from "@spiffcommerce/core";
 import Card from "../../components/card";
 import Typography from "../../components/typography";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 const StepHandler: FunctionComponent<{ step: Step<AnyStepData> }> = ({ step }) => {
     return (
@@ -28,7 +29,7 @@ const Customization: FunctionComponent<{
 
     if (traversableScenes.length === 0) {
         // TODO: spinner
-        return <div>Loading...</div>;
+        return <LoadingOverlay />;
     }
 
     return (

@@ -1,6 +1,8 @@
 import { FunctionComponent, useEffect, useState } from "react";
 import { CollectionProduct, ProductCollection } from "@spiffcommerce/core";
-import SelectorTile from "../../components/shared/SelectorTile";
+import SelectorTile from "../components/SelectorTile";
+import SelectorContainer from "../components/SelectorContainer";
+import LoadingOverlay from "../components/LoadingOverlay";
 
 const ProductSelector: FunctionComponent<{
     collection: ProductCollection;
@@ -19,8 +21,7 @@ const ProductSelector: FunctionComponent<{
     }, [collection]);
 
     if (loading && !collectionProducts) {
-        // TODO: spinner
-        return <div>Loading...</div>;
+        return <LoadingOverlay />;
     }
 
     if (!collectionProducts) {
@@ -29,9 +30,7 @@ const ProductSelector: FunctionComponent<{
     }
 
     return (
-        <div>
-            {/* TODO: spinner and prevent clicking */}
-            {loading && <div>Loading...</div>}
+        <SelectorContainer loading={loading}>
             {collectionProducts.map((collectionProduct) => (
                 <SelectorTile
                     key={collectionProduct.getId()}
@@ -43,7 +42,7 @@ const ProductSelector: FunctionComponent<{
                     }}
                 />
             ))}
-        </div>
+        </SelectorContainer>
     );
 };
 
