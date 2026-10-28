@@ -27,7 +27,7 @@ const StepHandler: FunctionComponent<{
             case StepType.Information:
                 return <InformationUI step={step} />;
             case StepType.Module:
-                return <ModuleUI step={step} />;
+                return <ModuleUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Question:
                 return <QuestionUI step={step} workflowExperience={workflowExperience} />;
             case StepType.Material:

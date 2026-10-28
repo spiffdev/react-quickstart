@@ -1,10 +1,12 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { Step, AnyStepData, WorkflowExperience } from "@spiffcommerce/core";
+import { Step, AnyStepData, WorkflowExperience, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
 
 const Container = styled.div`
     padding: 16px;
+    box-sizing: border-box;
+    width: 100%;
 `;
 
 const VariantGrid = styled.div`
@@ -15,19 +17,20 @@ const VariantGrid = styled.div`
     margin-bottom: 16px;
 `;
 
-const VariantCard = styled.div<{ selected?: boolean }>`
+const VariantCard = styled.div<{ $selected?: boolean; $disabled?: boolean }>`
     position: relative;
     aspect-ratio: 1;
-    border: 2px solid ${(props) => (props.selected ? "#007bff" : "#e0e0e0")};
+    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
     border-radius: 8px;
-    cursor: pointer;
+    cursor: ${(props) => (props.$disabled ? "not-allowed" : "pointer")};
     overflow: hidden;
     transition: all 0.2s;
+    opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
 
     &:hover {
-        border-color: #007bff;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        border-color: ${(props) => (props.$disabled ? "#e0e0e0" : "#007bff")};
+        transform: ${(props) => (props.$disabled ? "none" : "translateY(-2px)")};
+        box-shadow: ${(props) => (props.$disabled ? "none" : "0 4px 8px rgba(0, 0, 0, 0.1)")};
     }
 `;
 
@@ -62,47 +65,152 @@ const ColorPickerTitle = styled(Typography)`
     font-weight: 600;
 `;
 
-interface Variant {
-    id: string;
-    name: string;
-    thumbnail?: string;
+const ColorGrid = styled.div`
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
+    gap: 8px;
+    width: 100%;
+`;
+
+const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
+    aspect-ratio: 1;
+    background-color: ${(props) => props.$color};
+    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.2s;
+
+    &:hover {
+        border-color: #007bff;
+        transform: scale(1.1);
+    }
+`;
+
+interface ColorOptionDisplay {
+    fill?: string;
+    stroke?: string;
+    variant: { id?: string; color?: string };
 }
 
 const IllustrationUI: FunctionComponent<{
     step: Step<AnyStepData>;
     workflowExperience: WorkflowExperience;
     onActivation?: () => void;
-}> = ({ step, onActivation }) => {
-    const [variants] = useState<Variant[]>([]);
+}> = ({ step, workflowExperience, onActivation }) => {
+    const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
-    const [hasColorPicker] = useState(false);
+    const [colors, setColors] = useState<ColorOptionDisplay[]>([]);
+    const [selectedColorId, setSelectedColorId] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [updating, setUpdating] = useState(false);
 
     useEffect(() => {
-        // TODO: Load variants from step when API is available
-        // TODO: Check if color picker is enabled
-    }, [step]);
+        const loadData = async () => {
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) {
+                setLoading(false);
+                return;
+            }
+
+            try {
+                const allVariants = await stepHandle.getAllVariants();
+                setVariants(allVariants || []);
+
+                const currentVariant = stepHandle.getCurrentVariant();
+                if (currentVariant) {
+                    setSelectedVariantId(currentVariant.getId());
+                }
+
+                // Try to load available colors if the step supports it
+                const availableColors = await (stepHandle as any).getAvailableColors?.();
+                if (availableColors && availableColors.length > 0) {
+                    setColors(availableColors);
+                }
+            } catch (error) {
+                console.error("Error loading illustration data:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        loadData();
+    }, [step.stepName, workflowExperience]);
 
     const handleVariantClick = useCallback(
-        (variantId: string) => {
-            setSelectedVariantId(variantId);
+        async (variant: Variant) => {
+            if (updating || !variant.isEnabled()) return;
+
+            setSelectedVariantId(variant.getId());
+            setUpdating(true);
             onActivation?.();
-            // TODO: Implement variant selection logic
+
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) {
+                setUpdating(false);
+                return;
+            }
+
+            try {
+                await stepHandle.selectVariant(variant);
+            } catch (error) {
+                console.error("Error selecting illustration variant:", error);
+            } finally {
+                setUpdating(false);
+            }
         },
-        [onActivation],
+        [updating, onActivation, step.stepName, workflowExperience],
     );
+
+    const handleColorClick = useCallback(
+        async (colorOption: ColorOptionDisplay, colorClass: string) => {
+            if (updating) return;
+
+            setSelectedColorId(colorOption.variant.id || null);
+            setUpdating(true);
+            onActivation?.();
+
+            const stepHandle = workflowExperience.getStepById(step.stepName);
+            if (!stepHandle) {
+                setUpdating(false);
+                return;
+            }
+
+            try {
+                const color = colorOption.fill || colorOption.stroke;
+                if (color) {
+                    await (stepHandle as any).setColor?.(colorClass, color);
+                }
+            } catch (error) {
+                console.error("Error setting illustration color:", error);
+            } finally {
+                setUpdating(false);
+            }
+        },
+        [updating, onActivation, step.stepName, workflowExperience],
+    );
+
+    if (loading) {
+        return <Container data-test-step-type="illustration">Loading...</Container>;
+    }
+
+    const hasMultipleVariants = variants.length > 1;
+    const hasColorPicker = colors.length > 0;
 
     return (
         <Container data-test-step-type="illustration">
-            {variants.length > 1 && (
+            {hasMultipleVariants && (
                 <VariantGrid>
                     {variants.map((variant) => (
                         <VariantCard
-                            key={variant.id}
-                            selected={selectedVariantId === variant.id}
-                            onClick={() => handleVariantClick(variant.id)}
+                            key={variant.getId()}
+                            $selected={selectedVariantId === variant.getId()}
+                            $disabled={updating || !variant.isEnabled()}
+                            onClick={() => handleVariantClick(variant)}
                         >
-                            {variant.thumbnail && <VariantImage src={variant.thumbnail} alt={variant.name} />}
-                            <VariantName>{variant.name}</VariantName>
+                            {variant.getThumbnail() && (
+                                <VariantImage src={variant.getThumbnail()} alt={variant.getName()} />
+                            )}
+                            <VariantName>{variant.getName()}</VariantName>
                         </VariantCard>
                     ))}
                 </VariantGrid>
@@ -110,7 +218,16 @@ const IllustrationUI: FunctionComponent<{
             {hasColorPicker && (
                 <ColorPickerSection>
                     <ColorPickerTitle variant="h3">Color Options</ColorPickerTitle>
-                    {/* TODO: Implement SVG color picker */}
+                    <ColorGrid>
+                        {colors.map((color, index) => (
+                            <ColorSwatch
+                                key={color.variant.id || index}
+                                $color={color.fill || color.stroke || "#cccccc"}
+                                $selected={selectedColorId === color.variant.id}
+                                onClick={() => handleColorClick(color, "fill")}
+                            />
+                        ))}
+                    </ColorGrid>
                 </ColorPickerSection>
             )}
         </Container>
