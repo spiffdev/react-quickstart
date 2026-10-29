@@ -1,7 +1,8 @@
-import { FunctionComponent, useEffect, useState } from "react";
+import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import useCurrency from "../../hooks/useCurrency";
 import { PricingProvider } from "../../hooks/usePricing";
+import { canDownloadPreview, downloadPreview } from "./downloadPreview";
 import {
     AnyStepData,
     DigitalContentStepHandle,
@@ -9,6 +10,7 @@ import {
     FrameStepHandle,
     IllustrationStepHandle,
     InformationStepHandle,
+    MandatorySteps,
     MaterialStepHandle,
     ModelStepHandle,
     ModuleStepHandle,
@@ -40,6 +42,18 @@ import {
     FinishUI,
 } from "./Steps";
 
+// Only these step types can be marked as mandatory, matching Beeline.
+const STEP_TYPES_WITH_MANDATORY_SUPPORT = [
+    StepType.Frame,
+    StepType.Illustration,
+    StepType.Module,
+    StepType.Picture,
+    StepType.Question,
+    StepType.Text,
+    StepType.Model,
+    StepType.DigitalContent,
+];
+
 const TotalBar = styled.div`
     position: sticky;
     top: 0;
@@ -57,8 +71,9 @@ const StepHandler: FunctionComponent<{
     workflowExperience: WorkflowExperience;
     selectionCost: number;
     exportedData: ExportedStepData[];
+    onActivate: (stepName: string) => void;
     onFinished: () => void | Promise<void>;
-}> = ({ step, workflowExperience, selectionCost, exportedData, onFinished }) => {
+}> = ({ step, workflowExperience, selectionCost, exportedData, onActivate, onFinished }) => {
     const renderStepComponent = () => {
         // The finish step has no handle.
         if (step.type === StepType.Finish) {
@@ -70,23 +85,61 @@ const StepHandler: FunctionComponent<{
                     basePrice={workflowExperience.getProduct()?.basePrice || 0}
                     selectionCost={selectionCost}
                     showPricing={workflow?.showPricing !== false}
+                    onDownloadPreview={
+                        canDownloadPreview(workflowExperience) ? () => downloadPreview(workflowExperience) : undefined
+                    }
                     onFinished={onFinished}
                 />
             );
         }
 
         const handle = workflowExperience.getStepById(step.stepName);
+        const onActivation = () => onActivate(step.stepName);
         if (handle instanceof InformationStepHandle) return <InformationUI step={handle} />;
-        if (handle instanceof ModuleStepHandle) return <ModuleUI step={handle} />;
-        if (handle instanceof QuestionStepHandle) return <QuestionUI step={handle} />;
-        if (handle instanceof MaterialStepHandle) return <MaterialUI step={handle} />;
-        if (handle instanceof ModelStepHandle) return <ModelUI step={handle} />;
-        if (handle instanceof PictureStepHandle) return <PictureUI step={handle} />;
-        if (handle instanceof IllustrationStepHandle) return <IllustrationUI step={handle} />;
-        if (handle instanceof ShapeStepHandle) return <ShapeUI step={handle} />;
-        if (handle instanceof TextStepHandle) return <TextUI step={handle} />;
-        if (handle instanceof DigitalContentStepHandle) return <DigitalContentUI step={handle} />;
-        if (handle instanceof FrameStepHandle) return <FrameUI step={handle} />;
+        if (handle instanceof ModuleStepHandle) {
+            return (
+                <ModuleUI
+                    step={handle}
+                    workflowManager={workflowExperience.getWorkflowManager()}
+                    onActivation={onActivation}
+                />
+            );
+        }
+        if (handle instanceof QuestionStepHandle) return <QuestionUI step={handle} onActivation={onActivation} />;
+        if (handle instanceof MaterialStepHandle) return <MaterialUI step={handle} onActivation={onActivation} />;
+        if (handle instanceof ModelStepHandle) return <ModelUI step={handle} onActivation={onActivation} />;
+        if (handle instanceof PictureStepHandle) return <PictureUI step={handle} onActivation={onActivation} />;
+        if (handle instanceof IllustrationStepHandle) {
+            return <IllustrationUI step={handle} onActivation={onActivation} />;
+        }
+        if (handle instanceof ShapeStepHandle) return <ShapeUI step={handle} onActivation={onActivation} />;
+        if (handle instanceof TextStepHandle) {
+            return (
+                <TextUI
+                    step={handle}
+                    workflowManager={workflowExperience.getWorkflowManager()}
+                    onActivation={onActivation}
+                />
+            );
+        }
+        if (handle instanceof DigitalContentStepHandle) {
+            return (
+                <DigitalContentUI
+                    step={handle}
+                    workflowManager={workflowExperience.getWorkflowManager()}
+                    onActivation={onActivation}
+                />
+            );
+        }
+        if (handle instanceof FrameStepHandle) {
+            return (
+                <FrameUI
+                    step={handle}
+                    workflowManager={workflowExperience.getWorkflowManager()}
+                    onActivation={onActivation}
+                />
+            );
+        }
 
         return (
             <div>
@@ -112,6 +165,8 @@ const Customization: FunctionComponent<{
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
+    const [mandatorySteps, setMandatorySteps] = useState<MandatorySteps>({});
+    const activeStepName = useRef<string | undefined>(undefined);
     const formatPrice = useCurrency();
 
     const workflow = workflowExperience.getWorkflow();
@@ -120,20 +175,10 @@ const Customization: FunctionComponent<{
     const showPlus = workflow?.showPlusInVariantPrices !== false;
     const totalPrice = (workflowExperience.getProduct()?.basePrice || 0) + selectionCost;
 
-    // TEMPORARY pricing diagnostics - remove once the pricing display is confirmed working.
     useEffect(() => {
-        console.log("[pricing-debug]", {
-            workflowShowPricing: workflow?.showPricing,
-            showPricing,
-            hasCurrencyFormatter: !!formatPrice,
-            productBasePrice: workflowExperience.getProduct()?.basePrice,
-            selectionCost,
-            totalPrice,
-        });
-    }, [workflow, showPricing, formatPrice, workflowExperience, selectionCost, totalPrice]);
-
-    useEffect(() => {
-        workflowExperience.getWorkflowManager().addSelectionCallback((callbackOptions) => {
+        const manager = workflowExperience.getWorkflowManager();
+        manager.addMandatoryCallback(setMandatorySteps);
+        manager.addSelectionCallback((callbackOptions) => {
             setSelectionCost(callbackOptions.selectionCost || 0);
             setTraversableScenes(callbackOptions.traversableScenes);
             workflowExperience
@@ -142,6 +187,40 @@ const Customization: FunctionComponent<{
                 .catch((error) => console.error("Error loading exported step data:", error));
         });
     }, [workflowExperience]);
+
+    // When the customer first interacts with a different step, play that step's camera and model animations.
+    const handleActivation = useCallback(
+        (stepName: string) => {
+            if (activeStepName.current === stepName) return;
+            activeStepName.current = stepName;
+            workflowExperience.getStepById(stepName)?.executeAnimations();
+        },
+        [workflowExperience],
+    );
+
+    // Throws an error with a customer-readable message when the design isn't ready to be finished.
+    const handleFinish = useCallback(async () => {
+        const manager = workflowExperience.getWorkflowManager();
+        if (manager.getUpdatesPending()) {
+            throw new Error("Your design is still updating. Please wait a moment and try again.");
+        }
+
+        const validationErrors = manager.getValidationErrors();
+        for (const scene of traversableScenes) {
+            for (const step of scene.renderableSteps) {
+                if (step.mandatory && STEP_TYPES_WITH_MANDATORY_SUPPORT.includes(step.type)) {
+                    if (!mandatorySteps[step.stepName]) {
+                        throw new Error(`"${step.stepTitle}" is required before you can continue.`);
+                    }
+                }
+                if (validationErrors.steps.has(step.stepName)) {
+                    throw new Error(`Please check "${step.stepTitle}" before you continue.`);
+                }
+            }
+        }
+
+        await onNext();
+    }, [mandatorySteps, onNext, traversableScenes, workflowExperience]);
 
     if (traversableScenes.length === 0) {
         // TODO: spinner
@@ -184,7 +263,8 @@ const Customization: FunctionComponent<{
                                         workflowExperience={workflowExperience}
                                         selectionCost={selectionCost}
                                         exportedData={exportedData}
-                                        onFinished={onNext}
+                                        onActivate={handleActivation}
+                                        onFinished={handleFinish}
                                     />
                                 ))}
                             </Card>

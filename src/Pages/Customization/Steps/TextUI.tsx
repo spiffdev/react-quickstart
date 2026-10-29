@@ -1,7 +1,8 @@
-import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { ColorOption, TextChangeResult, TextStepHandle } from "@spiffcommerce/core";
-import styled from "styled-components";
+import { ChangeEvent, FunctionComponent, useCallback, useEffect, useState } from "react";
+import { ColorOption, TextChangeResult, TextStepHandle, Variant, WorkflowManager } from "@spiffcommerce/core";
+import styled, { css } from "styled-components";
 import Typography from "../../../components/typography";
+import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
     padding: 16px;
@@ -9,24 +10,53 @@ const Container = styled.div`
     width: 100%;
 `;
 
-const TextField = styled.input<{ $error?: boolean }>`
+const fieldStyles = css<{ $error?: boolean }>`
     width: 100%;
     padding: 12px;
     border: 1px solid ${(props) => (props.$error ? "#d32f2f" : "#ccc")};
     border-radius: 4px;
     font-size: 16px;
+    font-family: inherit;
     box-sizing: border-box;
 
     &:focus {
         outline: none;
         border-color: ${(props) => (props.$error ? "#d32f2f" : "#007bff")};
     }
+
+    &:disabled {
+        background-color: #f5f5f5;
+        cursor: not-allowed;
+    }
+`;
+
+const TextField = styled.input<{ $error?: boolean }>`
+    ${fieldStyles}
+`;
+
+const TextArea = styled.textarea<{ $error?: boolean }>`
+    ${fieldStyles}
+    min-height: 80px;
+    resize: vertical;
 `;
 
 const HelperText = styled(Typography)<{ $error?: boolean }>`
     margin-top: 4px;
     font-size: 12px;
     color: ${(props) => (props.$error ? "#d32f2f" : "#666")};
+`;
+
+const EditAllLabel = styled.label`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+    font-size: 13px;
+    cursor: pointer;
+`;
+
+const Section = styled.div`
+    margin-top: 16px;
 `;
 
 const ColorSection = styled.div`
@@ -53,6 +83,8 @@ const ColorGrid = styled.div`
 const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     aspect-ratio: 1;
     background-color: ${(props) => props.$color};
+    background-size: cover;
+    background-position: center;
     border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
     border-radius: 8px;
     cursor: pointer;
@@ -95,37 +127,93 @@ const remainingText = (remaining: number | undefined) =>
 
 const TextUI: FunctionComponent<{
     step: TextStepHandle;
+    workflowManager: WorkflowManager;
     onActivation?: () => void;
-}> = ({ step, onActivation }) => {
+}> = ({ step, workflowManager, onActivation }) => {
     const [text, setText] = useState(() => step.getText());
     const [helperText, setHelperText] = useState(() => remainingText(step.getCharactersRemaining()));
     const [error, setError] = useState(false);
+    const [customiseAllText, setCustomiseAllText] = useState(
+        () => !!workflowManager.getStepStorage(step.getId())?.customiseAllText,
+    );
+    const [variants, setVariants] = useState<Variant[]>([]);
+    const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
+        step.getCurrentVariant()?.getId(),
+    );
+    const [variantPending, setVariantPending] = useState(false);
     const [fillColors, setFillColors] = useState<ColorOption[]>([]);
     const [strokeColors, setStrokeColors] = useState<ColorOption[]>([]);
+    const [imageFills, setImageFills] = useState<Awaited<ReturnType<TextStepHandle["getAvailableFillImages"]>>>([]);
     const [selectedFill, setSelectedFill] = useState<string | undefined>(() => step.getFillColor());
     const [selectedStroke, setSelectedStroke] = useState<string | undefined>(() => step.getStrokeColor());
+    const [selectedImage, setSelectedImage] = useState<string | undefined>(() => step.getFillImage()?.src);
 
     useEffect(() => {
+        step.getAllVariants()
+            .then((allVariants) => setVariants(allVariants || []))
+            .catch((loadError) => console.error("Error loading text variants:", loadError));
         step.getAvailableFillColors()
             .then(setFillColors)
-            .catch((error) => console.error("Error loading fill colors:", error));
+            .catch((loadError) => console.error("Error loading fill colors:", loadError));
         step.getAvailableStrokeColors()
             .then(setStrokeColors)
-            .catch((error) => console.error("Error loading stroke colors:", error));
+            .catch((loadError) => console.error("Error loading stroke colors:", loadError));
+        step.getAvailableFillImages()
+            .then(setImageFills)
+            .catch((loadError) => console.error("Error loading fill images:", loadError));
     }, [step]);
 
+    const applyResult = useCallback((result: TextChangeResult) => {
+        const message = errorMessage(result);
+        setError(!!message);
+        setHelperText(message ?? remainingText(result.helperData.charactersRemaining));
+    }, []);
+
     const handleTextChange = useCallback(
-        (event: React.ChangeEvent<HTMLInputElement>) => {
+        (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
             const value = event.target.value;
             setText(value);
             onActivation?.();
-
-            const result = step.setText(value);
-            const message = errorMessage(result);
-            setError(!!message);
-            setHelperText(message ?? remainingText(result.helperData.charactersRemaining));
+            applyResult(step.setText(value));
         },
-        [onActivation, step],
+        [applyResult, onActivation, step],
+    );
+
+    const handleFocus = useCallback(() => {
+        onActivation?.();
+        const result = step.clearDefaultTextIfNecessary();
+        if (result) {
+            setText(result.input);
+        }
+    }, [onActivation, step]);
+
+    const handleCustomiseAllChange = useCallback(
+        (checked: boolean) => {
+            setCustomiseAllText(checked);
+            const result = step.setFullTextCustomization(checked);
+            setText(result.input);
+            applyResult(result);
+        },
+        [applyResult, step],
+    );
+
+    const handleVariantSelect = useCallback(
+        async (variant: Variant) => {
+            if (variantPending) return;
+
+            setSelectedVariantId(variant.getId());
+            setVariantPending(true);
+            onActivation?.();
+
+            try {
+                await step.selectVariant(variant);
+            } catch (selectError) {
+                console.error("Error selecting text variant:", selectError);
+            } finally {
+                setVariantPending(false);
+            }
+        },
+        [onActivation, step, variantPending],
     );
 
     const handleFillColorClick = useCallback(
@@ -135,8 +223,22 @@ const TextUI: FunctionComponent<{
 
             try {
                 await step.setFillColor(color);
-            } catch (error) {
-                console.error("Error setting fill color:", error);
+            } catch (fillError) {
+                console.error("Error setting fill color:", fillError);
+            }
+        },
+        [onActivation, step],
+    );
+
+    const handleFillImageClick = useCallback(
+        async (fillImage: (typeof imageFills)[number]) => {
+            setSelectedImage(fillImage.src);
+            onActivation?.();
+
+            try {
+                await step.setFillImage(fillImage);
+            } catch (fillError) {
+                console.error("Error setting fill image:", fillError);
             }
         },
         [onActivation, step],
@@ -149,44 +251,106 @@ const TextUI: FunctionComponent<{
 
             try {
                 await step.setStrokeColor(color);
-            } catch (error) {
-                console.error("Error setting stroke color:", error);
+            } catch (strokeError) {
+                console.error("Error setting stroke color:", strokeError);
             }
         },
         [onActivation, step],
     );
 
-    const showFillColors = !!step.hasColorPicker() && fillColors.length > 0;
+    const showImageFills = imageFills.length > 1;
+    const showFillColors = !showImageFills && !!step.hasColorPicker() && fillColors.length > 0;
     const showStrokeColors = strokeColors.length > 0;
+    const fieldProps = {
+        value: text,
+        onChange: handleTextChange,
+        onFocus: handleFocus,
+        placeholder: "Enter text...",
+        disabled: variantPending,
+        $error: error,
+    };
 
     return (
         <Container data-test-step-type="text">
-            <TextField
-                type="text"
-                value={text}
-                onChange={handleTextChange}
-                onFocus={onActivation}
-                placeholder="Enter text..."
-                $error={error}
-            />
+            {step.newLinesSupported() ? <TextArea {...fieldProps} /> : <TextField type="text" {...fieldProps} />}
             {helperText && (
                 <HelperText variant="span" $error={error}>
                     {helperText}
                 </HelperText>
             )}
-            {showFillColors && (
+            {step.isReplaceable() && (
+                <EditAllLabel>
+                    <input
+                        type="checkbox"
+                        checked={customiseAllText}
+                        disabled={variantPending}
+                        onChange={(event) => handleCustomiseAllChange(event.target.checked)}
+                    />
+                    Edit all text
+                </EditAllLabel>
+            )}
+            {variants.length > 1 && (
+                <Section>
+                    <VariantGallery
+                        variants={variants}
+                        selectedVariantId={selectedVariantId}
+                        disabled={variantPending}
+                        categoriesEnabled={step.isVariantCategoriesEnabled()}
+                        onSelect={handleVariantSelect}
+                    />
+                </Section>
+            )}
+            {showImageFills && (
                 <ColorSection>
-                    <ColorTitle variant="h3">Text Color</ColorTitle>
+                    <ColorTitle variant="h3">Text Fill</ColorTitle>
                     <ColorGrid>
-                        {fillColors.map((color, index) => (
+                        {imageFills.map((fillImage) => (
                             <ColorSwatch
-                                key={color.variant?.id || index}
-                                $color={fillValue(color) || "#000000"}
-                                $selected={selectedFill !== undefined && selectedFill === fillValue(color)}
-                                onClick={() => handleFillColorClick(color)}
+                                key={fillImage.src}
+                                $color="transparent"
+                                $selected={selectedImage === fillImage.src}
+                                style={{ backgroundImage: `url("${fillImage.src.replace(/"/g, "%22")}")` }}
+                                onClick={() => handleFillImageClick(fillImage)}
                             />
                         ))}
                     </ColorGrid>
+                </ColorSection>
+            )}
+            {showFillColors && (
+                <ColorSection>
+                    <ColorTitle variant="h3">Text Color</ColorTitle>
+                    {fillColors.some((color) => !!color.variant?.thumbnail) ? (
+                        <VariantGallery
+                            variants={fillColors.map(
+                                (color) =>
+                                    new Variant({
+                                        name: fillValue(color) ?? "",
+                                        enabled: true,
+                                        priceModifier: 0,
+                                        ...color.variant,
+                                        color: color.variant?.color || fillValue(color),
+                                    }),
+                            )}
+                            selectedVariantId={
+                                fillColors.find((color) => fillValue(color) === selectedFill)?.variant?.id
+                            }
+                            onSelect={(variant) => {
+                                const color = fillColors.find((c) => c.variant?.id === variant.getId());
+                                if (color) handleFillColorClick(color);
+                            }}
+                        />
+                    ) : (
+                        <ColorGrid>
+                            {fillColors.map((color, index) => (
+                                <ColorSwatch
+                                    key={color.variant?.id || index}
+                                    $color={fillValue(color) || "#000000"}
+                                    $selected={selectedFill !== undefined && selectedFill === fillValue(color)}
+                                    onClick={() => handleFillColorClick(color)}
+                                />
+                            ))}
+                        </ColorGrid>
+                    )}
                 </ColorSection>
             )}
             {showStrokeColors && (

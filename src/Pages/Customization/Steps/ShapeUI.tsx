@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { ShapeStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
+import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
     padding: 16px;
@@ -110,18 +111,36 @@ const ShapeUI: FunctionComponent<{
         return null;
     }
 
+    // Colors with thumbnails read better as a gallery than as plain swatches.
+    const useGallery = colors.some((color) => !!color.variant.thumbnail);
+
     return (
         <Container data-test-step-type="shape">
-            <ColorGrid>
-                {colors.map((color, index) => (
-                    <ColorSwatch
-                        key={color.variant.id || index}
-                        $color={color.fill || color.stroke || "#cccccc"}
-                        $selected={selectedVariantId === color.variant.id}
-                        onClick={() => handleColorClick(color)}
-                    />
-                ))}
-            </ColorGrid>
+            {useGallery ? (
+                <VariantGallery
+                    variants={colors.map(
+                        (color) =>
+                            new Variant({ ...color.variant, color: color.variant.color || color.fill || color.stroke }),
+                    )}
+                    selectedVariantId={selectedVariantId}
+                    categoriesEnabled={step.isVariantCategoriesEnabled()}
+                    onSelect={(variant) => {
+                        const color = colors.find((c) => c.variant.id === variant.getId());
+                        if (color) handleColorClick(color);
+                    }}
+                />
+            ) : (
+                <ColorGrid>
+                    {colors.map((color, index) => (
+                        <ColorSwatch
+                            key={color.variant.id || index}
+                            $color={color.fill || color.stroke || "#cccccc"}
+                            $selected={selectedVariantId === color.variant.id}
+                            onClick={() => handleColorClick(color)}
+                        />
+                    ))}
+                </ColorGrid>
+            )}
             {isCustom && (
                 <CustomColorSection>
                     <ColorInput type="color" value={customColor} onChange={handleCustomColorChange} />

@@ -1,5 +1,5 @@
-import { FunctionComponent, useCallback, useState } from "react";
-import { ModuleStepHandle } from "@spiffcommerce/core";
+import { ChangeEvent, FunctionComponent, useCallback, useEffect, useState } from "react";
+import { InformationMessageType, ModuleStepHandle, WorkflowManager } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
 
@@ -9,11 +9,11 @@ const Container = styled.div`
     width: 100%;
 `;
 
-const TextArea = styled.textarea`
+const TextArea = styled.textarea<{ $error?: boolean }>`
     width: 100%;
     min-height: 100px;
     padding: 12px;
-    border: 1px solid #ccc;
+    border: 1px solid ${(props) => (props.$error ? "#d32f2f" : "#ccc")};
     border-radius: 4px;
     font-size: 16px;
     font-family: inherit;
@@ -22,7 +22,7 @@ const TextArea = styled.textarea`
 
     &:focus {
         outline: none;
-        border-color: #007bff;
+        border-color: ${(props) => (props.$error ? "#d32f2f" : "#007bff")};
     }
 
     &:disabled {
@@ -31,33 +31,49 @@ const TextArea = styled.textarea`
     }
 `;
 
-const HelperText = styled(Typography)`
+const HelperText = styled(Typography)<{ $error?: boolean }>`
     margin-top: 8px;
     font-size: 13px;
-    color: #666;
+    color: ${(props) => (props.$error ? "#d32f2f" : "#666")};
 `;
 
-function getHelperText(step: ModuleStepHandle) {
+const remainingText = (step: ModuleStepHandle) => {
     const remaining = step.getCharactersRemaining();
     return remaining !== undefined ? `${remaining} characters remaining` : "";
-}
+};
 
 const ModuleUI: FunctionComponent<{
     step: ModuleStepHandle;
+    workflowManager: WorkflowManager;
     onActivation?: () => void;
-}> = ({ step, onActivation }) => {
+}> = ({ step, workflowManager, onActivation }) => {
     const [text, setText] = useState(() => step.getText());
-    const [helperText, setHelperText] = useState(() => getHelperText(step));
+    const [helperText, setHelperText] = useState(() => remainingText(step));
+    const [error, setError] = useState(false);
+    const [initialised, setInitialised] = useState(false);
+
+    useEffect(() => {
+        workflowManager.addInitCallback((stepInitialised) => {
+            setInitialised(stepInitialised[step.getId()] || false);
+        });
+    }, [step, workflowManager]);
 
     const handleTextChange = useCallback(
-        (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-            const value = e.target.value;
+        (event: ChangeEvent<HTMLTextAreaElement>) => {
+            const value = event.target.value;
             onActivation?.();
             step.setText(value);
             setText(value);
-            setHelperText(getHelperText(step));
+
+            const firstError = workflowManager
+                .getInformationResults()
+                .find(
+                    (result) => result.stepID === step.getId() && result.messageType === InformationMessageType.Error,
+                );
+            setError(!!firstError);
+            setHelperText(firstError?.message ?? remainingText(step));
         },
-        [onActivation, step],
+        [onActivation, step, workflowManager],
     );
 
     return (
@@ -67,8 +83,14 @@ const ModuleUI: FunctionComponent<{
                 onChange={handleTextChange}
                 onFocus={onActivation}
                 placeholder="Enter your text here..."
+                disabled={!initialised}
+                $error={error}
             />
-            {helperText && <HelperText variant="span">{helperText}</HelperText>}
+            {helperText && (
+                <HelperText variant="span" $error={error}>
+                    {helperText}
+                </HelperText>
+            )}
         </Container>
     );
 };
