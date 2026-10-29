@@ -4,9 +4,10 @@ import Button from "../../components/button";
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 
-const TileCard = styled(Card)`
+const TileCard = styled(Card)<{ $selected?: boolean }>`
     width: 250px;
     height: 400px;
+    ${(props) => props.$selected && "border-color: var(--theme-primary-color); box-shadow: var(--theme-primary-color) 0px 0px 4px 1px;"}
 `;
 
 const ImageContainer = styled.div`
@@ -25,14 +26,16 @@ const TileImage = styled.img`
 const SelectorTile: FunctionComponent<{
     imageUrl?: string;
     title: string;
+    /** Marks the choice the customer already made, when they come back to this page. */
+    selected?: boolean;
     onClick: () => void;
-}> = ({ imageUrl, title, onClick }) => {
+}> = ({ imageUrl, title, selected, onClick }) => {
     return (
-        <TileCard>
+        <TileCard $selected={selected}>
             <ImageContainer>{imageUrl ? <TileImage src={imageUrl} /> : undefined}</ImageContainer>
             <Typography>{title}</Typography>
             <Button onClick={() => onClick()}>
-                <Typography>Select</Typography>
+                <Typography>{selected ? "Selected" : "Select"}</Typography>
             </Button>
         </TileCard>
     );

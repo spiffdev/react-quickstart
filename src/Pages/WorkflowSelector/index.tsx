@@ -5,8 +5,9 @@ import SelectorContainer from "../components/SelectorContainer";
 
 const WorkflowSelector: FunctionComponent<{
     product: CollectionProduct;
-    onWorkflowSelected: (workflow: ProductWorkflow) => void;
-}> = ({ product, onWorkflowSelected }) => {
+    selectedWorkflowId?: string;
+    onWorkflowSelected: (workflow: ProductWorkflow) => void | Promise<void>;
+}> = ({ product, selectedWorkflowId, onWorkflowSelected }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [workflows, setWorkflows] = useState<ProductWorkflow[] | undefined>(undefined);
 
@@ -35,9 +36,11 @@ const WorkflowSelector: FunctionComponent<{
                     key={workflow.getId()}
                     imageUrl={workflow.getThumbnail()}
                     title={workflow.getName()}
+                    selected={workflow.getId() === selectedWorkflowId}
                     onClick={() => {
                         setLoading(true);
-                        onWorkflowSelected(workflow);
+                        // The tiles stop loading again if the selection fails and the customer stays on this page.
+                        Promise.resolve(onWorkflowSelected(workflow)).finally(() => setLoading(false));
                     }}
                 />
             ))}

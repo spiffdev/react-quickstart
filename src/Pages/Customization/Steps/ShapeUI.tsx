@@ -1,6 +1,8 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { ShapeStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
+import { swatchBackground } from "../components/customColor";
+import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
     padding: 16px;
@@ -17,14 +19,14 @@ const ColorGrid = styled.div`
 
 const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     aspect-ratio: 1;
-    background-color: ${(props) => props.$color};
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
+    background: ${(props) => props.$color};
+    border: 2px solid ${(props) => (props.$selected ? "var(--theme-primary-color)" : "#e0e0e0")};
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
 
     &:hover {
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
         transform: scale(1.05);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
@@ -110,18 +112,36 @@ const ShapeUI: FunctionComponent<{
         return null;
     }
 
+    // Colors with thumbnails read better as a gallery than as plain swatches.
+    const useGallery = colors.some((color) => !!color.variant.thumbnail);
+
     return (
         <Container data-test-step-type="shape">
-            <ColorGrid>
-                {colors.map((color, index) => (
-                    <ColorSwatch
-                        key={color.variant.id || index}
-                        $color={color.fill || color.stroke || "#cccccc"}
-                        $selected={selectedVariantId === color.variant.id}
-                        onClick={() => handleColorClick(color)}
-                    />
-                ))}
-            </ColorGrid>
+            {useGallery ? (
+                <VariantGallery
+                    variants={colors.map(
+                        (color) =>
+                            new Variant({ ...color.variant, color: color.variant.color || color.fill || color.stroke }),
+                    )}
+                    selectedVariantId={selectedVariantId}
+                    categoriesEnabled={step.isVariantCategoriesEnabled()}
+                    onSelect={(variant) => {
+                        const color = colors.find((c) => c.variant.id === variant.getId());
+                        if (color) handleColorClick(color);
+                    }}
+                />
+            ) : (
+                <ColorGrid>
+                    {colors.map((color, index) => (
+                        <ColorSwatch
+                            key={color.variant.id || index}
+                            $color={swatchBackground(color.fill || color.stroke || color.variant.color)}
+                            $selected={selectedVariantId === color.variant.id}
+                            onClick={() => handleColorClick(color)}
+                        />
+                    ))}
+                </ColorGrid>
+            )}
             {isCustom && (
                 <CustomColorSection>
                     <ColorInput type="color" value={customColor} onChange={handleCustomColorChange} />

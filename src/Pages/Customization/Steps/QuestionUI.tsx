@@ -2,6 +2,7 @@ import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { QuestionStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 import useVariantPrice from "../../../hooks/usePricing";
+import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
     padding: 16px;
@@ -21,7 +22,7 @@ const Select = styled.select`
 
     &:focus {
         outline: none;
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
     }
 
     &:disabled {
@@ -32,54 +33,6 @@ const Select = styled.select`
 
 const Option = styled.option`
     padding: 12px;
-`;
-
-const VariantGrid = styled.div`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px;
-    width: 100%;
-`;
-
-const VariantCard = styled.div<{ $selected?: boolean; $disabled?: boolean }>`
-    position: relative;
-    aspect-ratio: 1;
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
-    border-radius: 8px;
-    cursor: ${(props) => (props.$disabled ? "not-allowed" : "pointer")};
-    overflow: hidden;
-    transition: all 0.2s;
-    opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
-
-    &:hover {
-        border-color: ${(props) => (props.$disabled ? "#e0e0e0" : "#007bff")};
-        transform: ${(props) => (props.$disabled ? "none" : "translateY(-2px)")};
-        box-shadow: ${(props) => (props.$disabled ? "none" : "0 4px 8px rgba(0, 0, 0, 0.1)")};
-    }
-`;
-
-const VariantImage = styled.img`
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-`;
-
-const VariantPrice = styled.span`
-    display: block;
-    font-size: 11px;
-    opacity: 0.8;
-`;
-
-const VariantName = styled.div`
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    font-size: 12px;
-    text-align: center;
 `;
 
 const QuestionUI: FunctionComponent<{
@@ -147,24 +100,12 @@ const QuestionUI: FunctionComponent<{
     return (
         <Container data-test-step-type="question">
             {isGalleryMode ? (
-                <VariantGrid>
-                    {variants.map((variant) => (
-                        <VariantCard
-                            key={variant.getId()}
-                            $selected={selectedValue === variant.getId()}
-                            $disabled={updating || !variant.isEnabled()}
-                            onClick={() => selectVariant(variant)}
-                        >
-                            {variant.getThumbnail() && (
-                                <VariantImage src={variant.getThumbnail()} alt={variant.getName()} />
-                            )}
-                            <VariantName>
-                                {variant.getName()}
-                                {getVariantPrice(variant) && <VariantPrice>{getVariantPrice(variant)}</VariantPrice>}
-                            </VariantName>
-                        </VariantCard>
-                    ))}
-                </VariantGrid>
+                <VariantGallery
+                    variants={variants}
+                    selectedVariantId={selectedValue}
+                    disabled={updating}
+                    onSelect={selectVariant}
+                />
             ) : (
                 <Select value={selectedValue} onChange={handleDropdownChange} disabled={updating}>
                     <option value="">Select an option...</option>

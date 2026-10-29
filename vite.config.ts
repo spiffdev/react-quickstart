@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import svgr from "vite-plugin-svgr";
 // @ts-expect-error - spiffThemePlugin export may not be in type definitions yet
 import { spiffThemePlugin } from "@spiffcommerce/theme-bridge/plugin";
-import { configurationSchema } from "./src/configurationSchema";
+import { configurationSchema, pageSettings } from "./src/configurationSchema";
 import { existsSync, readFileSync } from "fs";
 
 // https://vitejs.dev/config/
@@ -15,7 +15,7 @@ export default defineConfig((env) => {
             __LOCAL_DEV_CONFIGURATION__: themeConfiguration,
             "globalThis.__DEV__": JSON.stringify(false),
         },
-        plugins: [svgr(), spiffThemePlugin({ configurationSchema, includePreloadChunks: false })],
+        plugins: [svgr(), spiffThemePlugin({ configurationSchema, pageSettings, includePreloadChunks: false })],
         build: {
             emptyOutDir: true,
             rollupOptions: {

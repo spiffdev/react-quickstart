@@ -40,6 +40,12 @@ const SummaryItem = styled.div`
     }
 `;
 
+const ErrorText = styled(Typography)`
+    margin: 12px 0 0 0;
+    font-size: 13px;
+    color: #d32f2f;
+`;
+
 const SummaryValue = styled.div`
     display: flex;
     gap: 12px;
@@ -64,12 +70,12 @@ const Label = styled.label`
 `;
 
 const TermsLink = styled(Typography)`
-    color: #007bff;
+    color: var(--theme-primary-color);
     text-decoration: underline;
     cursor: pointer;
 
     &:hover {
-        color: #0056b3;
+        color: var(--theme-primary-color-hover);
     }
 `;
 
@@ -94,8 +100,9 @@ const FinishUI: FunctionComponent<{
     basePrice: number;
     selectionCost: number;
     showPricing: boolean;
+    onDownloadPreview?: () => Promise<void>;
     onFinished?: () => void | Promise<void>;
-}> = ({ termsMarkdown, exportedData, basePrice, selectionCost, showPricing, onFinished }) => {
+}> = ({ termsMarkdown, exportedData, basePrice, selectionCost, showPricing, onDownloadPreview, onFinished }) => {
     const currencyFormatter = useCurrency();
     const totalPrice = basePrice + selectionCost;
     // Prices are only shown when enabled, chargeable, and a presentment currency is available.
@@ -111,16 +118,31 @@ const FinishUI: FunctionComponent<{
     const [isConfirmed, setIsConfirmed] = useState(false);
     const [showTerms, setShowTerms] = useState(false);
     const [finishing, setFinishing] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const [finishError, setFinishError] = useState("");
 
     const handleFinish = useCallback(async () => {
+        setFinishError("");
         setFinishing(true);
         try {
             await onFinished?.();
         } catch (error) {
             console.error("Error finishing design:", error);
+            setFinishError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
             setFinishing(false);
         }
     }, [onFinished]);
+
+    const handleDownloadPreview = useCallback(async () => {
+        setDownloading(true);
+        try {
+            await onDownloadPreview?.();
+        } catch (error) {
+            console.error("Error downloading preview:", error);
+        } finally {
+            setDownloading(false);
+        }
+    }, [onDownloadPreview]);
 
     const handleAgree = useCallback(() => {
         setIsConfirmed(true);
@@ -165,9 +187,13 @@ const FinishUI: FunctionComponent<{
                     )}
                 </OrderSummary>
             )}
-            <ButtonGroup>
-                <Button fullWidth>Download Preview</Button>
-            </ButtonGroup>
+            {onDownloadPreview && (
+                <ButtonGroup>
+                    <Button fullWidth disabled={downloading} onClick={handleDownloadPreview}>
+                        {downloading ? "Preparing preview..." : "Download Preview"}
+                    </Button>
+                </ButtonGroup>
+            )}
             {termsMarkdown && (
                 <>
                     <CheckboxContainer>
@@ -201,6 +227,7 @@ const FinishUI: FunctionComponent<{
             <Button fullWidth disabled={(!!termsMarkdown && !isConfirmed) || finishing} onClick={handleFinish}>
                 {finishing ? "Adding to cart..." : "Complete Design"}
             </Button>
+            {finishError && <ErrorText variant="p">{finishError}</ErrorText>}
         </Container>
     );
 };

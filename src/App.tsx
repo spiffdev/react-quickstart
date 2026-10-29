@@ -1,12 +1,15 @@
-import { FunctionComponent, useEffect, useState } from "react";
+import { FunctionComponent, ReactNode, useEffect, useState } from "react";
 import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommerce/theme-bridge";
-import { ActivationData, Bundle, CurrencyContext, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
+import { ActivationData, Bundle, CurrencyContext, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
 import { CurrencyProvider } from "./hooks/useCurrency";
+import { ThemeProvider } from "./hooks/useTheme";
+import { ThemeConfigurationProvider } from "./hooks/useThemeConfiguration";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
 import { ClientProvider } from "./hooks/useClient";
 import LoadingOverlay from "./Pages/components/LoadingOverlay";
+import ErrorScreen from "./components/ErrorScreen";
 
 function getProductCollectionForNewBundle(context: ThemeContext): string | null {
     const c = context as ThemeContextBundle;
@@ -50,6 +53,8 @@ const App: FunctionComponent<{
 
     const [bundle, setBundle] = useState<Bundle | undefined>(undefined);
     const [currencyContext, setCurrencyContext] = useState<CurrencyContext | undefined>(undefined);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [loadAttempt, setLoadAttempt] = useState(0);
 
     useEffect(() => {
         if (!context.currency) {
@@ -63,45 +68,44 @@ const App: FunctionComponent<{
     }, [client, context.currency]);
 
     useEffect(() => {
+        let cancelled = false;
+        setLoadFailed(false);
+
         const loadBundle = async () => {
             const c = context as ThemeContextBundle;
             if (c.bundleOptions.type === "existing") {
-                const bundle = await client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {});
-                setBundle(bundle);
-            } else {
-                const collectionId = getProductCollectionForNewBundle(context);
-                console.log(`Creating new bundle with product collection: ${collectionId}`);
-                const bundle = await client.getNewBundle(collectionId || undefined, undefined, {});
-                const productCollection = bundle.getProductCollection();
-                if (productCollection) {
-                    await productCollection.fetchProducts();
-                    const products = productCollection.getProducts();
-                    console.log("Products: ", products);
-                    setBundle(bundle);
-                    const exampleProduct = products[0].getIntegrationByType(IntegrationType.Hub);
-                    const workflow = await client.getWorkflowExperience({
-                        type: "integration",
-                        integrationProductId: exampleProduct?.id,
-                        workflowId: products[0].getAllWorkflows()[0].getId(),
-                    });
-                    bundle.addWorkflowExperience(workflow);
-                }
-                setBundle(bundle);
+                return client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {});
             }
+            const collectionId = getProductCollectionForNewBundle(context);
+            return client.getNewBundle(collectionId || undefined, undefined, {});
         };
-        loadBundle();
-    }, [client, context]);
 
-    if (!bundle) {
-        return (
-            <div className="app-body">
-                <LoadingOverlay />
-            </div>
+        loadBundle()
+            .then((loaded) => {
+                if (!cancelled) setBundle(loaded);
+            })
+            .catch((error) => {
+                console.error("Error loading the bundle:", error);
+                if (!cancelled) setLoadFailed(true);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [client, context, loadAttempt]);
+
+    let content: ReactNode;
+    if (loadFailed) {
+        content = (
+            <ErrorScreen
+                message="We couldn't load your bundle. Please check your connection and try again."
+                onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+            />
         );
-    }
-
-    return (
-        <div className="app-body">
+    } else if (!bundle) {
+        content = <LoadingOverlay />;
+    } else {
+        content = (
             <ClientProvider client={client}>
                 <ActivationProvider activation={context.activation}>
                     <BundleProvider bundle={bundle}>
@@ -111,7 +115,16 @@ const App: FunctionComponent<{
                     </BundleProvider>
                 </ActivationProvider>
             </ClientProvider>
-        </div>
+        );
+    }
+
+    // The styling wraps every state, so even the loading and error screens match the configured look.
+    return (
+        <ThemeConfigurationProvider configuration={context.configuration}>
+            <ThemeProvider container={context.container}>
+                <div className="app-body">{content}</div>
+            </ThemeProvider>
+        </ThemeConfigurationProvider>
     );
 };
 

@@ -1,3 +1,16 @@
+/* Styling defaults. The configured values are published on the theme's container, which overrides these. */
+:root {
+    --theme-primary-color: #007bff;
+    --theme-primary-color-hover: #0056b3;
+    --theme-primary-color-light: #7fb8ff;
+    --theme-primary-color-lighter: #f0f7ff;
+    --theme-primary-color-halo: rgba(0, 123, 255, 0.2);
+    --theme-primary-contrast-color: #ffffff;
+    --theme-text-color: #212121;
+    --theme-scene-heading-size: 24px;
+    --theme-step-heading-size: 18px;
+}
+
 body {
     margin: 0;
     min-height: 100vh;
@@ -18,10 +31,12 @@ body {
     height: 100%;
     overflow: hidden;
     box-sizing: unset;
+    color: var(--theme-text-color);
+    background: var(--theme-background-color, transparent);
 }
 
 .app-body * {
     box-sizing: unset;
-    font-family: var(--Default-Font);
+    font-family: var(--theme-font-family, var(--Default-Font));
     font-weight: var(--FW-Normal);
 }
