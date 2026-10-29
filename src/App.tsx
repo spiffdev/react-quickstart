@@ -71,7 +71,6 @@ const App: FunctionComponent<{
                 setBundle(bundle);
             } else {
                 const collectionId = getProductCollectionForNewBundle(context);
-                console.log(`Creating new bundle with product collection: ${collectionId}`);
                 const bundle = await client.getNewBundle(collectionId || undefined, undefined, {});
                 setBundle(bundle);
             }
