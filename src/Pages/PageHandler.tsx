@@ -6,6 +6,7 @@ import ProductSelector from "./ProductSelector";
 import useClient from "../hooks/useClient";
 import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
+import ExperienceSwitcher from "./components/ExperienceSwitcher";
 import type { SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
 
 type PageType = "collection" | "product" | "workflow" | "experience";
@@ -23,12 +24,14 @@ const PageHandler: FunctionComponent<{}> = () => {
         const collection = bundle.getProductCollection();
         if (collection) {
             setCollection(collection);
+        }
 
-            const experiences = bundle.getWorkflowExperiences();
-            if (experiences.length > 0) {
-                // TODO: assign state object and set page
-            }
-
+        // A reloaded bundle already has products, so pick up where the customer left off.
+        const experiences = bundle.getWorkflowExperiences();
+        if (experiences.length > 0) {
+            setExperience(experiences[0]);
+            setPage("experience");
+        } else if (collection) {
             setPage("product");
         }
     }, [bundle]);
@@ -89,8 +92,23 @@ const PageHandler: FunctionComponent<{}> = () => {
                 <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />
             )}
             {page === "workflow" && <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />}
-            {page === "experience" && (
-                <Customization workflowExperience={experience!} onNext={handleFinish} />
+            {page === "experience" && experience && (
+                <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                    {bundle.getWorkflowExperienceCount() > 1 && (
+                        <ExperienceSwitcher
+                            experiences={bundle.getWorkflowExperiences()}
+                            active={experience}
+                            onSelect={setExperience}
+                        />
+                    )}
+                    <div style={{ flex: "1 1 0", minHeight: 0 }}>
+                        <Customization
+                            key={experience.getTransaction().id}
+                            workflowExperience={experience}
+                            onNext={handleFinish}
+                        />
+                    </div>
+                </div>
             )}
         </div>
     );
