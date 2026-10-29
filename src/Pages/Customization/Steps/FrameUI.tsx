@@ -224,7 +224,7 @@ const FrameUI: FunctionComponent<{
     const [fileName, setFileName] = useState<string | undefined>(undefined);
     const [canRemoveBackground, setCanRemoveBackground] = useState(false);
     const [hasBackgroundRemoved, setHasBackgroundRemoved] = useState(() => step.hasBackgroundRemovedImageSelection());
-    const [useOriginal, setUseOriginal] = useState(() => step.getUseOriginalImageSelection());
+    const [useOriginal, setUseOriginal] = useState(() => step.getCurrentImageState() === ImageState.Original);
     const [showOptimizePrompt, setShowOptimizePrompt] = useState(false);
     const [imageState, setImageState] = useState<ImageStateName>(() =>
         step.getCurrentImageState() === ImageState.Optimized ? "optimized" : "original",
@@ -341,7 +341,7 @@ const FrameUI: FunctionComponent<{
         if (step.hasOriginalImageSelection()) {
             const coreState = step.getCurrentImageState();
             const useBackgroundRemoved =
-                step.hasBackgroundRemovedImageSelection() && !step.getUseOriginalImageSelection();
+                coreState === ImageState.BackgroundRemoved && step.hasBackgroundRemovedImageSelection();
             const load =
                 coreState === ImageState.Optimized
                     ? step.getVectorizedImageSelection()
