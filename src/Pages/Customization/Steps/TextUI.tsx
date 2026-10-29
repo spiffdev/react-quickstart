@@ -2,6 +2,7 @@ import { ChangeEvent, FunctionComponent, useCallback, useEffect, useState } from
 import { ColorOption, TextChangeResult, TextStepHandle, Variant, WorkflowManager } from "@spiffcommerce/core";
 import styled, { css } from "styled-components";
 import Typography from "../../../components/typography";
+import { swatchBackground } from "../components/customColor";
 import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
@@ -82,7 +83,7 @@ const ColorGrid = styled.div`
 
 const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     aspect-ratio: 1;
-    background-color: ${(props) => props.$color};
+    background: ${(props) => props.$color};
     background-size: cover;
     background-position: center;
     border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
@@ -344,7 +345,7 @@ const TextUI: FunctionComponent<{
                             {fillColors.map((color, index) => (
                                 <ColorSwatch
                                     key={color.variant?.id || index}
-                                    $color={fillValue(color) || "#000000"}
+                                    $color={swatchBackground(fillValue(color), "#000000")}
                                     $selected={selectedFill !== undefined && selectedFill === fillValue(color)}
                                     onClick={() => handleFillColorClick(color)}
                                 />
@@ -360,7 +361,7 @@ const TextUI: FunctionComponent<{
                         {strokeColors.map((color, index) => (
                             <ColorSwatch
                                 key={color.variant?.id || index}
-                                $color={strokeValue(color) || "#000000"}
+                                $color={swatchBackground(strokeValue(color), "#000000")}
                                 $selected={selectedStroke !== undefined && selectedStroke === strokeValue(color)}
                                 onClick={() => handleStrokeColorClick(color)}
                             />

@@ -3,6 +3,7 @@ import { Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
 import useVariantPrice from "../../../hooks/usePricing";
+import { swatchBackground } from "./customColor";
 
 const Filters = styled.div`
     display: flex;
@@ -48,9 +49,10 @@ const Grid = styled.div`
     width: 100%;
 `;
 
-const Card = styled.div<{ $selected?: boolean; $disabled?: boolean }>`
+const Card = styled.div<{ $selected?: boolean; $disabled?: boolean; $background?: string }>`
     position: relative;
     aspect-ratio: 1;
+    background: ${(props) => props.$background ?? "transparent"};
     border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
     border-radius: 8px;
     cursor: ${(props) => (props.$disabled ? "not-allowed" : "pointer")};
@@ -159,9 +161,12 @@ const VariantGallery: FunctionComponent<{
                 <Grid>
                     {filteredVariants.map((variant) => {
                         const price = getVariantPrice(variant);
+                        const color = variant.getColor();
                         return (
                             <Card
                                 key={variant.getId()}
+                                // Color variants without a thumbnail are drawn as their color (or the custom rainbow).
+                                $background={!variant.getThumbnail() && color ? swatchBackground(color) : undefined}
                                 $selected={selectedVariantId === variant.getId()}
                                 $disabled={disabled || !variant.isEnabled()}
                                 onClick={() => !disabled && variant.isEnabled() && onSelect(variant)}

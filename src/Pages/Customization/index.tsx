@@ -110,7 +110,13 @@ const StepHandler: FunctionComponent<{
         if (handle instanceof ModelStepHandle) return <ModelUI step={handle} onActivation={onActivation} />;
         if (handle instanceof PictureStepHandle) return <PictureUI step={handle} onActivation={onActivation} />;
         if (handle instanceof IllustrationStepHandle) {
-            return <IllustrationUI step={handle} onActivation={onActivation} />;
+            return (
+                <IllustrationUI
+                    step={handle}
+                    workflowManager={workflowExperience.getWorkflowManager()}
+                    onActivation={onActivation}
+                />
+            );
         }
         if (handle instanceof ShapeStepHandle) return <ShapeUI step={handle} onActivation={onActivation} />;
         if (handle instanceof TextStepHandle) {

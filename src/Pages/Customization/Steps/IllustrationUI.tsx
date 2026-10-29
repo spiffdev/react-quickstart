@@ -1,7 +1,15 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import { ColorDefinition, IllustrationStepHandle, Variant } from "@spiffcommerce/core";
+import {
+    AddonHandle,
+    ColorDefinition,
+    ColorPickerDisplayType,
+    IllustrationStepHandle,
+    Variant,
+    WorkflowManager,
+} from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
+import SVGColorSelector, { ReplacementColor } from "../components/SVGColorSelector";
 import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
@@ -23,59 +31,20 @@ const ColorPickerTitle = styled(Typography)`
     font-weight: 600;
 `;
 
-const ColorRowTitle = styled(Typography)`
-    margin: 8px 0;
-    font-size: 12px;
-    color: #616161;
-`;
-
-const ColorGrid = styled.div`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(40px, 1fr));
-    gap: 8px;
-    width: 100%;
-`;
-
-const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
-    aspect-ratio: 1;
-    background-color: ${(props) => props.$color};
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
-    border-radius: 50%;
-    cursor: pointer;
-    transition: all 0.2s;
-
-    &:hover {
-        border-color: #007bff;
-        transform: scale(1.1);
-    }
-`;
-
-const CustomColorInput = styled.input`
-    width: 100%;
-    height: 40px;
-    margin-top: 8px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    cursor: pointer;
-`;
-
-type AvailableColor = NonNullable<Awaited<ReturnType<IllustrationStepHandle["getAvailableColors"]>>>[number];
-
-const isCustomColor = (color: AvailableColor) => color.variant.color?.toLowerCase() === "#custom";
-const availableColorValue = (color: AvailableColor) => color.fill ?? color.stroke ?? color.variant.color;
-
 const IllustrationUI: FunctionComponent<{
     step: IllustrationStepHandle;
+    workflowManager: WorkflowManager;
     onActivation?: () => void;
-}> = ({ step, onActivation }) => {
+}> = ({ step, workflowManager, onActivation }) => {
     const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
         step.getCurrentVariant()?.getId(),
     );
-    const [availableColors, setAvailableColors] = useState<AvailableColor[]>([]);
+    const [availableColors, setAvailableColors] = useState<ReplacementColor[]>([]);
     const [existingColors, setExistingColors] = useState<{ [key: string]: ColorDefinition } | undefined>(() =>
         step.getColors(),
     );
+    const [canUsePmsColors, setCanUsePmsColors] = useState(false);
     const [loading, setLoading] = useState(true);
     const [updating, setUpdating] = useState(false);
 
@@ -94,6 +63,14 @@ const IllustrationUI: FunctionComponent<{
 
         loadData();
     }, [step]);
+
+    useEffect(() => {
+        workflowManager
+            .getClient()
+            .canUseAddon(AddonHandle.AdvancedImageManipulation)
+            .then(setCanUsePmsColors)
+            .catch(() => setCanUsePmsColors(false));
+    }, [workflowManager]);
 
     const handleVariantSelect = useCallback(
         async (variant: Variant) => {
@@ -115,32 +92,28 @@ const IllustrationUI: FunctionComponent<{
         [updating, onActivation, step],
     );
 
-    const applyColor = useCallback(
-        async (key: string, value: string, pmsValue?: string) => {
-            if (updating) return;
-
-            setUpdating(true);
+    const handleColorChange = useCallback(
+        async (key: string, fill: string, pmsValue?: string) => {
             onActivation?.();
 
             try {
-                await step.setColor(key, value, pmsValue);
+                await step.setColor(key, fill, pmsValue);
                 setExistingColors(step.getColors());
             } catch (error) {
                 console.error("Error setting illustration color:", error);
-            } finally {
-                setUpdating(false);
             }
         },
-        [updating, onActivation, step],
+        [onActivation, step],
     );
 
     if (loading) {
         return <Container data-test-step-type="illustration">Loading...</Container>;
     }
 
-    const colorKeys = Object.keys(existingColors ?? {});
-    const showColorPicker = step.isColorPickerEnabled() && colorKeys.length > 0 && availableColors.length > 0;
-    const hasCustomColor = availableColors.some(isCustomColor);
+    const showPms = step.isPMSPickerEnabled() && canUsePmsColors;
+    const displayType = step.getColorPickerDisplayType();
+    const hasExistingColors = Object.keys(existingColors ?? {}).length > 0;
+    const showColorPicker = step.isColorPickerEnabled() && hasExistingColors && (availableColors.length > 0 || showPms);
 
     return (
         <Container data-test-step-type="illustration">
@@ -157,38 +130,14 @@ const IllustrationUI: FunctionComponent<{
             {showColorPicker && (
                 <ColorPickerSection>
                     <ColorPickerTitle variant="h3">Color Options</ColorPickerTitle>
-                    {colorKeys.map((key, index) => (
-                        <div key={key}>
-                            {colorKeys.length > 1 && <ColorRowTitle variant="p">Color {index + 1}</ColorRowTitle>}
-                            <ColorGrid>
-                                {availableColors
-                                    .filter((color) => !isCustomColor(color))
-                                    .map((color, colorIndex) => {
-                                        const value = availableColorValue(color);
-                                        return (
-                                            <ColorSwatch
-                                                key={color.variant.id || colorIndex}
-                                                $color={value || "#cccccc"}
-                                                $selected={
-                                                    !!value &&
-                                                    existingColors?.[key]?.browserValue.toLowerCase() ===
-                                                        value.toLowerCase()
-                                                }
-                                                onClick={() => value && applyColor(key, value, color.pmsValue)}
-                                            />
-                                        );
-                                    })}
-                            </ColorGrid>
-                            {hasCustomColor && (
-                                <CustomColorInput
-                                    type="color"
-                                    aria-label={`Custom color ${index + 1}`}
-                                    value={existingColors?.[key]?.browserValue ?? "#000000"}
-                                    onChange={(event) => applyColor(key, event.target.value)}
-                                />
-                            )}
-                        </div>
-                    ))}
+                    <SVGColorSelector
+                        availableColors={availableColors}
+                        existingColors={existingColors}
+                        onChange={handleColorChange}
+                        showPms={showPms}
+                        singleColorOnly
+                        useGallery={displayType ? displayType === ColorPickerDisplayType.Large : undefined}
+                    />
                 </ColorPickerSection>
             )}
         </Container>

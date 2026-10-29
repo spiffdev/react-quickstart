@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { ShapeStepHandle, Variant } from "@spiffcommerce/core";
 import styled from "styled-components";
+import { swatchBackground } from "../components/customColor";
 import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
@@ -18,7 +19,7 @@ const ColorGrid = styled.div`
 
 const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     aspect-ratio: 1;
-    background-color: ${(props) => props.$color};
+    background: ${(props) => props.$color};
     border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
     border-radius: 8px;
     cursor: pointer;
@@ -134,7 +135,7 @@ const ShapeUI: FunctionComponent<{
                     {colors.map((color, index) => (
                         <ColorSwatch
                             key={color.variant.id || index}
-                            $color={color.fill || color.stroke || "#cccccc"}
+                            $color={swatchBackground(color.fill || color.stroke || color.variant.color)}
                             $selected={selectedVariantId === color.variant.id}
                             onClick={() => handleColorClick(color)}
                         />
