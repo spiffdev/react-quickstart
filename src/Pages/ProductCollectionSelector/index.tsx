@@ -6,8 +6,9 @@ import SelectorContainer from "../components/SelectorContainer";
 import LoadingOverlay from "../components/LoadingOverlay";
 
 const ProductCollectionSelector: FunctionComponent<{
+    selectedCollectionId?: string;
     onCollectionSelected: (collection: ProductCollection) => Promise<void>;
-}> = ({ onCollectionSelected }) => {
+}> = ({ selectedCollectionId, onCollectionSelected }) => {
     const activation = useActivation();
     const [loading, setLoading] = useState<boolean>(true);
     const [collections, setCollections] = useState<ProductCollection[] | undefined>(undefined);
@@ -34,6 +35,7 @@ const ProductCollectionSelector: FunctionComponent<{
                     key={collection.getId()}
                     imageUrl={collection.getImage()?.fileLink}
                     title={collection.getName()}
+                    selected={collection.getId() === selectedCollectionId}
                     onClick={() => {
                         setLoading(true);
                         onCollectionSelected(collection);

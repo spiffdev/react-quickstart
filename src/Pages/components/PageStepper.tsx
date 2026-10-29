@@ -54,7 +54,32 @@ const Item = styled.li<{ $complete: boolean }>`
     }
 `;
 
-const Marker = styled.span<{ $state: StepState }>`
+// Every step is a button, disabled when it can't be visited, so the markup (and its transitions) stay stable.
+const StepButton = styled.button`
+    display: inline-flex;
+    align-items: center;
+    padding: 0;
+    font: inherit;
+    background: none;
+    border: none;
+    cursor: pointer;
+
+    &:disabled {
+        cursor: default;
+    }
+
+    &:not(:disabled):hover span:last-child {
+        text-decoration: underline;
+    }
+
+    &:focus-visible {
+        outline: 2px solid ${ACTIVE_COLOR};
+        outline-offset: 4px;
+        border-radius: 4px;
+    }
+`;
+
+const Marker = styled.span<{ $state: StepState; $available: boolean }>`
     position: relative;
     display: inline-flex;
     align-items: center;
@@ -66,8 +91,14 @@ const Marker = styled.span<{ $state: StepState }>`
     font-size: 13px;
     font-weight: 600;
     border-radius: 50%;
-    border: 2px solid ${(props) => (props.$state === "upcoming" ? "#bdbdbd" : ACTIVE_COLOR)};
-    color: ${(props) => (props.$state === "complete" ? "#fff" : props.$state === "current" ? ACTIVE_COLOR : "#9e9e9e")};
+    border: 2px solid
+        ${(props) => (props.$state !== "upcoming" ? ACTIVE_COLOR : props.$available ? "#7fb8ff" : "#bdbdbd")};
+    color: ${(props) =>
+        props.$state === "complete"
+            ? "#fff"
+            : props.$state === "current" || props.$available
+              ? ACTIVE_COLOR
+              : "#9e9e9e"};
     background-color: ${(props) => (props.$state === "complete" ? ACTIVE_COLOR : "#fff")};
     box-shadow: 0 0 0 ${(props) => (props.$state === "current" ? 4 : 0)}px rgba(0, 123, 255, 0.2);
     transition:
@@ -95,12 +126,12 @@ const MarkerSymbol = styled.span<{ $visible: boolean }>`
     ${reducedMotion}
 `;
 
-const Label = styled.span<{ $state: StepState }>`
+const Label = styled.span<{ $state: StepState; $available: boolean }>`
     margin-left: 8px;
     font-size: 14px;
     font-weight: ${(props) => (props.$state === "current" ? 600 : 400)};
     white-space: nowrap;
-    color: ${(props) => (props.$state === "upcoming" ? "#9e9e9e" : "#212121")};
+    color: ${(props) => (props.$state === "upcoming" ? (props.$available ? ACTIVE_COLOR : "#9e9e9e") : "#212121")};
     transition: color ${MARKER_DURATION} ease;
     transition-delay: ${(props) => (props.$state === "current" ? CONNECTOR_DURATION : "0s")};
     ${reducedMotion}
@@ -112,26 +143,34 @@ const Label = styled.span<{ $state: StepState }>`
 const PageStepper: FunctionComponent<{
     steps: string[];
     currentIndex: number;
-}> = ({ steps, currentIndex }) => {
+    /** Which steps the customer can go to. */
+    enabledSteps: boolean[];
+    onStepSelected: (index: number) => void;
+}> = ({ steps, currentIndex, enabledSteps, onStepSelected }) => {
     return (
         <Nav aria-label="Progress">
             <List>
                 {steps.map((label, index) => {
                     const state: StepState =
                         index < currentIndex ? "complete" : index === currentIndex ? "current" : "upcoming";
+                    const enabled = !!enabledSteps[index];
                     return (
                         <Item
                             key={label}
                             $complete={state === "complete"}
                             aria-current={state === "current" ? "step" : undefined}
                         >
-                            <Marker $state={state}>
-                                <MarkerSymbol $visible={state !== "complete"}>{index + 1}</MarkerSymbol>
-                                <MarkerSymbol $visible={state === "complete"} aria-hidden="true">
-                                    ✓
-                                </MarkerSymbol>
-                            </Marker>
-                            <Label $state={state}>{label}</Label>
+                            <StepButton type="button" disabled={!enabled} onClick={() => onStepSelected(index)}>
+                                <Marker $state={state} $available={enabled}>
+                                    <MarkerSymbol $visible={state !== "complete"}>{index + 1}</MarkerSymbol>
+                                    <MarkerSymbol $visible={state === "complete"} aria-hidden="true">
+                                        ✓
+                                    </MarkerSymbol>
+                                </Marker>
+                                <Label $state={state} $available={enabled}>
+                                    {label}
+                                </Label>
+                            </StepButton>
                         </Item>
                     );
                 })}

@@ -5,8 +5,9 @@ import SelectorContainer from "../components/SelectorContainer";
 
 const WorkflowSelector: FunctionComponent<{
     product: CollectionProduct;
+    selectedWorkflowId?: string;
     onWorkflowSelected: (workflow: ProductWorkflow) => void;
-}> = ({ product, onWorkflowSelected }) => {
+}> = ({ product, selectedWorkflowId, onWorkflowSelected }) => {
     const [loading, setLoading] = useState<boolean>(true);
     const [workflows, setWorkflows] = useState<ProductWorkflow[] | undefined>(undefined);
 
@@ -35,6 +36,7 @@ const WorkflowSelector: FunctionComponent<{
                     key={workflow.getId()}
                     imageUrl={workflow.getThumbnail()}
                     title={workflow.getName()}
+                    selected={workflow.getId() === selectedWorkflowId}
                     onClick={() => {
                         setLoading(true);
                         onWorkflowSelected(workflow);
