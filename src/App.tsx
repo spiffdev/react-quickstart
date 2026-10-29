@@ -8,6 +8,7 @@ import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
 import { ClientProvider } from "./hooks/useClient";
 import LoadingOverlay from "./Pages/components/LoadingOverlay";
+import ErrorScreen from "./components/ErrorScreen";
 
 function getProductCollectionForNewBundle(context: ThemeContext): string | null {
     const c = context as ThemeContextBundle;
@@ -51,6 +52,8 @@ const App: FunctionComponent<{
 
     const [bundle, setBundle] = useState<Bundle | undefined>(undefined);
     const [currencyContext, setCurrencyContext] = useState<CurrencyContext | undefined>(undefined);
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [loadAttempt, setLoadAttempt] = useState(0);
 
     useEffect(() => {
         if (!context.currency) {
@@ -64,19 +67,42 @@ const App: FunctionComponent<{
     }, [client, context.currency]);
 
     useEffect(() => {
+        let cancelled = false;
+        setLoadFailed(false);
+
         const loadBundle = async () => {
             const c = context as ThemeContextBundle;
             if (c.bundleOptions.type === "existing") {
-                const bundle = await client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {});
-                setBundle(bundle);
-            } else {
-                const collectionId = getProductCollectionForNewBundle(context);
-                const bundle = await client.getNewBundle(collectionId || undefined, undefined, {});
-                setBundle(bundle);
+                return client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {});
             }
+            const collectionId = getProductCollectionForNewBundle(context);
+            return client.getNewBundle(collectionId || undefined, undefined, {});
         };
-        loadBundle();
-    }, [client, context]);
+
+        loadBundle()
+            .then((loaded) => {
+                if (!cancelled) setBundle(loaded);
+            })
+            .catch((error) => {
+                console.error("Error loading the bundle:", error);
+                if (!cancelled) setLoadFailed(true);
+            });
+
+        return () => {
+            cancelled = true;
+        };
+    }, [client, context, loadAttempt]);
+
+    if (loadFailed) {
+        return (
+            <div className="app-body">
+                <ErrorScreen
+                    message="We couldn't load your bundle. Please check your connection and try again."
+                    onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+                />
+            </div>
+        );
+    }
 
     if (!bundle) {
         return (

@@ -7,7 +7,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 
 const ProductCollectionSelector: FunctionComponent<{
     selectedCollectionId?: string;
-    onCollectionSelected: (collection: ProductCollection) => Promise<void>;
+    onCollectionSelected: (collection: ProductCollection) => void | Promise<void>;
 }> = ({ selectedCollectionId, onCollectionSelected }) => {
     const activation = useActivation();
     const [loading, setLoading] = useState<boolean>(true);
@@ -38,7 +38,8 @@ const ProductCollectionSelector: FunctionComponent<{
                     selected={collection.getId() === selectedCollectionId}
                     onClick={() => {
                         setLoading(true);
-                        onCollectionSelected(collection);
+                        // The tiles stop loading again if the selection fails and the customer stays on this page.
+                        Promise.resolve(onCollectionSelected(collection)).finally(() => setLoading(false));
                     }}
                 />
             ))}

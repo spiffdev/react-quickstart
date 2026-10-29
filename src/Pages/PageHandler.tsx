@@ -6,6 +6,7 @@ import ProductSelector from "./ProductSelector";
 import useClient from "../hooks/useClient";
 import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
+import ErrorBanner from "../components/ErrorBanner";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
 import PageStepper from "./components/PageStepper";
 import type { SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
@@ -35,6 +36,7 @@ const PageHandler: FunctionComponent<{}> = () => {
     const [selectionExperience, setSelectionExperience] = useState<WorkflowExperience | undefined>(undefined);
     // The furthest page the customer can return to using the stepper.
     const [reachedIndex, setReachedIndex] = useState(0);
+    const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
     // Experiences made by these pages in this visit. Only these are ever discarded by a new selection, so a
     // reloaded bundle's existing designs are never thrown away.
     const createdExperiences = useRef(new Set<WorkflowExperience>());
@@ -43,6 +45,7 @@ const PageHandler: FunctionComponent<{}> = () => {
         // Whenever the bundle changes (i.e. a new bundle is loaded) we need to reset
         const bundleCollection = bundle.getProductCollection();
         createdExperiences.current.clear();
+        setErrorMessage(undefined);
         setCollection(bundleCollection);
         setProduct(undefined);
         setWorkflow(undefined);
@@ -61,16 +64,30 @@ const PageHandler: FunctionComponent<{}> = () => {
         }
     }, [bundle]);
 
-    // A new selection replaces whatever the previous one led to.
-    const discardSelectionExperience = useCallback(async () => {
+    // Runs a change to the bundle. React state is only updated by `action` once every call it makes has succeeded,
+    // so a failure leaves the page exactly as it was and the customer can simply try again.
+    const attempt = useCallback(async (action: () => Promise<void>, failureMessage: string) => {
+        setErrorMessage(undefined);
+        try {
+            await action();
+        } catch (error) {
+            console.error(failureMessage, error);
+            setErrorMessage(failureMessage);
+        }
+    }, []);
+
+    // A new selection replaces whatever the previous one led to. Nothing is cleared unless the removal succeeds.
+    const removeSelectionExperience = useCallback(async () => {
         if (!selectionExperience) return;
-        if (createdExperiences.current.delete(selectionExperience)) {
+        if (createdExperiences.current.has(selectionExperience)) {
             await bundle.removeWorkflowExperience(selectionExperience);
+            createdExperiences.current.delete(selectionExperience);
         }
         setExperience((current) => (current === selectionExperience ? undefined : current));
         setSelectionExperience(undefined);
     }, [bundle, selectionExperience]);
 
+    // Creates the new experience before the previous one is removed, so a failure never leaves the customer without one.
     const startExperience = useCallback(
         async (selectedProduct: CollectionProduct, selectedWorkflow: ProductWorkflow) => {
             const [created] = await client.getWorkflowExperiences([
@@ -80,92 +97,122 @@ const PageHandler: FunctionComponent<{}> = () => {
                     integrationProductId: selectedProduct.getCurrentIntegration().id,
                 },
             ]);
-            createdExperiences.current.add(created);
+            if (!created) {
+                throw new Error("No workflow experience was created.");
+            }
             await bundle.addWorkflowExperience(created);
+            createdExperiences.current.add(created);
+
+            let leftoverWarning: string | undefined;
+            try {
+                await removeSelectionExperience();
+            } catch (error) {
+                console.error("Error removing the previous design from the bundle:", error);
+                leftoverWarning =
+                    "Your new design is ready, but the previous one could not be removed from your bundle.";
+            }
+
+            setProduct(selectedProduct);
             setWorkflow(selectedWorkflow);
             setSelectionExperience(created);
             setExperience(created);
             setReachedIndex(pageIndex("experience"));
             setPage("experience");
+            if (leftoverWarning) {
+                setErrorMessage(leftoverWarning);
+            }
         },
-        [bundle, client],
+        [bundle, client, removeSelectionExperience],
     );
 
     const handleCollectionSelected = useCallback(
-        async (selected: ProductCollection) => {
-            if (collection?.getId() === selected.getId()) {
-                // Nothing has changed, so keep everything the customer has already chosen.
-                setReachedIndex((reached) => Math.max(reached, pageIndex("product")));
-                setPage("product");
-                return;
-            }
+        (selected: ProductCollection) =>
+            attempt(async () => {
+                if (collection?.getId() === selected.getId()) {
+                    // Nothing has changed, so keep everything the customer has already chosen.
+                    setReachedIndex((reached) => Math.max(reached, pageIndex("product")));
+                    setPage("product");
+                    return;
+                }
 
-            await discardSelectionExperience();
-            await bundle.assignProductCollection(selected.getId());
-            setCollection(selected);
-            setProduct(undefined);
-            setWorkflow(undefined);
-            setReachedIndex(pageIndex("product"));
-            setPage("product");
-        },
-        [bundle, collection, discardSelectionExperience],
+                // Assigning is safe to repeat, so if removing the old design fails the customer can just try again.
+                await bundle.assignProductCollection(selected.getId());
+                await removeSelectionExperience();
+                setCollection(selected);
+                setProduct(undefined);
+                setWorkflow(undefined);
+                setReachedIndex(pageIndex("product"));
+                setPage("product");
+            }, "We couldn't select that collection. Please try again."),
+        [attempt, bundle, collection, removeSelectionExperience],
     );
 
     const handleProductSelected = useCallback(
-        async (selected: CollectionProduct) => {
-            const workflows = selected.getAllWorkflows();
-
-            if (product?.getId() === selected.getId()) {
-                if (workflows.length > 1) {
-                    setReachedIndex((reached) => Math.max(reached, pageIndex("workflow")));
-                    setPage("workflow");
-                } else if (selectionExperience) {
-                    setExperience(selectionExperience);
-                    setPage("experience");
-                } else {
-                    await startExperience(selected, workflows[0]);
+        (selected: CollectionProduct) =>
+            attempt(async () => {
+                const workflows = selected.getAllWorkflows();
+                if (workflows.length === 0) {
+                    throw new Error("The selected product has no designs available.");
                 }
-                return;
-            }
 
-            await discardSelectionExperience();
-            setProduct(selected);
-            setWorkflow(undefined);
-            if (workflows.length === 1) {
-                await startExperience(selected, workflows[0]);
-            } else {
+                if (product?.getId() === selected.getId()) {
+                    if (workflows.length > 1) {
+                        setReachedIndex((reached) => Math.max(reached, pageIndex("workflow")));
+                        setPage("workflow");
+                    } else if (selectionExperience) {
+                        setExperience(selectionExperience);
+                        setPage("experience");
+                    } else {
+                        await startExperience(selected, workflows[0]);
+                    }
+                    return;
+                }
+
+                if (workflows.length === 1) {
+                    await startExperience(selected, workflows[0]);
+                    return;
+                }
+
+                await removeSelectionExperience();
+                setProduct(selected);
+                setWorkflow(undefined);
                 setReachedIndex(pageIndex("workflow"));
                 setPage("workflow");
-            }
-        },
-        [discardSelectionExperience, product, selectionExperience, startExperience],
+            }, "We couldn't set up that product. Please try again."),
+        [attempt, product, removeSelectionExperience, selectionExperience, startExperience],
     );
 
     const handleWorkflowSelected = useCallback(
-        async (selected: ProductWorkflow) => {
-            if (!product) return;
+        (selected: ProductWorkflow) =>
+            attempt(async () => {
+                if (!product) return;
 
-            if (selectionExperience && workflow?.getId() === selected.getId()) {
-                setExperience(selectionExperience);
-                setPage("experience");
-                return;
-            }
+                if (selectionExperience && workflow?.getId() === selected.getId()) {
+                    setExperience(selectionExperience);
+                    setPage("experience");
+                    return;
+                }
 
-            await discardSelectionExperience();
-            await startExperience(product, selected);
-        },
-        [discardSelectionExperience, product, selectionExperience, startExperience, workflow],
+                await startExperience(product, selected);
+            }, "We couldn't start that design. Please try again."),
+        [attempt, product, selectionExperience, startExperience, workflow],
     );
 
     const handleFinish = useCallback(async () => {
-        // A screenshot can only be taken from the live preview when there is a single experience.
-        const takeScreenshot =
-            bundle.getWorkflowExperienceCount() === 1
-                ? (wfe: WorkflowExperience, use3D?: boolean) => wfe.createPreviewImage(use3D, 1024)
-                : undefined;
-        const result = await bundle.finish(undefined, takeScreenshot);
-        const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
-        spiffThemeLoader.addToEcommerceCart(result);
+        try {
+            // A screenshot can only be taken from the live preview when there is a single experience.
+            const takeScreenshot =
+                bundle.getWorkflowExperienceCount() === 1
+                    ? (wfe: WorkflowExperience, use3D?: boolean) => wfe.createPreviewImage(use3D, 1024)
+                    : undefined;
+            const result = await bundle.finish(undefined, takeScreenshot);
+            const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
+            spiffThemeLoader.addToEcommerceCart(result);
+        } catch (error) {
+            console.error("Error adding the bundle to the cart:", error);
+            // The finish step shows this message under its button.
+            throw new Error("We couldn't add your design to the cart. Please try again.");
+        }
     }, [bundle]);
 
     // A page can be returned to once it has been reached, as long as what it needs still exists.
@@ -180,8 +227,12 @@ const PageHandler: FunctionComponent<{}> = () => {
                 steps={PAGE_STEPS.map((pageStep) => pageStep.label)}
                 currentIndex={pageIndex(page)}
                 enabledSteps={PAGE_STEPS.map((_, index) => canVisit(index))}
-                onStepSelected={(index) => setPage(PAGE_STEPS[index].page)}
+                onStepSelected={(index) => {
+                    setErrorMessage(undefined);
+                    setPage(PAGE_STEPS[index].page);
+                }}
             />
+            {errorMessage && <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(undefined)} />}
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", position: "relative" }}>
                 {page === "collection" && (
                     <ProductCollectionSelector
