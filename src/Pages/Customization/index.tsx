@@ -111,6 +111,11 @@ const StepHandler: FunctionComponent<{
             );
         }
 
+        // An introduction only has a heading, so there's nothing to show under it.
+        if (step.type === StepType.Introduction) {
+            return null;
+        }
+
         const handle = workflowExperience.getStepById(step.stepName);
         const onActivation = () => onActivate(step.stepName);
         if (handle instanceof InformationStepHandle) return <InformationUI step={handle} />;
