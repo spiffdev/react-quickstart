@@ -73,20 +73,6 @@ const App: FunctionComponent<{
                 const collectionId = getProductCollectionForNewBundle(context);
                 console.log(`Creating new bundle with product collection: ${collectionId}`);
                 const bundle = await client.getNewBundle(collectionId || undefined, undefined, {});
-                const productCollection = bundle.getProductCollection();
-                if (productCollection) {
-                    await productCollection.fetchProducts();
-                    const products = productCollection.getProducts();
-                    console.log("Products: ", products);
-                    setBundle(bundle);
-                    const exampleProduct = products[0].getIntegrationByType(IntegrationType.Hub);
-                    const workflow = await client.getWorkflowExperience({
-                        type: "integration",
-                        integrationProductId: exampleProduct?.id,
-                        workflowId: products[0].getAllWorkflows()[0].getId(),
-                    });
-                    bundle.addWorkflowExperience(workflow);
-                }
                 setBundle(bundle);
             }
         };
