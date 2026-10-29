@@ -22,7 +22,7 @@ const Select = styled.select`
 
     &:focus {
         outline: none;
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
     }
 
     &:disabled {

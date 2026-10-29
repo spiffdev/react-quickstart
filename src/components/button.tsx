@@ -8,17 +8,17 @@ const StyledButton = styled.button<{ $fullWidth?: boolean }>`
     padding: 12px 24px;
     font-size: 16px;
     font-weight: 500;
-    border: 1px solid #007bff;
-    background-color: #007bff;
-    color: white;
+    border: 1px solid var(--theme-primary-color);
+    background-color: var(--theme-primary-color);
+    color: var(--theme-primary-contrast-color);
     cursor: pointer;
     transition: all 0.2s;
     width: ${(props) => (props.$fullWidth ? "100%" : "auto")};
     box-sizing: border-box;
 
     &:hover:not(:disabled) {
-        background-color: #0056b3;
-        border-color: #0056b3;
+        background-color: var(--theme-primary-color-hover);
+        border-color: var(--theme-primary-color-hover);
     }
 
     &:disabled {

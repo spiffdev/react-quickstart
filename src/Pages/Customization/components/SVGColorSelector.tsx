@@ -84,14 +84,14 @@ const Swatch = styled.div<{ $color: string; $selected?: boolean }>`
     width: 36px;
     height: 36px;
     background: ${(props) => props.$color};
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
+    border: 2px solid ${(props) => (props.$selected ? "var(--theme-primary-color)" : "#e0e0e0")};
     border-radius: 50%;
     cursor: pointer;
     box-sizing: border-box;
     transition: all 0.2s;
 
     &:hover {
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
         transform: scale(1.1);
     }
 `;
@@ -128,7 +128,7 @@ const AddSwatch = styled.button`
     cursor: pointer;
 
     &:hover {
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
     }
 `;
 

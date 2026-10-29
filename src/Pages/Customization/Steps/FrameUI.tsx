@@ -54,8 +54,8 @@ const Prompt = styled(Typography)`
 const UploadZone = styled.div<{ $dragging: boolean }>`
     box-sizing: border-box;
     margin-top: 16px;
-    border: 2px dashed ${(props) => (props.$dragging ? "#007bff" : "#ccc")};
-    background-color: ${(props) => (props.$dragging ? "#f0f7ff" : "transparent")};
+    border: 2px dashed ${(props) => (props.$dragging ? "var(--theme-primary-color)" : "#ccc")};
+    background-color: ${(props) => (props.$dragging ? "var(--theme-primary-color-lighter)" : "transparent")};
     border-radius: 8px;
     padding: 16px;
     text-align: center;
@@ -101,9 +101,9 @@ const ToggleButton = styled.button<{ $active: boolean }>`
     padding: 4px 16px;
     font-size: 12px;
     cursor: pointer;
-    border: 1px solid #007bff;
-    color: ${(props) => (props.$active ? "#fff" : "#007bff")};
-    background-color: ${(props) => (props.$active ? "#007bff" : "#fff")};
+    border: 1px solid var(--theme-primary-color);
+    color: ${(props) => (props.$active ? "var(--theme-primary-contrast-color)" : "var(--theme-primary-color)")};
+    background-color: ${(props) => (props.$active ? "var(--theme-primary-color)" : "#fff")};
 
     &:first-child {
         border-radius: 4px 0 0 4px;
@@ -181,7 +181,7 @@ const ProgressBar = styled.div`
 const ProgressFill = styled.div<{ $progress: number }>`
     height: 100%;
     width: ${(props) => props.$progress}%;
-    background-color: #007bff;
+    background-color: var(--theme-primary-color);
     transition: width 0.3s;
 `;
 

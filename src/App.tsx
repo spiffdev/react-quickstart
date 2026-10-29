@@ -1,8 +1,9 @@
-import { FunctionComponent, useEffect, useState } from "react";
+import { FunctionComponent, ReactNode, useEffect, useState } from "react";
 import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommerce/theme-bridge";
 import { ActivationData, Bundle, CurrencyContext, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
 import { CurrencyProvider } from "./hooks/useCurrency";
+import { ThemeProvider } from "./hooks/useTheme";
 import { ThemeConfigurationProvider } from "./hooks/useThemeConfiguration";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
@@ -93,39 +94,37 @@ const App: FunctionComponent<{
         };
     }, [client, context, loadAttempt]);
 
+    let content: ReactNode;
     if (loadFailed) {
-        return (
-            <div className="app-body">
-                <ErrorScreen
-                    message="We couldn't load your bundle. Please check your connection and try again."
-                    onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
-                />
-            </div>
+        content = (
+            <ErrorScreen
+                message="We couldn't load your bundle. Please check your connection and try again."
+                onRetry={() => setLoadAttempt((attempt) => attempt + 1)}
+            />
         );
-    }
-
-    if (!bundle) {
-        return (
-            <div className="app-body">
-                <LoadingOverlay />
-            </div>
-        );
-    }
-
-    return (
-        <div className="app-body">
+    } else if (!bundle) {
+        content = <LoadingOverlay />;
+    } else {
+        content = (
             <ClientProvider client={client}>
                 <ActivationProvider activation={context.activation}>
                     <BundleProvider bundle={bundle}>
-                        <ThemeConfigurationProvider configuration={context.configuration}>
-                            <CurrencyProvider currencyContext={currencyContext}>
-                                <PageHandler />
-                            </CurrencyProvider>
-                        </ThemeConfigurationProvider>
+                        <CurrencyProvider currencyContext={currencyContext}>
+                            <PageHandler />
+                        </CurrencyProvider>
                     </BundleProvider>
                 </ActivationProvider>
             </ClientProvider>
-        </div>
+        );
+    }
+
+    // The styling wraps every state, so even the loading and error screens match the configured look.
+    return (
+        <ThemeConfigurationProvider configuration={context.configuration}>
+            <ThemeProvider container={context.container}>
+                <div className="app-body">{content}</div>
+            </ThemeProvider>
+        </ThemeConfigurationProvider>
     );
 };
 

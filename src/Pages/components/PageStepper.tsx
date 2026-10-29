@@ -3,7 +3,7 @@ import styled, { css } from "styled-components";
 
 type StepState = "complete" | "current" | "upcoming";
 
-const ACTIVE_COLOR = "#007bff";
+const ACTIVE_COLOR = "var(--theme-primary-color)";
 const INACTIVE_COLOR = "#e0e0e0";
 const CONNECTOR_DURATION = "0.35s";
 const MARKER_DURATION = "0.3s";
@@ -92,15 +92,15 @@ const Marker = styled.span<{ $state: StepState; $available: boolean }>`
     font-weight: 600;
     border-radius: 50%;
     border: 2px solid
-        ${(props) => (props.$state !== "upcoming" ? ACTIVE_COLOR : props.$available ? "#7fb8ff" : "#bdbdbd")};
+        ${(props) => (props.$state !== "upcoming" ? ACTIVE_COLOR : props.$available ? "var(--theme-primary-color-light)" : "#bdbdbd")};
     color: ${(props) =>
         props.$state === "complete"
-            ? "#fff"
+            ? "var(--theme-primary-contrast-color)"
             : props.$state === "current" || props.$available
               ? ACTIVE_COLOR
               : "#9e9e9e"};
     background-color: ${(props) => (props.$state === "complete" ? ACTIVE_COLOR : "#fff")};
-    box-shadow: 0 0 0 ${(props) => (props.$state === "current" ? 4 : 0)}px rgba(0, 123, 255, 0.2);
+    box-shadow: 0 0 0 ${(props) => (props.$state === "current" ? 4 : 0)}px var(--theme-primary-color-halo);
     transition:
         border-color ${MARKER_DURATION} ease,
         color ${MARKER_DURATION} ease,
@@ -131,7 +131,7 @@ const Label = styled.span<{ $state: StepState; $available: boolean }>`
     font-size: 14px;
     font-weight: ${(props) => (props.$state === "current" ? 600 : 400)};
     white-space: nowrap;
-    color: ${(props) => (props.$state === "upcoming" ? (props.$available ? ACTIVE_COLOR : "#9e9e9e") : "#212121")};
+    color: ${(props) => (props.$state === "upcoming" ? (props.$available ? ACTIVE_COLOR : "#9e9e9e") : "var(--theme-text-color)")};
     transition: color ${MARKER_DURATION} ease;
     transition-delay: ${(props) => (props.$state === "current" ? CONNECTOR_DURATION : "0s")};
     ${reducedMotion}

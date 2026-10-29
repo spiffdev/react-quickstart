@@ -22,7 +22,7 @@ const fieldStyles = css<{ $error?: boolean }>`
 
     &:focus {
         outline: none;
-        border-color: ${(props) => (props.$error ? "#d32f2f" : "#007bff")};
+        border-color: ${(props) => (props.$error ? "#d32f2f" : "var(--theme-primary-color)")};
     }
 
     &:disabled {
@@ -86,13 +86,13 @@ const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     background: ${(props) => props.$color};
     background-size: cover;
     background-position: center;
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
+    border: 2px solid ${(props) => (props.$selected ? "var(--theme-primary-color)" : "#e0e0e0")};
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
 
     &:hover {
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
         transform: scale(1.05);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }

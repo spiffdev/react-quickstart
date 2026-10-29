@@ -22,7 +22,7 @@ const FilterInput = styled.input`
 
     &:focus {
         outline: none;
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
     }
 `;
 
@@ -38,7 +38,7 @@ const FilterSelect = styled.select`
 
     &:focus {
         outline: none;
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
     }
 `;
 
@@ -53,7 +53,7 @@ const Card = styled.div<{ $selected?: boolean; $disabled?: boolean; $background?
     position: relative;
     aspect-ratio: 1;
     background: ${(props) => props.$background ?? "transparent"};
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
+    border: 2px solid ${(props) => (props.$selected ? "var(--theme-primary-color)" : "#e0e0e0")};
     border-radius: 8px;
     cursor: ${(props) => (props.$disabled ? "not-allowed" : "pointer")};
     overflow: hidden;
@@ -61,7 +61,7 @@ const Card = styled.div<{ $selected?: boolean; $disabled?: boolean; $background?
     opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
 
     &:hover {
-        border-color: ${(props) => (props.$disabled ? "#e0e0e0" : "#007bff")};
+        border-color: ${(props) => (props.$disabled ? "#e0e0e0" : "var(--theme-primary-color)")};
         transform: ${(props) => (props.$disabled ? "none" : "translateY(-2px)")};
         box-shadow: ${(props) => (props.$disabled ? "none" : "0 4px 8px rgba(0, 0, 0, 0.1)")};
     }

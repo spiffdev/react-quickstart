@@ -70,12 +70,12 @@ const Label = styled.label`
 `;
 
 const TermsLink = styled(Typography)`
-    color: #007bff;
+    color: var(--theme-primary-color);
     text-decoration: underline;
     cursor: pointer;
 
     &:hover {
-        color: #0056b3;
+        color: var(--theme-primary-color-hover);
     }
 `;
 

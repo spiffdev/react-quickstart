@@ -45,7 +45,7 @@ const ProcessingBar = styled.div`
         display: block;
         width: 40%;
         height: 100%;
-        background-color: #007bff;
+        background-color: var(--theme-primary-color);
         animation: image-cropper-progress 1.2s ease-in-out infinite;
     }
 
@@ -90,7 +90,7 @@ const ResetValue = styled(ControlLabel)`
     user-select: none;
 
     &:hover {
-        color: #007bff;
+        color: var(--theme-primary-color);
     }
 `;
 

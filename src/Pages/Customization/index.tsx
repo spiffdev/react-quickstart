@@ -58,6 +58,14 @@ const STEP_TYPES_WITH_MANDATORY_SUPPORT = [
 
 const DEFAULT_SIDEBAR_WIDTH_PERCENTAGE = 25;
 
+const SceneTitle = styled(Typography)`
+    font-size: var(--theme-scene-heading-size);
+`;
+
+const StepTitle = styled(Typography)`
+    font-size: var(--theme-step-heading-size);
+`;
+
 const StepHeading = styled.div`
     display: flex;
     align-items: center;
@@ -170,7 +178,7 @@ const StepHandler: FunctionComponent<{
         <div>
             {!isFinishStep && (
                 <StepHeading>
-                    <Typography variant="h3">{step.stepTitle}</Typography>
+                    <StepTitle variant="h3">{step.stepTitle}</StepTitle>
                     {step.helpText && <StepHelp helpText={step.helpText} />}
                 </StepHeading>
             )}
@@ -277,7 +285,7 @@ const Customization: FunctionComponent<{
                         const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
                         return (
                             <Card key={scene.name}>
-                                {!isFinishScene && <Typography variant="h2">{scene.title}</Typography>}
+                                {!isFinishScene && <SceneTitle variant="h2">{scene.title}</SceneTitle>}
                                 {scene.renderableSteps.map((step) => (
                                     <StepHandler
                                         key={step.stepName}

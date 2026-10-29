@@ -22,7 +22,7 @@ const TextArea = styled.textarea<{ $error?: boolean }>`
 
     &:focus {
         outline: none;
-        border-color: ${(props) => (props.$error ? "#d32f2f" : "#007bff")};
+        border-color: ${(props) => (props.$error ? "#d32f2f" : "var(--theme-primary-color)")};
     }
 
     &:disabled {

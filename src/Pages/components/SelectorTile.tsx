@@ -7,7 +7,7 @@ import Typography from "../../components/typography";
 const TileCard = styled(Card)<{ $selected?: boolean }>`
     width: 250px;
     height: 400px;
-    ${(props) => props.$selected && "border-color: #007bff; box-shadow: #007bff 0px 0px 4px 1px;"}
+    ${(props) => props.$selected && "border-color: var(--theme-primary-color); box-shadow: var(--theme-primary-color) 0px 0px 4px 1px;"}
 `;
 
 const ImageContainer = styled.div`

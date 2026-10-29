@@ -17,9 +17,9 @@ const Tab = styled.button<{ $active: boolean }>`
     font-size: 14px;
     cursor: pointer;
     white-space: nowrap;
-    color: ${(props) => (props.$active ? "#fff" : "#007bff")};
-    background-color: ${(props) => (props.$active ? "#007bff" : "#fff")};
-    border: 1px solid #007bff;
+    color: ${(props) => (props.$active ? "var(--theme-primary-contrast-color)" : "var(--theme-primary-color)")};
+    background-color: ${(props) => (props.$active ? "var(--theme-primary-color)" : "#fff")};
+    border: 1px solid var(--theme-primary-color);
     border-radius: 16px;
 `;
 

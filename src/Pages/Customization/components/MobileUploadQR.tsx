@@ -3,6 +3,7 @@ import { Asset, assetService } from "@spiffcommerce/core";
 import QRCode from "qrcode";
 import styled from "styled-components";
 import Button from "../../../components/button";
+import useTheme from "../../../hooks/useTheme";
 import Typography from "../../../components/typography";
 
 const POLL_INTERVAL_MS = 2000;
@@ -79,10 +80,13 @@ const MobileUploadQR: FunctionComponent<{
     maxSizeBytes,
     logoUrl,
     whitelistedExtensions,
-    primaryColor = "#007bff",
+    primaryColor: primaryColorOverride,
     onCancel,
     onUploadComplete,
 }) => {
+    // The phone's upload page is given this colour directly, so it needs the real value rather than a CSS variable.
+    const theme = useTheme();
+    const primaryColor = primaryColorOverride ?? theme.primaryColor;
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
     const extensionsKey = whitelistedExtensions?.join(",");
 

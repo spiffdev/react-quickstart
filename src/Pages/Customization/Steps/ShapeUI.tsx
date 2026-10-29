@@ -20,13 +20,13 @@ const ColorGrid = styled.div`
 const ColorSwatch = styled.div<{ $color: string; $selected?: boolean }>`
     aspect-ratio: 1;
     background: ${(props) => props.$color};
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
+    border: 2px solid ${(props) => (props.$selected ? "var(--theme-primary-color)" : "#e0e0e0")};
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.2s;
 
     &:hover {
-        border-color: #007bff;
+        border-color: var(--theme-primary-color);
         transform: scale(1.05);
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
     }
