@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import useCurrency from "../../hooks/useCurrency";
+import useThemeConfiguration from "../../hooks/useThemeConfiguration";
 import { PricingProvider } from "../../hooks/usePricing";
 import { canDownloadPreview, downloadPreview } from "./downloadPreview";
 import {
@@ -26,6 +27,7 @@ import {
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 import LoadingOverlay from "../components/LoadingOverlay";
+import StepHelp from "./components/StepHelp";
 import ThreeDPreview from "./components/ThreeDPreview";
 import {
     InformationUI,
@@ -53,6 +55,14 @@ const STEP_TYPES_WITH_MANDATORY_SUPPORT = [
     StepType.Model,
     StepType.DigitalContent,
 ];
+
+const DEFAULT_SIDEBAR_WIDTH_PERCENTAGE = 25;
+
+const StepHeading = styled.div`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+`;
 
 const TotalBar = styled.div`
     position: sticky;
@@ -158,7 +168,12 @@ const StepHandler: FunctionComponent<{
 
     return (
         <div>
-            {!isFinishStep && <Typography variant="h3">{step.stepTitle}</Typography>}
+            {!isFinishStep && (
+                <StepHeading>
+                    <Typography variant="h3">{step.stepTitle}</Typography>
+                    {step.helpText && <StepHelp helpText={step.helpText} />}
+                </StepHeading>
+            )}
             {renderStepComponent()}
         </div>
     );
@@ -174,6 +189,7 @@ const Customization: FunctionComponent<{
     const [mandatorySteps, setMandatorySteps] = useState<MandatorySteps>({});
     const activeStepName = useRef<string | undefined>(undefined);
     const formatPrice = useCurrency();
+    const sidebarWidthPercentage = useThemeConfiguration().sidebarWidthPercentage || DEFAULT_SIDEBAR_WIDTH_PERCENTAGE;
 
     const workflow = workflowExperience.getWorkflow();
     // An unset (null) flag counts as enabled; only an explicit false hides pricing.
@@ -236,7 +252,7 @@ const Customization: FunctionComponent<{
     return (
         <PricingProvider showPricing={showPricing} showPlus={showPlus}>
             <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "row" }}>
-                <div style={{ flex: "0 0 70%", minWidth: 0, height: "100%" }}>
+                <div style={{ flex: "1 1 0", minWidth: 0, height: "100%" }}>
                     <ThreeDPreview workflowExperience={workflowExperience} />
                 </div>
                 <div
@@ -244,7 +260,7 @@ const Customization: FunctionComponent<{
                         position: "relative",
                         height: "100%",
                         overflow: "auto",
-                        flex: "1 1 0",
+                        flex: `0 0 ${sidebarWidthPercentage}%`,
                         minWidth: 0,
                         gap: "5px",
                         display: "flex",
