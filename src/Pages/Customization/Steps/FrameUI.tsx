@@ -1,10 +1,12 @@
 import { DragEvent, FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+    Asset,
     assetService,
     AssetType,
     FrameService,
     FrameStep,
     FrameStepHandle,
+    ImageState,
     Variant,
     WorkflowManager,
 } from "@spiffcommerce/core";
@@ -18,6 +20,7 @@ const DEFAULT_EXTENSIONS = [".jpg", ".jpeg", ".png", ".svg", ".pdf", ".eps", ".a
 const VECTOR_MIME_TYPES = ["image/svg+xml", "application/pdf", "application/postscript"];
 
 type FrameData = ReturnType<FrameService["getFrameData"]>;
+type ImageStateName = "original" | "optimized";
 
 const Container = styled.div`
     padding: 16px;
@@ -55,6 +58,84 @@ const FileName = styled(Typography)`
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+`;
+
+const StatusChip = styled.span<{ $tone: "success" | "warning" }>`
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 8px;
+    padding: 4px 10px;
+    font-size: 12px;
+    border-radius: 12px;
+    color: ${(props) => (props.$tone === "success" ? "#1b5e20" : "#8a4b00")};
+    background-color: ${(props) => (props.$tone === "success" ? "#e8f5e9" : "#fff3e0")};
+
+    &::before {
+        content: "";
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background-color: ${(props) => (props.$tone === "success" ? "#43a047" : "#fb8c00")};
+    }
+`;
+
+const ToggleGroup = styled.div`
+    display: flex;
+    justify-content: center;
+    margin-bottom: 8px;
+`;
+
+const ToggleButton = styled.button<{ $active: boolean }>`
+    padding: 4px 16px;
+    font-size: 12px;
+    cursor: pointer;
+    border: 1px solid #007bff;
+    color: ${(props) => (props.$active ? "#fff" : "#007bff")};
+    background-color: ${(props) => (props.$active ? "#007bff" : "#fff")};
+
+    &:first-child {
+        border-radius: 4px 0 0 4px;
+    }
+
+    &:last-child {
+        border-radius: 0 4px 4px 0;
+    }
+
+    &:disabled {
+        cursor: not-allowed;
+        opacity: 0.6;
+    }
+`;
+
+const OptimizationCard = styled.div`
+    margin-top: 12px;
+    padding: 12px;
+    text-align: left;
+    background-color: #fff8e1;
+    border: 1px solid #ffe0b2;
+    border-radius: 8px;
+`;
+
+const OptimizationText = styled(Typography)`
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #4d4f5c;
+`;
+
+const PromptButtons = styled.div`
+    display: flex;
+    gap: 8px;
+`;
+
+const WarningAlert = styled(Typography)`
+    margin: 12px 0 0 0;
+    padding: 8px 12px;
+    font-size: 12px;
+    text-align: left;
+    color: #8a4b00;
+    background-color: #fff3e0;
+    border-radius: 4px;
 `;
 
 const HelpText = styled(Typography)`
@@ -104,6 +185,7 @@ const FrameUI: FunctionComponent<{
     onActivation?: () => void;
 }> = ({ step, workflowManager, onActivation }) => {
     const inputRef = useRef<HTMLInputElement>(null);
+    const preOptimization = useRef<{ asset: Asset; state: "original" | "removeBG" } | undefined>(undefined);
     const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
         step.getCurrentVariant()?.getId(),
@@ -115,14 +197,19 @@ const FrameUI: FunctionComponent<{
     const [error, setError] = useState("");
     const [dragging, setDragging] = useState(false);
     const [hasUserImage, setHasUserImage] = useState(() => step.hasOriginalImageSelection());
-    const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+    const [currentImageAsset, setCurrentImageAsset] = useState<Asset | undefined>(undefined);
     const [fileName, setFileName] = useState<string | undefined>(undefined);
     const [canRemoveBackground, setCanRemoveBackground] = useState(false);
     const [hasBackgroundRemoved, setHasBackgroundRemoved] = useState(() => step.hasBackgroundRemovedImageSelection());
     const [useOriginal, setUseOriginal] = useState(() => step.getUseOriginalImageSelection());
+    const [showOptimizePrompt, setShowOptimizePrompt] = useState(false);
+    const [imageState, setImageState] = useState<ImageStateName>(() =>
+        step.getCurrentImageState() === ImageState.Optimized ? "optimized" : "original",
+    );
 
     const busy = busyMessage !== undefined;
     const frameService = step.getFrameService();
+    const imageUrl = currentImageAsset?.fileLink;
     const extensions = useMemo(() => {
         const whitelisted = step
             .getWhitelistedExtensions()
@@ -136,6 +223,19 @@ const FrameUI: FunctionComponent<{
         variants.map((variant) => variant.getResource()),
     );
 
+    // Optimization is only needed for raster images, and only when the step is configured to vectorize.
+    const imageData = frameService?.getImageData();
+    const shouldVectorize = step.getShouldVectorize();
+    const hasVectorized = step.hasVectorizedImageSelection();
+    const needsOptimization = currentImageAsset?.type === AssetType.Image && !!imageData;
+    const minimumSize = step.getMinimumPixelThresholdForOptimization();
+    const needsEnhancement =
+        needsOptimization &&
+        !!minimumSize &&
+        !!imageData &&
+        (imageData.width < minimumSize || imageData.height < minimumSize);
+    const canToggleImageState = step.hasOriginalImageSelection() && hasVectorized;
+
     useEffect(() => {
         step.onFrameDataChanged(setFrameData);
     }, [step]);
@@ -146,15 +246,20 @@ const FrameUI: FunctionComponent<{
             .catch((loadError) => console.error("Error loading frame variants:", loadError));
 
         if (step.hasOriginalImageSelection()) {
+            const coreState = step.getCurrentImageState();
             const useBackgroundRemoved =
                 step.hasBackgroundRemovedImageSelection() && !step.getUseOriginalImageSelection();
-            (useBackgroundRemoved ? step.getBackgroundRemovedImageSelection() : step.getOriginalImageSelection())
-                .then((asset) => {
-                    setImageUrl(asset?.fileLink);
-                    setFileName((current) => current ?? asset?.key?.split("/").pop());
-                })
-                .catch((loadError) => console.error("Error loading frame image:", loadError));
-            step.canRemoveBackground()
+            const load =
+                coreState === ImageState.Optimized
+                    ? step.getVectorizedImageSelection()
+                    : useBackgroundRemoved
+                      ? step.getBackgroundRemovedImageSelection()
+                      : step.getOriginalImageSelection();
+            load.then((asset) => {
+                setCurrentImageAsset(asset);
+                setFileName((current) => current ?? asset?.key?.split("/").pop());
+            }).catch((loadError) => console.error("Error loading frame image:", loadError));
+            step.canUseAdvancedImageManipulation()
                 .then(setCanRemoveBackground)
                 .catch(() => setCanRemoveBackground(false));
         }
@@ -188,6 +293,7 @@ const FrameUI: FunctionComponent<{
             }
 
             setError("");
+            setShowOptimizePrompt(false);
             setProgress(0);
             setBusyMessage("Uploading photo...");
             workflowManager.setMandatoryFulfilled(step.getId(), false);
@@ -206,11 +312,13 @@ const FrameUI: FunctionComponent<{
                 );
                 onActivation?.();
                 await step.selectImage(asset);
-                setImageUrl(asset.fileLink);
+                preOptimization.current = undefined;
+                setCurrentImageAsset(asset);
                 setFileName(file.name);
                 setHasUserImage(true);
                 setHasBackgroundRemoved(false);
                 setUseOriginal(false);
+                setImageState("original");
                 setCanRemoveBackground(await step.canRemoveBackground());
             } catch (uploadError) {
                 console.error("Error uploading frame image:", uploadError);
@@ -257,13 +365,13 @@ const FrameUI: FunctionComponent<{
                 if (target) {
                     setBusyMessage("Applying image...");
                     await step.selectImage(target, false, false);
-                    setImageUrl(target.fileLink);
+                    setCurrentImageAsset(target);
                     setUseOriginal(!useOriginal);
                 }
             } else {
                 setBusyMessage("Removing background...");
                 const asset = await step.removeBackgroundFromImageSelection();
-                setImageUrl(asset.fileLink);
+                setCurrentImageAsset(asset);
                 setHasBackgroundRemoved(true);
                 setUseOriginal(false);
             }
@@ -275,7 +383,115 @@ const FrameUI: FunctionComponent<{
         }
     }, [hasBackgroundRemoved, onActivation, step, useOriginal]);
 
+    const optimize = useCallback(
+        async (removeBackground: boolean) => {
+            if (!currentImageAsset) return;
+
+            setShowOptimizePrompt(false);
+            setError("");
+            onActivation?.();
+            const stageCount = (needsEnhancement ? 1 : 0) + (removeBackground ? 1 : 0) + 1;
+            let completedStages = 0;
+            const startStage = (message: string) => {
+                setBusyMessage(message);
+                setProgress(Math.round((completedStages / stageCount) * 100));
+            };
+            startStage("Optimising...");
+            const updateId = workflowManager.markUpdatePending();
+            if (currentImageAsset.key) {
+                assetService.removePersistedAsset(currentImageAsset.key);
+            }
+
+            try {
+                let asset = currentImageAsset;
+                const startedFrom = currentImageAsset;
+
+                if (needsEnhancement && minimumSize && imageData) {
+                    startStage("AI Rendering...");
+                    asset = await step.enhanceWithAI(asset, {
+                        targetWidth: Math.max(imageData.width, minimumSize),
+                        targetHeight: Math.max(imageData.height, minimumSize),
+                        quality: "standard",
+                    });
+                    setCurrentImageAsset(asset);
+                    completedStages++;
+                }
+
+                if (removeBackground) {
+                    startStage("Removing background...");
+                    asset = await step.removeBackgroundFromImageSelection(!needsEnhancement);
+                    setHasBackgroundRemoved(true);
+                    if (needsEnhancement) {
+                        await step.selectImage(asset, false, false);
+                    }
+                    setCurrentImageAsset(asset);
+                    completedStages++;
+                }
+
+                startStage("Optimising...");
+                preOptimization.current = removeBackground
+                    ? { asset, state: "removeBG" }
+                    : { asset: startedFrom, state: useOriginal ? "original" : "removeBG" };
+                const vectorized = await step.vectorize(asset, step.getVectorizeMaxColors());
+                setCurrentImageAsset(vectorized);
+                setImageState("optimized");
+                setProgress(100);
+            } catch (optimizeError) {
+                console.error("Error optimising image:", optimizeError);
+                setError("The image could not be optimised. Please try again.");
+            } finally {
+                workflowManager.markUpdateCompleted(updateId);
+                setProgress(undefined);
+                setBusyMessage(undefined);
+            }
+        },
+        [currentImageAsset, imageData, minimumSize, needsEnhancement, onActivation, step, useOriginal, workflowManager],
+    );
+
+    const handleImageStateChange = useCallback(
+        async (newState: ImageStateName) => {
+            if (newState === imageState || busy) return;
+
+            const previousState = imageState;
+            setImageState(newState);
+            setBusyMessage("Applying image...");
+            setError("");
+            onActivation?.();
+
+            try {
+                let asset: Asset | undefined;
+                const before = preOptimization.current;
+                if (previousState === "optimized" && newState === "original" && before?.state === "original") {
+                    await step.selectImage(before.asset, true, true);
+                    asset = before.asset;
+                    setUseOriginal(true);
+                } else if (newState === "original") {
+                    await step.setImageState(ImageState.Original);
+                    asset = await step.getOriginalImageSelection();
+                    setUseOriginal(true);
+                } else {
+                    await step.setImageState(ImageState.Optimized);
+                    asset = await step.getVectorizedImageSelection();
+                }
+                if (asset) {
+                    setCurrentImageAsset(asset);
+                }
+            } catch (stateError) {
+                console.error("Error switching image state:", stateError);
+                setImageState(previousState);
+                setError("The image could not be switched. Please try again.");
+            } finally {
+                setBusyMessage(undefined);
+            }
+        },
+        [busy, imageState, onActivation, step],
+    );
+
     const backgroundButtonLabel = hasBackgroundRemoved && !useOriginal ? "Use Original Image" : "Remove Background";
+    const backgroundIsRemoved = hasBackgroundRemoved && !useOriginal;
+    const showOptimizationCard = hasUserImage && needsOptimization && !hasVectorized && shouldVectorize;
+    const showBackgroundButton =
+        hasUserImage && canRemoveBackground && currentImageAsset?.type === AssetType.Image && !hasVectorized;
 
     return (
         <Container data-test-step-type="frame">
@@ -304,6 +520,47 @@ const FrameUI: FunctionComponent<{
                 >
                     {hasUserImage && frameService && (
                         <CropperSection>
+                            {shouldVectorize && !busy && (
+                                <StatusChip
+                                    $tone={
+                                        hasVectorized
+                                            ? imageState === "optimized"
+                                                ? "success"
+                                                : "warning"
+                                            : needsOptimization
+                                              ? "warning"
+                                              : "success"
+                                    }
+                                >
+                                    {hasVectorized
+                                        ? imageState === "optimized"
+                                            ? "Print ready"
+                                            : "Not print ready, manual review required"
+                                        : needsOptimization
+                                          ? "Not print ready, please optimise to continue"
+                                          : "Production ready"}
+                                </StatusChip>
+                            )}
+                            {canToggleImageState && (
+                                <ToggleGroup>
+                                    <ToggleButton
+                                        type="button"
+                                        $active={imageState === "original"}
+                                        disabled={busy}
+                                        onClick={() => handleImageStateChange("original")}
+                                    >
+                                        Original
+                                    </ToggleButton>
+                                    <ToggleButton
+                                        type="button"
+                                        $active={imageState === "optimized"}
+                                        disabled={busy}
+                                        onClick={() => handleImageStateChange("optimized")}
+                                    >
+                                        Optimized
+                                    </ToggleButton>
+                                </ToggleGroup>
+                            )}
                             {fileName && <FileName variant="p">{fileName}</FileName>}
                             <ImageCropper
                                 key={imageUrl}
@@ -312,16 +569,55 @@ const FrameUI: FunctionComponent<{
                             />
                         </CropperSection>
                     )}
-                    <HiddenInput
-                        ref={inputRef}
-                        type="file"
-                        accept={extensions.join(",")}
-                        onChange={handleFileSelect}
-                        disabled={busy}
-                    />
-                    <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
-                        {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
-                    </Button>
+                    {showOptimizationCard && (
+                        <OptimizationCard>
+                            {!showOptimizePrompt ? (
+                                <>
+                                    <OptimizationText variant="p">Needs optimisation for print</OptimizationText>
+                                    <Button fullWidth disabled={busy} onClick={() => setShowOptimizePrompt(true)}>
+                                        Optimize image
+                                    </Button>
+                                </>
+                            ) : (
+                                <>
+                                    <OptimizationText variant="p">
+                                        {backgroundIsRemoved
+                                            ? "Return background before optimizing?"
+                                            : "Remove the background before optimising?"}
+                                    </OptimizationText>
+                                    <PromptButtons>
+                                        <Button
+                                            fullWidth
+                                            disabled={!canRemoveBackground || busy}
+                                            onClick={() => optimize(true)}
+                                        >
+                                            {backgroundIsRemoved ? "Restore BG first" : "Remove BG first"}
+                                        </Button>
+                                        <Button fullWidth disabled={busy} onClick={() => optimize(false)}>
+                                            Keep background
+                                        </Button>
+                                    </PromptButtons>
+                                    <ButtonSpacing>
+                                        <Button fullWidth disabled={busy} onClick={() => setShowOptimizePrompt(false)}>
+                                            Cancel
+                                        </Button>
+                                    </ButtonSpacing>
+                                </>
+                            )}
+                        </OptimizationCard>
+                    )}
+                    <ButtonSpacing>
+                        <HiddenInput
+                            ref={inputRef}
+                            type="file"
+                            accept={extensions.join(",")}
+                            onChange={handleFileSelect}
+                            disabled={busy}
+                        />
+                        <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
+                            {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
+                        </Button>
+                    </ButtonSpacing>
                     {progress !== undefined && (
                         <ProgressBar>
                             <ProgressFill $progress={progress} />
@@ -333,12 +629,18 @@ const FrameUI: FunctionComponent<{
                             {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
                         </HelpText>
                     )}
-                    {hasUserImage && canRemoveBackground && (
+                    {showBackgroundButton && (
                         <ButtonSpacing>
                             <Button onClick={handleBackgroundToggle} disabled={busy} fullWidth>
                                 {backgroundButtonLabel}
                             </Button>
                         </ButtonSpacing>
+                    )}
+                    {hasUserImage && imageState === "original" && hasVectorized && shouldVectorize && (
+                        <WarningAlert variant="p">
+                            This selected asset is not print ready and will need manual review before the order is
+                            produced.
+                        </WarningAlert>
                     )}
                 </UploadZone>
             )}
