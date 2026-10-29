@@ -1,12 +1,23 @@
 import { DragEvent, FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { assetService, AssetType, FrameStepHandle, Variant, WorkflowManager } from "@spiffcommerce/core";
+import {
+    assetService,
+    AssetType,
+    FrameService,
+    FrameStep,
+    FrameStepHandle,
+    Variant,
+    WorkflowManager,
+} from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
-import useVariantPrice from "../../../hooks/usePricing";
+import ImageCropper from "../components/ImageCropper";
+import VariantGallery from "../components/VariantGallery";
 
 const DEFAULT_EXTENSIONS = [".jpg", ".jpeg", ".png", ".svg", ".pdf", ".eps", ".ai"];
 const VECTOR_MIME_TYPES = ["image/svg+xml", "application/pdf", "application/postscript"];
+
+type FrameData = ReturnType<FrameService["getFrameData"]>;
 
 const Container = styled.div`
     padding: 16px;
@@ -20,63 +31,30 @@ const SectionTitle = styled(Typography)`
     font-weight: 600;
 `;
 
-const VariantGrid = styled.div`
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-    gap: 12px;
-    width: 100%;
-    margin-bottom: 16px;
-`;
-
-const VariantCard = styled.div<{ $selected?: boolean; $disabled?: boolean }>`
-    position: relative;
-    aspect-ratio: 1;
-    border: 2px solid ${(props) => (props.$selected ? "#007bff" : "#e0e0e0")};
-    border-radius: 8px;
-    cursor: ${(props) => (props.$disabled ? "not-allowed" : "pointer")};
-    overflow: hidden;
-    transition: all 0.2s;
-    opacity: ${(props) => (props.$disabled ? 0.5 : 1)};
-
-    &:hover {
-        border-color: ${(props) => (props.$disabled ? "#e0e0e0" : "#007bff")};
-        transform: ${(props) => (props.$disabled ? "none" : "translateY(-2px)")};
-        box-shadow: ${(props) => (props.$disabled ? "none" : "0 4px 8px rgba(0, 0, 0, 0.1)")};
-    }
-`;
-
-const VariantImage = styled.img`
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-`;
-
-const VariantPrice = styled.span`
-    display: block;
-    font-size: 11px;
-    opacity: 0.8;
-`;
-
-const VariantName = styled.div`
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    font-size: 12px;
-    text-align: center;
+const Prompt = styled(Typography)`
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    color: #4d4f5c;
 `;
 
 const UploadZone = styled.div<{ $dragging: boolean }>`
     box-sizing: border-box;
+    margin-top: 16px;
     border: 2px dashed ${(props) => (props.$dragging ? "#007bff" : "#ccc")};
     background-color: ${(props) => (props.$dragging ? "#f0f7ff" : "transparent")};
     border-radius: 8px;
-    padding: 24px 16px;
+    padding: 16px;
     text-align: center;
     transition: all 0.2s;
+`;
+
+const FileName = styled(Typography)`
+    margin: 0 0 8px 0;
+    font-size: 13px;
+    color: #4d4f5c;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 `;
 
 const HelpText = styled(Typography)`
@@ -107,12 +85,13 @@ const ProgressFill = styled.div<{ $progress: number }>`
     transition: width 0.3s;
 `;
 
-const ImagePreview = styled.img`
-    display: block;
-    max-width: 100%;
-    max-height: 160px;
-    margin: 0 auto 12px auto;
-    object-fit: contain;
+const CropperSection = styled.div`
+    margin-bottom: 12px;
+    text-align: left;
+`;
+
+const ButtonSpacing = styled.div`
+    margin-top: 12px;
 `;
 
 const HiddenInput = styled.input`
@@ -124,12 +103,12 @@ const FrameUI: FunctionComponent<{
     workflowManager: WorkflowManager;
     onActivation?: () => void;
 }> = ({ step, workflowManager, onActivation }) => {
-    const getVariantPrice = useVariantPrice();
     const inputRef = useRef<HTMLInputElement>(null);
     const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
         step.getCurrentVariant()?.getId(),
     );
+    const [frameData, setFrameData] = useState<FrameData>(() => step.getFrameService()?.getFrameData());
     const [frameUpdating, setFrameUpdating] = useState(false);
     const [busyMessage, setBusyMessage] = useState<string | undefined>(undefined);
     const [progress, setProgress] = useState<number | undefined>(undefined);
@@ -137,16 +116,28 @@ const FrameUI: FunctionComponent<{
     const [dragging, setDragging] = useState(false);
     const [hasUserImage, setHasUserImage] = useState(() => step.hasOriginalImageSelection());
     const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+    const [fileName, setFileName] = useState<string | undefined>(undefined);
     const [canRemoveBackground, setCanRemoveBackground] = useState(false);
     const [hasBackgroundRemoved, setHasBackgroundRemoved] = useState(() => step.hasBackgroundRemovedImageSelection());
     const [useOriginal, setUseOriginal] = useState(() => step.getUseOriginalImageSelection());
 
     const busy = busyMessage !== undefined;
+    const frameService = step.getFrameService();
     const extensions = useMemo(() => {
         const whitelisted = step
             .getWhitelistedExtensions()
             .map((extension) => (extension.startsWith(".") ? extension : `.${extension}`).toLowerCase());
         return whitelisted.length > 0 ? whitelisted : DEFAULT_EXTENSIONS;
+    }, [step]);
+    const currentFrameStep = step.getCurrentFrameStep(
+        frameData?.[0] as Parameters<FrameStepHandle["getCurrentFrameStep"]>[0],
+        busy,
+        hasUserImage,
+        variants.map((variant) => variant.getResource()),
+    );
+
+    useEffect(() => {
+        step.onFrameDataChanged(setFrameData);
     }, [step]);
 
     useEffect(() => {
@@ -155,9 +146,13 @@ const FrameUI: FunctionComponent<{
             .catch((loadError) => console.error("Error loading frame variants:", loadError));
 
         if (step.hasOriginalImageSelection()) {
-            const load = step.hasBackgroundRemovedImageSelection() && !step.getUseOriginalImageSelection();
-            (load ? step.getBackgroundRemovedImageSelection() : step.getOriginalImageSelection())
-                .then((asset) => setImageUrl(asset?.fileLink))
+            const useBackgroundRemoved =
+                step.hasBackgroundRemovedImageSelection() && !step.getUseOriginalImageSelection();
+            (useBackgroundRemoved ? step.getBackgroundRemovedImageSelection() : step.getOriginalImageSelection())
+                .then((asset) => {
+                    setImageUrl(asset?.fileLink);
+                    setFileName((current) => current ?? asset?.key?.split("/").pop());
+                })
                 .catch((loadError) => console.error("Error loading frame image:", loadError));
             step.canRemoveBackground()
                 .then(setCanRemoveBackground)
@@ -165,9 +160,9 @@ const FrameUI: FunctionComponent<{
         }
     }, [step]);
 
-    const handleVariantClick = useCallback(
+    const handleVariantSelect = useCallback(
         async (variant: Variant) => {
-            if (frameUpdating || !variant.isEnabled()) return;
+            if (frameUpdating) return;
 
             setSelectedVariantId(variant.getId());
             setFrameUpdating(true);
@@ -212,6 +207,7 @@ const FrameUI: FunctionComponent<{
                 onActivation?.();
                 await step.selectImage(asset);
                 setImageUrl(asset.fileLink);
+                setFileName(file.name);
                 setHasUserImage(true);
                 setHasBackgroundRemoved(false);
                 setUseOriginal(false);
@@ -279,74 +275,73 @@ const FrameUI: FunctionComponent<{
         }
     }, [hasBackgroundRemoved, onActivation, step, useOriginal]);
 
-    const backgroundButtonLabel = !hasBackgroundRemoved
-        ? "Remove Background"
-        : useOriginal
-          ? "Remove Background"
-          : "Use Original Image";
+    const backgroundButtonLabel = hasBackgroundRemoved && !useOriginal ? "Use Original Image" : "Remove Background";
 
     return (
         <Container data-test-step-type="frame">
+            {currentFrameStep === FrameStep.SelectFrame && <Prompt variant="p">Select a frame to begin</Prompt>}
             {variants.length > 1 && (
                 <>
                     <SectionTitle variant="h3">Choose a frame</SectionTitle>
-                    <VariantGrid>
-                        {variants.map((variant) => (
-                            <VariantCard
-                                key={variant.getId()}
-                                $selected={selectedVariantId === variant.getId()}
-                                $disabled={frameUpdating || !variant.isEnabled()}
-                                onClick={() => handleVariantClick(variant)}
-                            >
-                                {variant.getThumbnail() && (
-                                    <VariantImage src={variant.getThumbnail()} alt={variant.getName()} />
-                                )}
-                                <VariantName>
-                                    {variant.getName()}
-                                    {getVariantPrice(variant) && (
-                                        <VariantPrice>{getVariantPrice(variant)}</VariantPrice>
-                                    )}
-                                </VariantName>
-                            </VariantCard>
-                        ))}
-                    </VariantGrid>
+                    <VariantGallery
+                        variants={variants}
+                        selectedVariantId={selectedVariantId}
+                        disabled={frameUpdating}
+                        categoriesEnabled={step.isVariantCategoriesEnabled()}
+                        onSelect={handleVariantSelect}
+                    />
                 </>
             )}
-            <UploadZone
-                $dragging={dragging}
-                onDragOver={(event) => {
-                    event.preventDefault();
-                    if (!busy) setDragging(true);
-                }}
-                onDragLeave={() => setDragging(false)}
-                onDrop={handleDrop}
-            >
-                {hasUserImage && imageUrl && <ImagePreview src={imageUrl} alt="Your image" />}
-                <HiddenInput
-                    ref={inputRef}
-                    type="file"
-                    accept={extensions.join(",")}
-                    onChange={handleFileSelect}
-                    disabled={busy}
-                />
-                <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
-                    {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
-                </Button>
-                {progress !== undefined && (
-                    <ProgressBar>
-                        <ProgressFill $progress={progress} />
-                    </ProgressBar>
-                )}
-                <HelpText variant="p">
-                    Drag and drop an image here, or choose a file. Accepted types:{" "}
-                    {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
-                </HelpText>
-                {hasUserImage && canRemoveBackground && (
-                    <Button onClick={handleBackgroundToggle} disabled={busy} fullWidth style={{ marginTop: 12 }}>
-                        {backgroundButtonLabel}
+            {currentFrameStep !== FrameStep.SelectFrame && (
+                <UploadZone
+                    $dragging={dragging}
+                    onDragOver={(event) => {
+                        event.preventDefault();
+                        if (!busy) setDragging(true);
+                    }}
+                    onDragLeave={() => setDragging(false)}
+                    onDrop={handleDrop}
+                >
+                    {hasUserImage && frameService && (
+                        <CropperSection>
+                            {fileName && <FileName variant="p">{fileName}</FileName>}
+                            <ImageCropper
+                                key={imageUrl}
+                                frameService={frameService}
+                                overlayImageUrl={step.hasOverlayImageUrl() || undefined}
+                            />
+                        </CropperSection>
+                    )}
+                    <HiddenInput
+                        ref={inputRef}
+                        type="file"
+                        accept={extensions.join(",")}
+                        onChange={handleFileSelect}
+                        disabled={busy}
+                    />
+                    <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
+                        {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
                     </Button>
-                )}
-            </UploadZone>
+                    {progress !== undefined && (
+                        <ProgressBar>
+                            <ProgressFill $progress={progress} />
+                        </ProgressBar>
+                    )}
+                    {!hasUserImage && (
+                        <HelpText variant="p">
+                            Drag and drop an image here, or choose a file. Accepted types:{" "}
+                            {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
+                        </HelpText>
+                    )}
+                    {hasUserImage && canRemoveBackground && (
+                        <ButtonSpacing>
+                            <Button onClick={handleBackgroundToggle} disabled={busy} fullWidth>
+                                {backgroundButtonLabel}
+                            </Button>
+                        </ButtonSpacing>
+                    )}
+                </UploadZone>
+            )}
             {error && <ErrorText variant="p">{error}</ErrorText>}
         </Container>
     );
