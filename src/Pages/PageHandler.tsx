@@ -7,9 +7,18 @@ import useClient from "../hooks/useClient";
 import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
+import PageStepper from "./components/PageStepper";
 import type { SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
 
 type PageType = "collection" | "product" | "workflow" | "experience";
+
+// The pages in the order the customer visits them, and the heading each is shown under.
+const PAGE_STEPS: { page: PageType; label: string }[] = [
+    { page: "collection", label: "Collection" },
+    { page: "product", label: "Product" },
+    { page: "workflow", label: "Design" },
+    { page: "experience", label: "Personalise" },
+];
 
 const PageHandler: FunctionComponent<{}> = () => {
     const client = useClient();
@@ -86,30 +95,38 @@ const PageHandler: FunctionComponent<{}> = () => {
     }, [bundle]);
 
     return (
-        <div style={{ height: "100%", overflow: "hidden", position: "relative" }}>
-            {page === "collection" && <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />}
-            {page === "product" && (
-                <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />
-            )}
-            {page === "workflow" && <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />}
-            {page === "experience" && experience && (
-                <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-                    {bundle.getWorkflowExperienceCount() > 1 && (
-                        <ExperienceSwitcher
-                            experiences={bundle.getWorkflowExperiences()}
-                            active={experience}
-                            onSelect={setExperience}
-                        />
-                    )}
-                    <div style={{ flex: "1 1 0", minHeight: 0 }}>
-                        <Customization
-                            key={experience.getTransaction().id}
-                            workflowExperience={experience}
-                            onNext={handleFinish}
-                        />
+        <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            <PageStepper
+                steps={PAGE_STEPS.map((pageStep) => pageStep.label)}
+                currentIndex={PAGE_STEPS.findIndex((pageStep) => pageStep.page === page)}
+            />
+            <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", position: "relative" }}>
+                {page === "collection" && <ProductCollectionSelector onCollectionSelected={handleCollectionSelected} />}
+                {page === "product" && (
+                    <ProductSelector collection={collection!} onProductSelected={handleProductSelected} />
+                )}
+                {page === "workflow" && (
+                    <WorkflowSelector product={product!} onWorkflowSelected={handleWorkflowSelected} />
+                )}
+                {page === "experience" && experience && (
+                    <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+                        {bundle.getWorkflowExperienceCount() > 1 && (
+                            <ExperienceSwitcher
+                                experiences={bundle.getWorkflowExperiences()}
+                                active={experience}
+                                onSelect={setExperience}
+                            />
+                        )}
+                        <div style={{ flex: "1 1 0", minHeight: 0 }}>
+                            <Customization
+                                key={experience.getTransaction().id}
+                                workflowExperience={experience}
+                                onNext={handleFinish}
+                            />
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+            </div>
         </div>
     );
 };

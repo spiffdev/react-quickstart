@@ -1,6 +1,6 @@
 import { FunctionComponent, useEffect, useState } from "react";
 import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommerce/theme-bridge";
-import { ActivationData, Bundle, CurrencyContext, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
+import { ActivationData, Bundle, CurrencyContext, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
 import { CurrencyProvider } from "./hooks/useCurrency";
 import { ThemeConfigurationProvider } from "./hooks/useThemeConfiguration";
