@@ -3,24 +3,35 @@ import {
     Asset,
     assetService,
     AssetType,
+    browserColorToHex,
+    ColorDefinition,
     FrameService,
     FrameStep,
     FrameStepHandle,
+    generate,
     ImageState,
+    matchHexToPms,
     Variant,
     WorkflowManager,
 } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
+import useThemeConfiguration from "../../../hooks/useThemeConfiguration";
+import { ActiveColorIds } from "../components/colorIsolation";
 import ImageCropper from "../components/ImageCropper";
+import MobileUploadQR from "../components/MobileUploadQR";
+import SVGColorSelector, { ReplacementColor } from "../components/SVGColorSelector";
 import VariantGallery from "../components/VariantGallery";
 
 const DEFAULT_EXTENSIONS = [".jpg", ".jpeg", ".png", ".svg", ".pdf", ".eps", ".ai"];
 const VECTOR_MIME_TYPES = ["image/svg+xml", "application/pdf", "application/postscript"];
+const PMS_MAX_DISTANCE = 64;
+const MOBILE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
 type FrameData = ReturnType<FrameService["getFrameData"]>;
 type ImageStateName = "original" | "optimized";
+type Colors = { [key: string]: ColorDefinition };
 
 const Container = styled.div`
     padding: 16px;
@@ -128,6 +139,14 @@ const PromptButtons = styled.div`
     gap: 8px;
 `;
 
+const ColorEditor = styled.div`
+    margin-top: 12px;
+    padding: 12px;
+    text-align: left;
+    background-color: #f5f5f5;
+    border-radius: 8px;
+`;
+
 const WarningAlert = styled(Typography)`
     margin: 12px 0 0 0;
     padding: 8px 12px;
@@ -186,6 +205,10 @@ const FrameUI: FunctionComponent<{
 }> = ({ step, workflowManager, onActivation }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const preOptimization = useRef<{ asset: Asset; state: "original" | "removeBG" } | undefined>(undefined);
+    // The latest colors, readable synchronously so several colors can be changed in one go.
+    const colorsRef = useRef<Colors | undefined>(undefined);
+    // Edits made to each version of the image, restored when switching between them.
+    const colorCache = useRef<{ original?: Colors; optimized?: { colors: Colors; svg?: string } }>({});
     const [variants, setVariants] = useState<Variant[]>([]);
     const [selectedVariantId, setSelectedVariantId] = useState<string | undefined>(() =>
         step.getCurrentVariant()?.getId(),
@@ -206,6 +229,15 @@ const FrameUI: FunctionComponent<{
     const [imageState, setImageState] = useState<ImageStateName>(() =>
         step.getCurrentImageState() === ImageState.Optimized ? "optimized" : "original",
     );
+    const [colors, setColors] = useState<Colors | undefined>(undefined);
+    const [originalSvgColors, setOriginalSvgColors] = useState<ReplacementColor[]>([]);
+    const [colorOptions, setColorOptions] = useState<ReplacementColor[]>([]);
+    const [isEditingColors, setIsEditingColors] = useState(false);
+    const [colorsConfirmed, setColorsConfirmed] = useState(false);
+    const [activeColorIds, setActiveColorIds] = useState<ActiveColorIds>({ selected: [], hovered: [] });
+    const [showMobileQR, setShowMobileQR] = useState(false);
+    const [mobileUploadAsset, setMobileUploadAsset] = useState<Asset | undefined>(undefined);
+    const { enableMobileUpload } = useThemeConfiguration();
 
     const busy = busyMessage !== undefined;
     const frameService = step.getFrameService();
@@ -236,6 +268,57 @@ const FrameUI: FunctionComponent<{
         (imageData.width < minimumSize || imageData.height < minimumSize);
     const canToggleImageState = step.hasOriginalImageSelection() && hasVectorized;
 
+    const storeColors = useCallback((next: Colors | undefined) => {
+        colorsRef.current = next;
+        setColors(next);
+    }, []);
+
+    // Reads the colors of the image currently in the frame, and applies their PMS values to the design.
+    const populateColors = useCallback(async () => {
+        const imageColors = step.getImageData()?.colors;
+        if (!imageColors) {
+            storeColors(undefined);
+            setOriginalSvgColors([]);
+            return;
+        }
+        Object.values(imageColors).forEach((color) => {
+            if (!color.pmsValue) {
+                const matches = matchHexToPms(browserColorToHex(color.browserValue), PMS_MAX_DISTANCE);
+                if (matches.length > 0) {
+                    color.pmsValue = matches[0].pms;
+                }
+            }
+        });
+        storeColors({ ...imageColors });
+
+        const originalColors = await step.getOriginalImageColors();
+        setOriginalSvgColors(
+            Object.entries(originalColors ?? {}).map(([key, definition]) => ({
+                fill: definition.browserValue,
+                stroke: definition.browserValue,
+                variant: { id: key, name: "", priceModifier: 0, enabled: true },
+                pmsValue: matchHexToPms(browserColorToHex(definition.browserValue), PMS_MAX_DISTANCE)[0]?.pms,
+            })),
+        );
+        await step.changeColors(new Map(Object.entries(imageColors)));
+    }, [step, storeColors]);
+
+    // Applies a new set of colors to the design and remembers them for the version of the image being edited.
+    const updateColors = useCallback(
+        (next: Colors) => {
+            storeColors(next);
+            if (imageState === "optimized") {
+                colorCache.current.optimized = { colors: next, svg: step.getImageData()?.svg };
+            } else {
+                colorCache.current.original = next;
+            }
+            step.changeColors(new Map(Object.entries(next))).catch((changeError) =>
+                console.error("Error changing colors:", changeError),
+            );
+        },
+        [imageState, step, storeColors],
+    );
+
     useEffect(() => {
         step.onFrameDataChanged(setFrameData);
     }, [step]);
@@ -244,6 +327,16 @@ const FrameUI: FunctionComponent<{
         step.getAllVariants()
             .then((allVariants) => setVariants(allVariants || []))
             .catch((loadError) => console.error("Error loading frame variants:", loadError));
+        step.getAvailableColors()
+            .then((available) =>
+                setColorOptions(
+                    (available || []).map((color) => ({
+                        ...color,
+                        variant: color.variant ?? { name: "", priceModifier: 0, enabled: true },
+                    })),
+                ),
+            )
+            .catch((loadError) => console.error("Error loading frame colors:", loadError));
 
         if (step.hasOriginalImageSelection()) {
             const coreState = step.getCurrentImageState();
@@ -262,8 +355,9 @@ const FrameUI: FunctionComponent<{
             step.canUseAdvancedImageManipulation()
                 .then(setCanRemoveBackground)
                 .catch(() => setCanRemoveBackground(false));
+            populateColors().catch((colorError) => console.error("Error loading image colors:", colorError));
         }
-    }, [step]);
+    }, [populateColors, step]);
 
     const handleVariantSelect = useCallback(
         async (variant: Variant) => {
@@ -284,6 +378,28 @@ const FrameUI: FunctionComponent<{
         [frameUpdating, onActivation, step],
     );
 
+    // Puts an uploaded asset into the frame and resets everything that depended on the previous image.
+    const applyUploadedImage = useCallback(
+        async (asset: Asset, name?: string) => {
+            setShowOptimizePrompt(false);
+            setColorsConfirmed(false);
+            setIsEditingColors(false);
+            onActivation?.();
+            await step.selectImage(asset);
+            preOptimization.current = undefined;
+            colorCache.current = {};
+            setCurrentImageAsset(asset);
+            setFileName(name ?? asset.key?.split("/").pop());
+            setHasUserImage(true);
+            setHasBackgroundRemoved(false);
+            setUseOriginal(false);
+            setImageState("original");
+            setCanRemoveBackground(await step.canRemoveBackground());
+            await populateColors();
+        },
+        [onActivation, populateColors, step],
+    );
+
     const uploadFile = useCallback(
         async (file: File) => {
             const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
@@ -293,7 +409,6 @@ const FrameUI: FunctionComponent<{
             }
 
             setError("");
-            setShowOptimizePrompt(false);
             setProgress(0);
             setBusyMessage("Uploading photo...");
             workflowManager.setMandatoryFulfilled(step.getId(), false);
@@ -310,16 +425,7 @@ const FrameUI: FunctionComponent<{
                     (value) => setProgress(Math.max(0, Math.min(value, 100))),
                     true,
                 );
-                onActivation?.();
-                await step.selectImage(asset);
-                preOptimization.current = undefined;
-                setCurrentImageAsset(asset);
-                setFileName(file.name);
-                setHasUserImage(true);
-                setHasBackgroundRemoved(false);
-                setUseOriginal(false);
-                setImageState("original");
-                setCanRemoveBackground(await step.canRemoveBackground());
+                await applyUploadedImage(asset, file.name);
             } catch (uploadError) {
                 console.error("Error uploading frame image:", uploadError);
                 setError("The image could not be uploaded or applied. Please try another file.");
@@ -329,7 +435,52 @@ const FrameUI: FunctionComponent<{
                 setBusyMessage(undefined);
             }
         },
-        [extensions, onActivation, step, workflowManager],
+        [applyUploadedImage, extensions, step, workflowManager],
+    );
+
+    // Mobile upload: the phone uploads straight into an empty asset that we create up front.
+    const handleToggleMobileQR = useCallback(async () => {
+        if (showMobileQR) {
+            setShowMobileQR(false);
+            setMobileUploadAsset(undefined);
+            return;
+        }
+        try {
+            const asset = await assetService.createAssetWithoutUpload(
+                `mobile-upload-${generate()}-${Date.now()}`,
+                AssetType.Image,
+                true,
+                false,
+            );
+            setError("");
+            setMobileUploadAsset(asset);
+            setShowMobileQR(true);
+        } catch (mobileError) {
+            console.error("Failed to create asset for mobile upload:", mobileError);
+            setError("A mobile upload could not be started. Please try again.");
+        }
+    }, [showMobileQR]);
+
+    const handleMobileUploadComplete = useCallback(
+        async (asset: Asset) => {
+            setShowMobileQR(false);
+            setMobileUploadAsset(undefined);
+            setError("");
+            setBusyMessage("Applying image...");
+            workflowManager.setMandatoryFulfilled(step.getId(), false);
+            const updateId = workflowManager.markUpdatePending();
+
+            try {
+                await applyUploadedImage(asset);
+            } catch (applyError) {
+                console.error("Error applying mobile upload:", applyError);
+                setError("The image could not be applied. Please try another file.");
+            } finally {
+                workflowManager.markUpdateCompleted(updateId);
+                setBusyMessage(undefined);
+            }
+        },
+        [applyUploadedImage, step, workflowManager],
     );
 
     const handleFileSelect = useCallback(
@@ -405,6 +556,7 @@ const FrameUI: FunctionComponent<{
             try {
                 let asset = currentImageAsset;
                 const startedFrom = currentImageAsset;
+                colorCache.current.original = colorsRef.current;
 
                 if (needsEnhancement && minimumSize && imageData) {
                     startStage("AI Rendering...");
@@ -435,6 +587,12 @@ const FrameUI: FunctionComponent<{
                 const vectorized = await step.vectorize(asset, step.getVectorizeMaxColors());
                 setCurrentImageAsset(vectorized);
                 setImageState("optimized");
+                setColorsConfirmed(false);
+                await populateColors();
+                const optimizedData = step.getImageData();
+                if (optimizedData?.colors) {
+                    colorCache.current.optimized = { colors: optimizedData.colors, svg: optimizedData.svg };
+                }
                 setProgress(100);
             } catch (optimizeError) {
                 console.error("Error optimising image:", optimizeError);
@@ -445,7 +603,17 @@ const FrameUI: FunctionComponent<{
                 setBusyMessage(undefined);
             }
         },
-        [currentImageAsset, imageData, minimumSize, needsEnhancement, onActivation, step, useOriginal, workflowManager],
+        [
+            currentImageAsset,
+            imageData,
+            minimumSize,
+            needsEnhancement,
+            onActivation,
+            populateColors,
+            step,
+            useOriginal,
+            workflowManager,
+        ],
     );
 
     const handleImageStateChange = useCallback(
@@ -476,6 +644,27 @@ const FrameUI: FunctionComponent<{
                 if (asset) {
                     setCurrentImageAsset(asset);
                 }
+
+                // Bring back any colour edits made to the version of the image we're switching to.
+                const cachedOriginal = colorCache.current.original;
+                const cachedOptimized = colorCache.current.optimized;
+                if (newState === "original" && cachedOriginal) {
+                    storeColors(cachedOriginal);
+                    await step.changeColors(new Map(Object.entries(cachedOriginal)));
+                } else if (newState === "optimized" && cachedOptimized) {
+                    const optimizedData = step.getFrameService()?.getImageData();
+                    if (cachedOptimized.svg && optimizedData) {
+                        step.getFrameService()?.setPatternData(
+                            { ...optimizedData, svg: cachedOptimized.svg, colors: cachedOptimized.colors },
+                            false,
+                        );
+                    }
+                    storeColors(cachedOptimized.colors);
+                    await step.changeColors(new Map(Object.entries(cachedOptimized.colors)));
+                } else {
+                    await populateColors();
+                }
+                setActiveColorIds({ selected: [], hovered: [] });
             } catch (stateError) {
                 console.error("Error switching image state:", stateError);
                 setImageState(previousState);
@@ -484,14 +673,115 @@ const FrameUI: FunctionComponent<{
                 setBusyMessage(undefined);
             }
         },
-        [busy, imageState, onActivation, step],
+        [busy, imageState, onActivation, populateColors, step, storeColors],
     );
+
+    const handleChangeColor = useCallback(
+        (key: string, fill: string, pmsValue?: string) => {
+            onActivation?.();
+            updateColors({ ...colorsRef.current, [key]: { browserValue: fill, pmsValue } });
+        },
+        [onActivation, updateColors],
+    );
+
+    // Merging and unmerging rewrite the SVG itself, so the colors have to be read back afterwards.
+    const afterColorsRewritten = useCallback(async () => {
+        await populateColors();
+        const rewritten = step.getImageData();
+        if (rewritten?.colors) {
+            if (imageState === "optimized") {
+                colorCache.current.optimized = { colors: rewritten.colors, svg: rewritten.svg };
+            } else {
+                colorCache.current.original = rewritten.colors;
+            }
+        }
+        onActivation?.();
+    }, [imageState, onActivation, populateColors, step]);
+
+    const handleMergeColors = useCallback(
+        async (sourceIds: string[], targetId: string, targetColor: ColorDefinition) => {
+            await step.mergeColors(sourceIds, targetId, targetColor);
+            await afterColorsRewritten();
+        },
+        [afterColorsRewritten, step],
+    );
+
+    const handleUnmergeColors = useCallback(
+        async (
+            sourceIds: string[],
+            targetId: string,
+            preMergeColors: { [key: string]: ColorDefinition },
+            preMergeSvg: string,
+        ) => {
+            await step.unmergeColors(sourceIds, targetId, preMergeColors, preMergeSvg);
+            await afterColorsRewritten();
+        },
+        [afterColorsRewritten, step],
+    );
+
+    const handleAddColor = useCallback(
+        (color: ColorDefinition) => {
+            onActivation?.();
+            updateColors({ ...colorsRef.current, [`color-${Date.now()}`]: color });
+        },
+        [onActivation, updateColors],
+    );
+
+    const handleDeleteColor = useCallback(
+        (key: string) => {
+            onActivation?.();
+            const remaining = { ...colorsRef.current };
+            delete remaining[key];
+            updateColors(remaining);
+        },
+        [onActivation, updateColors],
+    );
+
+    const handleEditImageClick = useCallback(() => {
+        if (colorsConfirmed) {
+            setColorsConfirmed(false);
+            return;
+        }
+        setIsEditingColors((editing) => !editing);
+    }, [colorsConfirmed]);
+
+    const handleConfirmColors = useCallback(() => {
+        setColorsConfirmed(true);
+        setIsEditingColors(false);
+    }, []);
+
+    const handleColorHover = useCallback(
+        (keys: string[]) => setActiveColorIds((current) => ({ ...current, hovered: keys })),
+        [],
+    );
+    const handleColorSelectionChange = useCallback(
+        (keys: string[]) => setActiveColorIds((current) => ({ ...current, selected: keys })),
+        [],
+    );
+    const getCurrentSvg = useCallback(() => step.getImageData()?.svg, [step]);
 
     const backgroundButtonLabel = hasBackgroundRemoved && !useOriginal ? "Use Original Image" : "Remove Background";
     const backgroundIsRemoved = hasBackgroundRemoved && !useOriginal;
     const showOptimizationCard = hasUserImage && needsOptimization && !hasVectorized && shouldVectorize;
     const showBackgroundButton =
         hasUserImage && canRemoveBackground && currentImageAsset?.type === AssetType.Image && !hasVectorized;
+    const isCurrentAssetSvg = currentImageAsset?.type === AssetType.Illustration;
+    const isOriginalWithOptimized = imageState === "original" && hasVectorized;
+    const showColorEditor =
+        hasUserImage && !colorsConfirmed && step.isColorPickerEnabled() && canRemoveBackground && !!colors;
+    const showConfirmColors = hasUserImage && !colorsConfirmed && (hasVectorized || !needsOptimization);
+
+    const status: { tone: "success" | "warning"; text: string } | undefined = (() => {
+        if (!shouldVectorize || colorsConfirmed) return undefined;
+        if (!hasVectorized) {
+            return needsOptimization
+                ? { tone: "warning", text: "Not print ready, please optimise to continue" }
+                : { tone: "success", text: "Production ready, please confirm colours" };
+        }
+        return imageState === "optimized"
+            ? { tone: "success", text: "Print ready, confirm colours" }
+            : { tone: "warning", text: "Not print ready, fee may incur, select colours to continue" };
+    })();
 
     return (
         <Container data-test-step-type="frame">
@@ -520,27 +810,7 @@ const FrameUI: FunctionComponent<{
                 >
                     {hasUserImage && frameService && (
                         <CropperSection>
-                            {shouldVectorize && !busy && (
-                                <StatusChip
-                                    $tone={
-                                        hasVectorized
-                                            ? imageState === "optimized"
-                                                ? "success"
-                                                : "warning"
-                                            : needsOptimization
-                                              ? "warning"
-                                              : "success"
-                                    }
-                                >
-                                    {hasVectorized
-                                        ? imageState === "optimized"
-                                            ? "Print ready"
-                                            : "Not print ready, manual review required"
-                                        : needsOptimization
-                                          ? "Not print ready, please optimise to continue"
-                                          : "Production ready"}
-                                </StatusChip>
-                            )}
+                            {status && !busy && <StatusChip $tone={status.tone}>{status.text}</StatusChip>}
                             {canToggleImageState && (
                                 <ToggleGroup>
                                     <ToggleButton
@@ -566,6 +836,9 @@ const FrameUI: FunctionComponent<{
                                 key={imageUrl}
                                 frameService={frameService}
                                 overlayImageUrl={step.hasOverlayImageUrl() || undefined}
+                                showScale={!isEditingColors}
+                                showRotation={isEditingColors}
+                                activeColorIds={activeColorIds}
                             />
                         </CropperSection>
                     )}
@@ -606,28 +879,82 @@ const FrameUI: FunctionComponent<{
                             )}
                         </OptimizationCard>
                     )}
-                    <ButtonSpacing>
-                        <HiddenInput
-                            ref={inputRef}
-                            type="file"
-                            accept={extensions.join(",")}
-                            onChange={handleFileSelect}
-                            disabled={busy}
-                        />
-                        <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
-                            {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
-                        </Button>
-                    </ButtonSpacing>
-                    {progress !== undefined && (
-                        <ProgressBar>
-                            <ProgressFill $progress={progress} />
-                        </ProgressBar>
+                    {showColorEditor && colors && (
+                        <ColorEditor>
+                            <SVGColorSelector
+                                key={`${imageState}-${currentImageAsset?.key ?? ""}`}
+                                availableColors={[...originalSvgColors, ...colorOptions]}
+                                existingColors={colors}
+                                onChange={handleChangeColor}
+                                onMergeColors={handleMergeColors}
+                                onUnmergeColors={handleUnmergeColors}
+                                getCurrentSvg={getCurrentSvg}
+                                onDeleteColor={isOriginalWithOptimized ? handleDeleteColor : undefined}
+                                onAddColor={
+                                    imageState === "original" && !isCurrentAssetSvg ? handleAddColor : undefined
+                                }
+                                showPms
+                                showEyeDropper
+                                showUndoRedo
+                                isEditingColors={isEditingColors}
+                                currentAsset={currentImageAsset}
+                                showColorName={imageState === "original"}
+                                showAutoDetected={imageState === "optimized" || isCurrentAssetSvg}
+                                onColorHover={handleColorHover}
+                                onSelectionChange={handleColorSelectionChange}
+                            />
+                        </ColorEditor>
                     )}
-                    {!hasUserImage && (
-                        <HelpText variant="p">
-                            Drag and drop an image here, or choose a file. Accepted types:{" "}
-                            {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
-                        </HelpText>
+                    {hasUserImage && (
+                        <ButtonSpacing>
+                            <Button fullWidth disabled={busy} onClick={handleEditImageClick}>
+                                {isEditingColors ? "Confirm Edit" : colorsConfirmed ? "Make Changes" : "Edit Image"}
+                            </Button>
+                        </ButtonSpacing>
+                    )}
+                    {showMobileQR && mobileUploadAsset && !hasUserImage ? (
+                        <MobileUploadQR
+                            assetKey={mobileUploadAsset.key ?? ""}
+                            fileLink={mobileUploadAsset.fileLink ?? ""}
+                            fileType={extensions.map((extension) => `image/${extension.replace(".", "")}`).join(",")}
+                            maxSizeBytes={MOBILE_UPLOAD_MAX_BYTES}
+                            whitelistedExtensions={extensions.map((extension) => extension.replace(".", ""))}
+                            onCancel={handleToggleMobileQR}
+                            onUploadComplete={handleMobileUploadComplete}
+                        />
+                    ) : (
+                        <>
+                            <ButtonSpacing>
+                                <HiddenInput
+                                    ref={inputRef}
+                                    type="file"
+                                    accept={extensions.join(",")}
+                                    onChange={handleFileSelect}
+                                    disabled={busy}
+                                />
+                                <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
+                                    {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
+                                </Button>
+                            </ButtonSpacing>
+                            {progress !== undefined && (
+                                <ProgressBar>
+                                    <ProgressFill $progress={progress} />
+                                </ProgressBar>
+                            )}
+                            {!hasUserImage && (
+                                <HelpText variant="p">
+                                    Drag and drop an image here, or choose a file. Accepted types:{" "}
+                                    {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
+                                </HelpText>
+                            )}
+                            {!hasUserImage && enableMobileUpload && (
+                                <ButtonSpacing>
+                                    <Button fullWidth disabled={busy} onClick={handleToggleMobileQR}>
+                                        Upload from your mobile
+                                    </Button>
+                                </ButtonSpacing>
+                            )}
+                        </>
                     )}
                     {showBackgroundButton && (
                         <ButtonSpacing>
@@ -636,7 +963,14 @@ const FrameUI: FunctionComponent<{
                             </Button>
                         </ButtonSpacing>
                     )}
-                    {hasUserImage && imageState === "original" && hasVectorized && shouldVectorize && (
+                    {showConfirmColors && (
+                        <ButtonSpacing>
+                            <Button fullWidth disabled={busy} onClick={handleConfirmColors}>
+                                Confirm Colors
+                            </Button>
+                        </ButtonSpacing>
+                    )}
+                    {hasUserImage && colorsConfirmed && imageState === "original" && hasVectorized && (
                         <WarningAlert variant="p">
                             This selected asset is not print ready and will need manual review before the order is
                             produced.

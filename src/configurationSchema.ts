@@ -1,20 +1,23 @@
-import { ThemeConfigurationSchema } from "@spiffcommerce/theme-bridge";
+import { FieldType, ThemeConfigurationSchema } from "@spiffcommerce/theme-bridge";
 
 // TODO: fill these out with stuff like colors and fonts for basic configuration.
 
 export interface ThemeConfiguration {
     /**
-     * TODO: Place configuration typing here.
-     * These types should
+     * Lets customers upload an image from their phone by scanning a QR code.
      */
+    enableMobileUpload?: boolean;
 }
 
 export const configurationSchema: ThemeConfigurationSchema = {
     fields: [
-        /**
-         * TODO: Place configuration fields here.
-         * The fields are used to generate the configuration form in the Spiff dashboard.
-         */
+        {
+            type: FieldType.Boolean,
+            key: "enableMobileUpload",
+            title: "Enable Mobile Upload",
+            defaultValue: "false",
+            description: "When true, allows users to upload images from their mobile device using a QR code.",
+        },
     ],
 };
 

@@ -3,6 +3,7 @@ import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommer
 import { ActivationData, Bundle, CurrencyContext, IntegrationType, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
 import { CurrencyProvider } from "./hooks/useCurrency";
+import { ThemeConfigurationProvider } from "./hooks/useThemeConfiguration";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
 import { ClientProvider } from "./hooks/useClient";
@@ -105,9 +106,11 @@ const App: FunctionComponent<{
             <ClientProvider client={client}>
                 <ActivationProvider activation={context.activation}>
                     <BundleProvider bundle={bundle}>
-                        <CurrencyProvider currencyContext={currencyContext}>
-                            <PageHandler />
-                        </CurrencyProvider>
+                        <ThemeConfigurationProvider configuration={context.configuration}>
+                            <CurrencyProvider currencyContext={currencyContext}>
+                                <PageHandler />
+                            </CurrencyProvider>
+                        </ThemeConfigurationProvider>
                     </BundleProvider>
                 </ActivationProvider>
             </ClientProvider>

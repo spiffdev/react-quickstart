@@ -1,7 +1,8 @@
-import { FunctionComponent, MouseEvent, TouchEvent, useCallback, useEffect, useRef, useState } from "react";
+import { FunctionComponent, MouseEvent, TouchEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { FrameService, generate } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Typography from "../../../components/typography";
+import { ActiveColorIds, isolateColors } from "./colorIsolation";
 
 const FRAME_BORDER_WIDTH = 24;
 
@@ -201,7 +202,9 @@ const ImageCropper: FunctionComponent<{
     overlayImageUrl?: string;
     showScale?: boolean;
     showRotation?: boolean;
-}> = ({ frameService, overlayImageUrl, showScale = true, showRotation = false }) => {
+    /** Colors to highlight (selected/hovered) while the rest of the image is dimmed. */
+    activeColorIds?: ActiveColorIds;
+}> = ({ frameService, overlayImageUrl, showScale = true, showRotation = false, activeColorIds }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const maskRectRef = useRef<SVGRectElement>(null);
     const dragging = useRef(false);
@@ -215,6 +218,16 @@ const ImageCropper: FunctionComponent<{
     const imageData = frameService.getImageData();
     const frameDatas = frameService.getFrameData();
     const hasData = !!imageData && !!frameDatas;
+    const imageSrc = frameService.getImageSrc();
+    const selectedColorIds = activeColorIds?.selected;
+    const hoveredColorIds = activeColorIds?.hovered;
+    const displayedImageSrc = useMemo(
+        () =>
+            imageSrc && selectedColorIds && hoveredColorIds
+                ? isolateColors(imageSrc, { selected: selectedColorIds, hovered: hoveredColorIds })
+                : imageSrc,
+        [hoveredColorIds, imageSrc, selectedColorIds],
+    );
 
     useEffect(() => {
         frameService.onZoom(refresh);
@@ -537,7 +550,7 @@ const ImageCropper: FunctionComponent<{
                     <g mask={`url(#frame${framingUuid})`}>
                         <g transform={`rotate(${rotation} ${imageX + imageWidth / 2} ${imageY + imageHeight / 2})`}>
                             <image
-                                href={frameService.getImageSrc()}
+                                href={displayedImageSrc}
                                 x={imageX}
                                 y={imageY}
                                 width={imageWidth}
