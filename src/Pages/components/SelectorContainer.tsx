@@ -19,6 +19,11 @@ const Grid = styled.div`
     flex-direction: row;
     gap: 10px;
     flex-wrap: wrap;
+
+    @media (max-width: 768px) {
+        padding: 16px;
+        justify-content: center;
+    }
 `;
 
 const SelectorContainer: FunctionComponent<{ children: ReactNode; loading?: boolean }> = ({

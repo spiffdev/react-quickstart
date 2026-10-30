@@ -58,6 +58,50 @@ const STEP_TYPES_WITH_MANDATORY_SUPPORT = [
 
 const DEFAULT_SIDEBAR_WIDTH_PERCENTAGE = 25;
 
+const MOBILE_BREAKPOINT = "768px";
+
+const Layout = styled.div`
+    height: 100%;
+    overflow: hidden;
+    display: flex;
+    flex-direction: row;
+
+    /* The preview stays pinned on top while the steps scroll beneath it. */
+    @media (max-width: ${MOBILE_BREAKPOINT}) {
+        flex-direction: column;
+    }
+`;
+
+const PreviewPane = styled.div`
+    flex: 1 1 0;
+    min-width: 0;
+    height: 100%;
+
+    @media (max-width: ${MOBILE_BREAKPOINT}) {
+        flex: 0 0 40%;
+        height: auto;
+        min-height: 0;
+    }
+`;
+
+const Sidebar = styled.div<{ $widthPercentage: number }>`
+    position: relative;
+    height: 100%;
+    overflow: auto;
+    flex: 0 0 ${(props) => props.$widthPercentage}%;
+    min-width: 0;
+    gap: 5px;
+    display: flex;
+    flex-direction: column;
+
+    @media (max-width: ${MOBILE_BREAKPOINT}) {
+        flex: 1 1 0;
+        height: auto;
+        min-height: 0;
+        -webkit-overflow-scrolling: touch;
+    }
+`;
+
 const SceneTitle = styled(Typography)`
     font-size: var(--theme-scene-heading-size);
 `;
@@ -264,22 +308,11 @@ const Customization: FunctionComponent<{
 
     return (
         <PricingProvider showPricing={showPricing} showPlus={showPlus}>
-            <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "row" }}>
-                <div style={{ flex: "1 1 0", minWidth: 0, height: "100%" }}>
+            <Layout>
+                <PreviewPane>
                     <ThreeDPreview workflowExperience={workflowExperience} />
-                </div>
-                <div
-                    style={{
-                        position: "relative",
-                        height: "100%",
-                        overflow: "auto",
-                        flex: `0 0 ${sidebarWidthPercentage}%`,
-                        minWidth: 0,
-                        gap: "5px",
-                        display: "flex",
-                        flexDirection: "column",
-                    }}
-                >
+                </PreviewPane>
+                <Sidebar $widthPercentage={sidebarWidthPercentage}>
                     {showPricing && formatPrice && totalPrice > 0 && (
                         <TotalBar>
                             <Typography variant="span">Total</Typography>
@@ -305,8 +338,8 @@ const Customization: FunctionComponent<{
                             </Card>
                         );
                     })}
-                </div>
-            </div>
+                </Sidebar>
+            </Layout>
         </PricingProvider>
     );
 };
