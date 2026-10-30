@@ -27,6 +27,10 @@ const List = styled.ol`
     margin: 0;
     padding: 12px 16px;
     list-style: none;
+
+    @media (max-width: 768px) {
+        padding: 12px;
+    }
 `;
 
 const Item = styled.li<{ $complete: boolean }>`
@@ -45,6 +49,10 @@ const Item = styled.li<{ $complete: boolean }>`
         min-width: 16px;
         height: 2px;
         margin: 0 12px;
+
+        @media (max-width: 768px) {
+            margin: 0 8px;
+        }
         background:
             linear-gradient(${ACTIVE_COLOR}, ${ACTIVE_COLOR}) left center / ${(props) => (props.$complete ? 100 : 0)}%
                 100% no-repeat,
@@ -135,6 +143,11 @@ const Label = styled.span<{ $state: StepState; $available: boolean }>`
     transition: color ${MARKER_DURATION} ease;
     transition-delay: ${(props) => (props.$state === "current" ? CONNECTOR_DURATION : "0s")};
     ${reducedMotion}
+
+    /* Only the current page keeps its label on narrow screens, so the markers fit. */
+    @media (max-width: 768px) {
+        ${(props) => props.$state !== "current" && "display: none;"}
+    }
 `;
 
 /**

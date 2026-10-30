@@ -7,6 +7,12 @@ import Typography from "../../components/typography";
 const TileCard = styled(Card)<{ $selected?: boolean }>`
     width: 250px;
     height: 400px;
+    max-width: 100%;
+
+    @media (max-width: 768px) {
+        width: 100%;
+        height: 320px;
+    }
     ${(props) => props.$selected && "border-color: var(--theme-primary-color); box-shadow: var(--theme-primary-color) 0px 0px 4px 1px;"}
 `;
 
