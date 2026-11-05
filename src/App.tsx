@@ -1,5 +1,10 @@
-import { FunctionComponent, ReactNode, useEffect, useState } from "react";
-import { SpiffThemeLoader, ThemeContext, ThemeContextBundle } from "@spiffcommerce/theme-bridge";
+import { FunctionComponent, ReactNode, useEffect, useMemo, useState } from "react";
+import {
+    SpiffThemeLoader,
+    ThemeContext,
+    ThemeContextBundle,
+    themeInstallConfigurationFieldsToRecordObject,
+} from "@spiffcommerce/theme-bridge";
 import { ActivationData, Bundle, CurrencyContext, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
 import { CurrencyProvider } from "./hooks/useCurrency";
@@ -7,6 +12,7 @@ import { ThemeProvider } from "./hooks/useTheme";
 import { ThemeConfigurationProvider } from "./hooks/useThemeConfiguration";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
+import type { ThemeConfiguration } from "./configurationSchema";
 import { ClientProvider } from "./hooks/useClient";
 import LoadingOverlay from "./Pages/components/LoadingOverlay";
 import ErrorScreen from "./components/ErrorScreen";
@@ -67,6 +73,16 @@ const App: FunctionComponent<{
             .catch((error) => console.error("Error loading currency context:", error));
     }, [client, context.currency]);
 
+    // Test bundles are excluded from reporting and billing.
+    const enableTestOrders = useMemo(
+        () =>
+            context.configuration
+                ? !!(themeInstallConfigurationFieldsToRecordObject(context.configuration.fields) as ThemeConfiguration)
+                      .enableTestOrders
+                : false,
+        [context.configuration],
+    );
+
     useEffect(() => {
         let cancelled = false;
         setLoadFailed(false);
@@ -74,10 +90,12 @@ const App: FunctionComponent<{
         const loadBundle = async () => {
             const c = context as ThemeContextBundle;
             if (c.bundleOptions.type === "existing") {
-                return client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {});
+                return client.getExistingBundle(c.bundleOptions.bundleId, undefined, undefined, {
+                    test: enableTestOrders || undefined,
+                });
             }
             const collectionId = getProductCollectionForNewBundle(context);
-            return client.getNewBundle(collectionId || undefined, undefined, {});
+            return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders });
         };
 
         loadBundle()
@@ -92,7 +110,7 @@ const App: FunctionComponent<{
         return () => {
             cancelled = true;
         };
-    }, [client, context, loadAttempt]);
+    }, [client, context, enableTestOrders, loadAttempt]);
 
     let content: ReactNode;
     if (loadFailed) {

@@ -9,7 +9,11 @@ import Customization from "./Customization";
 import ErrorBanner from "../components/ErrorBanner";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
 import PageStepper from "./components/PageStepper";
-import type { SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
+import { ConversionDataType, type SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
+import { StakeholderType } from "@spiffcommerce/core";
+import TestOrderBanner from "../components/TestOrderBanner";
+import useThemeConfiguration from "../hooks/useThemeConfiguration";
+import type { QuoteDetails } from "./Customization/components/QuoteForm";
 
 type PageType = "collection" | "product" | "workflow" | "experience";
 
@@ -26,6 +30,7 @@ const pageIndex = (page: PageType) => PAGE_STEPS.findIndex((step) => step.page =
 const PageHandler: FunctionComponent<{}> = () => {
     const client = useClient();
     const bundle = useBundle();
+    const { conversionConfiguration } = useThemeConfiguration();
     const [page, setPage] = useState<PageType>("collection");
     const [collection, setCollection] = useState<ProductCollection | undefined>(undefined);
     const [product, setProduct] = useState<CollectionProduct | undefined>(undefined);
@@ -207,13 +212,66 @@ const PageHandler: FunctionComponent<{}> = () => {
                     : undefined;
             const result = await bundle.finish(undefined, takeScreenshot);
             const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
-            spiffThemeLoader.addToEcommerceCart(result);
+            if (bundle.getTest()) {
+                // Test orders are placed directly and the window is closed rather than handing off to the cart.
+                await bundle.placeOrder();
+                spiffThemeLoader.close();
+            } else {
+                spiffThemeLoader.addToEcommerceCart(result);
+            }
         } catch (error) {
-            console.error("Error adding the bundle to the cart:", error);
+            console.error("Error completing the design:", error);
             // The finish step shows this message under its button.
             throw new Error("We couldn't add your design to the cart. Please try again.");
         }
     }, [bundle]);
+
+    const handleRequestQuote = useCallback(
+        async (details: QuoteDetails) => {
+            try {
+                // Details are stored under the configured identifier for each field, falling back to its type.
+                const items = conversionConfiguration?.requestedDataItems ?? [];
+                const valueOf = (type: ConversionDataType) => {
+                    const item = items.find((candidate) => candidate.type === type);
+                    return details[item?.uniqueIdentifier ?? type]?.trim() || undefined;
+                };
+
+                const email = valueOf(ConversionDataType.Email);
+                const stakeholders = await bundle.getAllStakeholders();
+                if (email && !stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) {
+                    await bundle.addStakeholder(
+                        {
+                            emailAddress: email,
+                            firstName: valueOf(ConversionDataType.FirstName),
+                            lastName: valueOf(ConversionDataType.LastName),
+                            phoneNumber: valueOf(ConversionDataType.Phone),
+                        },
+                        StakeholderType.Owner,
+                    );
+                }
+
+                const metadata = new Map(bundle.getMetadata());
+                for (const [key, value] of Object.entries(details)) {
+                    if (value.trim()) metadata.set(key, value.trim());
+                }
+                if (conversionConfiguration) metadata.set("conversionConfigurationId", conversionConfiguration.id);
+                await bundle.setMetadata(metadata);
+
+                const organizationName = valueOf(ConversionDataType.OrganizationName);
+                if (organizationName) await bundle.attachOrganization(organizationName);
+
+                const quoteId = await bundle.generateQuoteId();
+                await bundle.finish();
+                const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
+                spiffThemeLoader.completeQuote({ bundleId: bundle.getId(), quoteId });
+            } catch (error) {
+                console.error("Error requesting a quote:", error);
+                // The finish step shows this message under its button.
+                throw new Error("We couldn't request your quote. Please try again.");
+            }
+        },
+        [bundle, conversionConfiguration],
+    );
 
     // A page can be returned to once it has been reached, as long as what it needs still exists.
     const canVisit = (index: number) =>
@@ -232,6 +290,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                     setPage(PAGE_STEPS[index].page);
                 }}
             />
+            {bundle.getTest() && <TestOrderBanner />}
             {errorMessage && <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(undefined)} />}
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", position: "relative" }}>
                 {page === "collection" && (
@@ -268,6 +327,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                                 key={experience.getTransaction().id}
                                 workflowExperience={experience}
                                 onNext={handleFinish}
+                                onRequestQuote={handleRequestQuote}
                             />
                         </div>
                     </div>

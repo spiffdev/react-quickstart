@@ -27,6 +27,7 @@ import {
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 import LoadingOverlay from "../components/LoadingOverlay";
+import type { QuoteDetails } from "./components/QuoteForm";
 import StepHelp from "./components/StepHelp";
 import ThreeDPreview from "./components/ThreeDPreview";
 import {
@@ -59,6 +60,8 @@ const STEP_TYPES_WITH_MANDATORY_SUPPORT = [
 const DEFAULT_SIDEBAR_WIDTH_PERCENTAGE = 25;
 
 const MOBILE_BREAKPOINT = "768px";
+// Between mobile and this width the preview and sidebar share the screen evenly.
+const TABLET_BREAKPOINT = "1024px";
 
 const Layout = styled.div`
     height: 100%;
@@ -77,6 +80,10 @@ const PreviewPane = styled.div`
     min-width: 0;
     height: 100%;
 
+    @media (min-width: 769px) and (max-width: ${TABLET_BREAKPOINT}) {
+        flex: 0 0 50%;
+    }
+
     @media (max-width: ${MOBILE_BREAKPOINT}) {
         flex: 0 0 40%;
         height: auto;
@@ -93,6 +100,10 @@ const Sidebar = styled.div<{ $widthPercentage: number }>`
     gap: 5px;
     display: flex;
     flex-direction: column;
+
+    @media (min-width: 769px) and (max-width: ${TABLET_BREAKPOINT}) {
+        flex: 0 0 50%;
+    }
 
     @media (max-width: ${MOBILE_BREAKPOINT}) {
         flex: 1 1 0;
@@ -135,7 +146,12 @@ const StepHandler: FunctionComponent<{
     exportedData: ExportedStepData[];
     onActivate: (stepName: string) => void;
     onFinished: () => void | Promise<void>;
-}> = ({ step, workflowExperience, selectionCost, exportedData, onActivate, onFinished }) => {
+    onRequestQuote: (details: QuoteDetails) => void | Promise<void>;
+}> = ({ step, workflowExperience, selectionCost, exportedData, onActivate, onFinished, onRequestQuote }) => {
+    const { addToCartLabel, allowQuoteRequests, allowCartRequests } = useThemeConfiguration();
+    // Adding to the cart is the default, so it stays available unless it's switched off and quotes are on.
+    const allowQuote = !!allowQuoteRequests;
+    const allowCart = allowCartRequests !== false || !allowQuote;
     const renderStepComponent = () => {
         // The finish step has no handle.
         if (step.type === StepType.Finish) {
@@ -151,6 +167,10 @@ const StepHandler: FunctionComponent<{
                         canDownloadPreview(workflowExperience) ? () => downloadPreview(workflowExperience) : undefined
                     }
                     onFinished={onFinished}
+                    addToCartLabel={addToCartLabel}
+                    allowCart={allowCart}
+                    allowQuote={allowQuote}
+                    onRequestQuote={onRequestQuote}
                 />
             );
         }
@@ -239,7 +259,8 @@ const StepHandler: FunctionComponent<{
 const Customization: FunctionComponent<{
     workflowExperience: WorkflowExperience;
     onNext: () => void | Promise<void>;
-}> = ({ workflowExperience, onNext }) => {
+    onRequestQuote: (details: QuoteDetails) => void | Promise<void>;
+}> = ({ workflowExperience, onNext, onRequestQuote }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
@@ -278,7 +299,7 @@ const Customization: FunctionComponent<{
     );
 
     // Throws an error with a customer-readable message when the design isn't ready to be finished.
-    const handleFinish = useCallback(async () => {
+    const handleFinishChecks = useCallback(async () => {
         const manager = workflowExperience.getWorkflowManager();
         if (manager.getUpdatesPending()) {
             throw new Error("Your design is still updating. Please wait a moment and try again.");
@@ -297,9 +318,21 @@ const Customization: FunctionComponent<{
                 }
             }
         }
+    }, [mandatorySteps, traversableScenes, workflowExperience]);
 
+    const handleFinish = useCallback(async () => {
+        await handleFinishChecks();
         await onNext();
-    }, [mandatorySteps, onNext, traversableScenes, workflowExperience]);
+    }, [handleFinishChecks, onNext]);
+
+    // A quote needs the same checks as adding to the cart.
+    const handleQuote = useCallback(
+        async (details: QuoteDetails) => {
+            await handleFinishChecks();
+            await onRequestQuote(details);
+        },
+        [handleFinishChecks, onRequestQuote],
+    );
 
     if (traversableScenes.length === 0) {
         // TODO: spinner
@@ -333,6 +366,7 @@ const Customization: FunctionComponent<{
                                         exportedData={exportedData}
                                         onActivate={handleActivation}
                                         onFinished={handleFinish}
+                                        onRequestQuote={handleQuote}
                                     />
                                 ))}
                             </Card>

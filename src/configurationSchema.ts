@@ -1,6 +1,7 @@
 import {
     AssetType,
     type AssetResource,
+    type ConversionConfiguration,
     FieldType,
     type ThemeConfigurationPageSettings,
     ThemeConfigurationSchema,
@@ -33,6 +34,26 @@ export interface ThemeConfiguration {
      * Lets customers upload an image from their phone by scanning a QR code.
      */
     enableMobileUpload?: boolean;
+    /**
+     * Places orders as test bundles, which are excluded from reporting and billing. A warning banner is shown.
+     */
+    enableTestOrders?: boolean;
+    /**
+     * Lets customers request a quote instead of purchasing.
+     */
+    allowQuoteRequests?: boolean;
+    /**
+     * Lets customers add their design to the cart and check out.
+     */
+    allowCartRequests?: boolean;
+    /**
+     * The details asked of the customer when they request a quote. Only an email is asked for when unset.
+     */
+    conversionConfiguration?: ConversionConfiguration;
+    /**
+     * The text of the button that adds the design to the cart.
+     */
+    addToCartLabel?: string;
 }
 
 export const configurationSchema: ThemeConfigurationSchema = {
@@ -87,6 +108,43 @@ export const configurationSchema: ThemeConfigurationSchema = {
             title: "Enable Mobile Upload",
             defaultValue: "false",
             description: "When true, allows users to upload images from their mobile device using a QR code.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "enableTestOrders",
+            title: "Enable Test Orders",
+            defaultValue: "false",
+            description:
+                "When true, orders are placed as test orders and a warning banner is shown. Only use this while testing.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "allowQuoteRequests",
+            title: "Allow Quote Requests",
+            defaultValue: "false",
+            description:
+                "When true, the customer will be allowed to enter their details and request a quote instead of purchasing.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "allowCartRequests",
+            title: "Allow Cart Requests",
+            defaultValue: "true",
+            description:
+                "When true, the customer will be allowed to add items to their cart and proceed to checkout immediately.",
+        },
+        {
+            type: FieldType.ConversionConfiguration,
+            key: "conversionConfiguration",
+            title: "Conversion Configuration",
+            description: "The details asked of the customer when they request a quote.",
+        },
+        {
+            type: FieldType.Text,
+            key: "addToCartLabel",
+            title: "Add to Cart Button Text",
+            defaultValue: "Complete Design",
+            description: "The text shown on the button that adds the design to the cart.",
         },
     ],
 };
@@ -152,7 +210,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                             {{/each}}
                         </div>
 
-                        <button style="padding: 10px 24px; font-size: 14px; color: #ffffff; background-color: {{#if primaryColor}}{{primaryColor}}{{else}}#007bff{{/if}}; border: none; border-radius: 5px;">Add to cart</button>
+                        <button style="padding: 10px 24px; font-size: 14px; color: #ffffff; background-color: {{#if primaryColor}}{{primaryColor}}{{else}}#007bff{{/if}}; border: none; border-radius: 5px;">{{#if addToCartLabel}}{{addToCartLabel}}{{else}}Add to cart{{/if}}</button>
                     </div>
                 </div>
             `,
@@ -171,6 +229,14 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                 {
                     title: "Uploads",
                     fields: ["enableMobileUpload"],
+                },
+                {
+                    title: "Checkout",
+                    fields: ["addToCartLabel", "allowCartRequests", "allowQuoteRequests", "conversionConfiguration"],
+                },
+                {
+                    title: "Testing",
+                    fields: ["enableTestOrders"],
                 },
             ],
         },
