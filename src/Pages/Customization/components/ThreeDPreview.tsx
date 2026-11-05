@@ -1,6 +1,6 @@
 import { FunctionComponent, useEffect, useRef, useState } from "react";
 import { WorkflowExperience } from "@spiffcommerce/core";
-import { SpiffCommerce3DPreviewService } from "@spiffcommerce/preview";
+import { SpiffCommerce3DPreviewService } from "@spiffcommerce/preview-3d";
 import styled from "styled-components";
 import LoadingOverlay from "../../components/LoadingOverlay";
 

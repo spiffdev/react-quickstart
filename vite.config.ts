@@ -25,7 +25,7 @@ export default defineConfig((env) => {
                     assetFileNames: "assets/[name].[ext]",
                     manualChunks(id, _meta) {
                         if (!id.includes("node_modules")) return;
-                        if (id.includes("@spiffcommerce/preview")) return "vendor-spiffcommerce-preview";
+                        if (id.includes("@spiffcommerce/preview-3d")) return "vendor-spiffcommerce-preview-3d";
                         if (id.includes("@spiffcommerce")) return "vendor-spiffcommerce";
                         return;
                     },
