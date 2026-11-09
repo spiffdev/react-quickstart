@@ -59,7 +59,9 @@ export const fieldId = (field: ConversionData) => field.uniqueIdentifier ?? fiel
 const QuoteForm: FunctionComponent<{
     submitting: boolean;
     onSubmit: (details: QuoteDetails) => void;
-}> = ({ submitting, onSubmit }) => {
+    submitLabel?: string;
+    submittingLabel?: string;
+}> = ({ submitting, onSubmit, submitLabel = "Request a Quote", submittingLabel = "Requesting quote..." }) => {
     const { conversionConfiguration } = useThemeConfiguration();
     const fields = useMemo<ConversionData[]>(
         () => conversionConfiguration?.requestedDataItems ?? [{ type: ConversionDataType.Email, mandatory: true }],
@@ -91,7 +93,7 @@ const QuoteForm: FunctionComponent<{
                 <ErrorText variant="p">Please fill in the required fields.</ErrorText>
             )}
             <Button type="submit" fullWidth disabled={submitting || missing.length > 0}>
-                {submitting ? "Requesting quote..." : "Request a Quote"}
+                {submitting ? submittingLabel : submitLabel}
             </Button>
         </Form>
     );

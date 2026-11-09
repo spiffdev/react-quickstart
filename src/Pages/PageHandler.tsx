@@ -9,12 +9,13 @@ import Customization from "./Customization";
 import ErrorBanner from "../components/ErrorBanner";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
 import PageStepper from "./components/PageStepper";
-import { ConversionDataType, type SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
+import { ConversionDataType, ConversionLocation, type SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
 import { StakeholderType } from "@spiffcommerce/core";
 import TestOrderBanner from "../components/TestOrderBanner";
 import ConfirmReplaceDialog, { type ReplaceSubject } from "../components/ConfirmReplaceDialog";
 import useThemeConfiguration from "../hooks/useThemeConfiguration";
 import type { QuoteDetails } from "./Customization/components/QuoteForm";
+import ConversionDialog from "../components/ConversionDialog";
 
 type PageType = "collection" | "product" | "workflow" | "experience";
 
@@ -48,6 +49,9 @@ const PageHandler: FunctionComponent<{}> = () => {
     const createdExperiences = useRef(new Set<WorkflowExperience>());
     // "Don't ask again" is deliberately held in memory only, so it lasts until the page is reloaded.
     const skipReplaceConfirmation = useRef(false);
+    // The conversion prompt currently shown, and the locations it has already been shown at.
+    const [pendingConversion, setPendingConversion] = useState<{ resolve: () => void } | undefined>(undefined);
+    const consumedConversionLocations = useRef(new Set<ConversionLocation>());
     const [pendingReplace, setPendingReplace] = useState<
         { subject: ReplaceSubject; resolve: (confirmed: boolean) => void } | undefined
     >(undefined);
@@ -231,8 +235,71 @@ const PageHandler: FunctionComponent<{}> = () => {
         [attempt, confirmReplace, product, selectionExperience, startExperience, workflow],
     );
 
+    // Records the customer's details against the bundle: as its owner, in its metadata and as its organization.
+    const saveDetails = useCallback(
+        async (details: QuoteDetails) => {
+            // Details are stored under the configured identifier for each field, falling back to its type.
+            const items = conversionConfiguration?.requestedDataItems ?? [];
+            const valueOf = (type: ConversionDataType) => {
+                const item = items.find((candidate) => candidate.type === type);
+                return details[item?.uniqueIdentifier ?? type]?.trim() || undefined;
+            };
+
+            const email = valueOf(ConversionDataType.Email);
+            const stakeholders = await bundle.getAllStakeholders();
+            if (email && !stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) {
+                await bundle.addStakeholder(
+                    {
+                        emailAddress: email,
+                        firstName: valueOf(ConversionDataType.FirstName),
+                        lastName: valueOf(ConversionDataType.LastName),
+                        phoneNumber: valueOf(ConversionDataType.Phone),
+                    },
+                    StakeholderType.Owner,
+                );
+            }
+
+            const metadata = new Map(bundle.getMetadata());
+            for (const [key, value] of Object.entries(details)) {
+                if (value.trim()) metadata.set(key, value.trim());
+            }
+            if (conversionConfiguration) metadata.set("conversionConfigurationId", conversionConfiguration.id);
+            await bundle.setMetadata(metadata);
+
+            const organizationName = valueOf(ConversionDataType.OrganizationName);
+            if (organizationName) await bundle.attachOrganization(organizationName);
+        },
+        [bundle, conversionConfiguration],
+    );
+
+    // Asks for the customer's details if the conversion configuration calls for it at this location. Each location is
+    // only asked once, and never when the bundle already has an owner. Resolves once the prompt has closed.
+    const requestConversionIfRequired = useCallback(
+        async (location: ConversionLocation) => {
+            if (!conversionConfiguration?.locations?.includes(location)) return;
+            if (consumedConversionLocations.current.has(location)) return;
+            const stakeholders = await bundle.getAllStakeholders();
+            if (stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) return;
+            consumedConversionLocations.current.add(location);
+            await new Promise<void>((resolve) => setPendingConversion({ resolve }));
+        },
+        [bundle, conversionConfiguration],
+    );
+
+    const closeConversion = () => {
+        pendingConversion?.resolve();
+        setPendingConversion(undefined);
+    };
+
+    // Reaching the personalise page for the first time is the start of the customer's design.
+    const onExperiencePage = page === "experience" && !!experience;
+    useEffect(() => {
+        if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
+    }, [onExperiencePage, requestConversionIfRequired]);
+
     const handleFinish = useCallback(async () => {
         try {
+            await requestConversionIfRequired(ConversionLocation.OnEnd);
             // A screenshot can only be taken from the live preview when there is a single experience.
             const takeScreenshot =
                 bundle.getWorkflowExperienceCount() === 1
@@ -252,42 +319,12 @@ const PageHandler: FunctionComponent<{}> = () => {
             // The finish step shows this message under its button.
             throw new Error("We couldn't add your design to the cart. Please try again.");
         }
-    }, [bundle]);
+    }, [bundle, requestConversionIfRequired]);
 
     const handleRequestQuote = useCallback(
         async (details: QuoteDetails) => {
             try {
-                // Details are stored under the configured identifier for each field, falling back to its type.
-                const items = conversionConfiguration?.requestedDataItems ?? [];
-                const valueOf = (type: ConversionDataType) => {
-                    const item = items.find((candidate) => candidate.type === type);
-                    return details[item?.uniqueIdentifier ?? type]?.trim() || undefined;
-                };
-
-                const email = valueOf(ConversionDataType.Email);
-                const stakeholders = await bundle.getAllStakeholders();
-                if (email && !stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) {
-                    await bundle.addStakeholder(
-                        {
-                            emailAddress: email,
-                            firstName: valueOf(ConversionDataType.FirstName),
-                            lastName: valueOf(ConversionDataType.LastName),
-                            phoneNumber: valueOf(ConversionDataType.Phone),
-                        },
-                        StakeholderType.Owner,
-                    );
-                }
-
-                const metadata = new Map(bundle.getMetadata());
-                for (const [key, value] of Object.entries(details)) {
-                    if (value.trim()) metadata.set(key, value.trim());
-                }
-                if (conversionConfiguration) metadata.set("conversionConfigurationId", conversionConfiguration.id);
-                await bundle.setMetadata(metadata);
-
-                const organizationName = valueOf(ConversionDataType.OrganizationName);
-                if (organizationName) await bundle.attachOrganization(organizationName);
-
+                await saveDetails(details);
                 const quoteId = await bundle.generateQuoteId();
                 await bundle.finish();
                 const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
@@ -298,7 +335,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                 throw new Error("We couldn't request your quote. Please try again.");
             }
         },
-        [bundle, conversionConfiguration],
+        [bundle, saveDetails],
     );
 
     // A page can be returned to once it has been reached, as long as what it needs still exists.
@@ -369,6 +406,16 @@ const PageHandler: FunctionComponent<{}> = () => {
                     </div>
                 )}
             </div>
+            {pendingConversion && (
+                <ConversionDialog
+                    mandatory={!!conversionConfiguration?.mandatory}
+                    onSubmit={async (details) => {
+                        await saveDetails(details);
+                        closeConversion();
+                    }}
+                    onSkip={closeConversion}
+                />
+            )}
             {pendingReplace && (
                 <ConfirmReplaceDialog
                     subject={pendingReplace.subject}
