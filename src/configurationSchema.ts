@@ -31,6 +31,11 @@ export interface ThemeConfiguration {
      */
     sidebarWidthPercentage?: number;
     /**
+     * Lets customers upload an image from their device's files. Treated as true when unset. Turn this off for
+     * kiosks, where local files are irrelevant. Mobile upload is then always available, whatever enableMobileUpload says.
+     */
+    enableLocalUpload?: boolean;
+    /**
      * Lets customers upload an image from their phone by scanning a QR code.
      */
     enableMobileUpload?: boolean;
@@ -101,6 +106,14 @@ export const configurationSchema: ThemeConfigurationSchema = {
             title: "Sidebar Width (Percentage)",
             defaultValue: "25",
             description: "Width of the scenes sidebar, as a percentage of the window.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "enableLocalUpload",
+            title: "Enable Local Upload",
+            defaultValue: "true",
+            description:
+                "When false, customers can't choose or drag in files from the device. Useful for kiosks. Mobile Upload is then always on, regardless of its own setting.",
         },
         {
             type: FieldType.Boolean,
@@ -228,7 +241,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                 },
                 {
                     title: "Uploads",
-                    fields: ["enableMobileUpload"],
+                    fields: ["enableLocalUpload", "enableMobileUpload"],
                 },
                 {
                     title: "Checkout",

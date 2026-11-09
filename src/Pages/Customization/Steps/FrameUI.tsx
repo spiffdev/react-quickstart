@@ -237,7 +237,11 @@ const FrameUI: FunctionComponent<{
     const [activeColorIds, setActiveColorIds] = useState<ActiveColorIds>({ selected: [], hovered: [] });
     const [showMobileQR, setShowMobileQR] = useState(false);
     const [mobileUploadAsset, setMobileUploadAsset] = useState<Asset | undefined>(undefined);
-    const { enableMobileUpload } = useThemeConfiguration();
+    const { enableMobileUpload: mobileUploadSetting, enableLocalUpload: localUploadSetting } = useThemeConfiguration();
+    // Local upload is on unless it has been explicitly turned off.
+    const enableLocalUpload = localUploadSetting !== false;
+    // Mobile upload is always available when local upload is off, so customers are never left without a way to upload.
+    const enableMobileUpload = !!mobileUploadSetting || !enableLocalUpload;
 
     const busy = busyMessage !== undefined;
     const frameService = step.getFrameService();
@@ -803,10 +807,10 @@ const FrameUI: FunctionComponent<{
                     $dragging={dragging}
                     onDragOver={(event) => {
                         event.preventDefault();
-                        if (!busy) setDragging(true);
+                        if (!busy && enableLocalUpload) setDragging(true);
                     }}
                     onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
+                    onDrop={enableLocalUpload ? handleDrop : (event) => event.preventDefault()}
                 >
                     {hasUserImage && frameService && (
                         <CropperSection>
@@ -924,28 +928,32 @@ const FrameUI: FunctionComponent<{
                         />
                     ) : (
                         <>
-                            <ButtonSpacing>
-                                <HiddenInput
-                                    ref={inputRef}
-                                    type="file"
-                                    accept={extensions.join(",")}
-                                    onChange={handleFileSelect}
-                                    disabled={busy}
-                                />
-                                <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
-                                    {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
-                                </Button>
-                            </ButtonSpacing>
+                            {enableLocalUpload && (
+                                <>
+                                    <ButtonSpacing>
+                                        <HiddenInput
+                                            ref={inputRef}
+                                            type="file"
+                                            accept={extensions.join(",")}
+                                            onChange={handleFileSelect}
+                                            disabled={busy}
+                                        />
+                                        <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
+                                            {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
+                                        </Button>
+                                    </ButtonSpacing>
+                                    {!hasUserImage && (
+                                        <HelpText variant="p">
+                                            Drag and drop an image here, or choose a file. Accepted types:{" "}
+                                            {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
+                                        </HelpText>
+                                    )}
+                                </>
+                            )}
                             {progress !== undefined && (
                                 <ProgressBar>
                                     <ProgressFill $progress={progress} />
                                 </ProgressBar>
-                            )}
-                            {!hasUserImage && (
-                                <HelpText variant="p">
-                                    Drag and drop an image here, or choose a file. Accepted types:{" "}
-                                    {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
-                                </HelpText>
                             )}
                             {!hasUserImage && enableMobileUpload && (
                                 <ButtonSpacing>
