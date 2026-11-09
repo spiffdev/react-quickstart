@@ -8,15 +8,16 @@ import {
     FrameService,
     FrameStep,
     FrameStepHandle,
-    generate,
     ImageState,
     matchHexToPms,
+    MobileUploadSession,
     Variant,
     WorkflowManager,
 } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
+import useTheme from "../../../hooks/useTheme";
 import useThemeConfiguration from "../../../hooks/useThemeConfiguration";
 import { ActiveColorIds } from "../components/colorIsolation";
 import ImageCropper from "../components/ImageCropper";
@@ -27,7 +28,6 @@ import VariantGallery from "../components/VariantGallery";
 const DEFAULT_EXTENSIONS = [".jpg", ".jpeg", ".png", ".svg", ".pdf", ".eps", ".ai"];
 const VECTOR_MIME_TYPES = ["image/svg+xml", "application/pdf", "application/postscript"];
 const PMS_MAX_DISTANCE = 64;
-const MOBILE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
 type FrameData = ReturnType<FrameService["getFrameData"]>;
 type ImageStateName = "original" | "optimized";
@@ -236,8 +236,13 @@ const FrameUI: FunctionComponent<{
     const [colorsConfirmed, setColorsConfirmed] = useState(false);
     const [activeColorIds, setActiveColorIds] = useState<ActiveColorIds>({ selected: [], hovered: [] });
     const [showMobileQR, setShowMobileQR] = useState(false);
-    const [mobileUploadAsset, setMobileUploadAsset] = useState<Asset | undefined>(undefined);
-    const { enableMobileUpload } = useThemeConfiguration();
+    const [mobileUploadSession, setMobileUploadSession] = useState<MobileUploadSession | undefined>(undefined);
+    const theme = useTheme();
+    const { enableMobileUpload: mobileUploadSetting, enableLocalUpload: localUploadSetting } = useThemeConfiguration();
+    // Local upload is on unless it has been explicitly turned off.
+    const enableLocalUpload = localUploadSetting !== false;
+    // Mobile upload is always available when local upload is off, so customers are never left without a way to upload.
+    const enableMobileUpload = !!mobileUploadSetting || !enableLocalUpload;
 
     const busy = busyMessage !== undefined;
     const frameService = step.getFrameService();
@@ -438,33 +443,28 @@ const FrameUI: FunctionComponent<{
         [applyUploadedImage, extensions, step, workflowManager],
     );
 
-    // Mobile upload: the phone uploads straight into an empty asset that we create up front.
+    // Mobile upload: core creates an empty asset for the phone to upload into, along with the QR code that links to it.
     const handleToggleMobileQR = useCallback(async () => {
         if (showMobileQR) {
             setShowMobileQR(false);
-            setMobileUploadAsset(undefined);
+            setMobileUploadSession(undefined);
             return;
         }
         try {
-            const asset = await assetService.createAssetWithoutUpload(
-                `mobile-upload-${generate()}-${Date.now()}`,
-                AssetType.Image,
-                true,
-                false,
-            );
+            const session = await step.createMobileUploadSession({ primaryColor: theme.primaryColor });
             setError("");
-            setMobileUploadAsset(asset);
+            setMobileUploadSession(session);
             setShowMobileQR(true);
         } catch (mobileError) {
-            console.error("Failed to create asset for mobile upload:", mobileError);
+            console.error("Failed to start a mobile upload:", mobileError);
             setError("A mobile upload could not be started. Please try again.");
         }
-    }, [showMobileQR]);
+    }, [showMobileQR, step, theme.primaryColor]);
 
     const handleMobileUploadComplete = useCallback(
         async (asset: Asset) => {
             setShowMobileQR(false);
-            setMobileUploadAsset(undefined);
+            setMobileUploadSession(undefined);
             setError("");
             setBusyMessage("Applying image...");
             workflowManager.setMandatoryFulfilled(step.getId(), false);
@@ -737,6 +737,41 @@ const FrameUI: FunctionComponent<{
         [onActivation, updateColors],
     );
 
+    // Removes the customer's image, returning the frame to its default state and clearing everything derived from it.
+    const handleRemoveImage = useCallback(async () => {
+        setError("");
+        setBusyMessage("Removing image...");
+        workflowManager.setMandatoryFulfilled(step.getId(), false);
+        const updateId = workflowManager.markUpdatePending();
+        onActivation?.();
+
+        try {
+            await step.removeImage();
+            preOptimization.current = undefined;
+            colorCache.current = {};
+            setShowOptimizePrompt(false);
+            setIsEditingColors(false);
+            setColorsConfirmed(false);
+            setCurrentImageAsset(undefined);
+            setFileName(undefined);
+            setHasUserImage(false);
+            setHasBackgroundRemoved(false);
+            setUseOriginal(false);
+            setCanRemoveBackground(false);
+            setImageState("original");
+            setColors(undefined);
+            setOriginalSvgColors([]);
+            setColorOptions([]);
+            setActiveColorIds({ selected: [], hovered: [] });
+        } catch (removeError) {
+            console.error("Error removing the image:", removeError);
+            setError("The image could not be removed. Please try again.");
+        } finally {
+            workflowManager.markUpdateCompleted(updateId);
+            setBusyMessage(undefined);
+        }
+    }, [onActivation, step, workflowManager]);
+
     const handleEditImageClick = useCallback(() => {
         if (colorsConfirmed) {
             setColorsConfirmed(false);
@@ -803,10 +838,10 @@ const FrameUI: FunctionComponent<{
                     $dragging={dragging}
                     onDragOver={(event) => {
                         event.preventDefault();
-                        if (!busy) setDragging(true);
+                        if (!busy && enableLocalUpload) setDragging(true);
                     }}
                     onDragLeave={() => setDragging(false)}
-                    onDrop={handleDrop}
+                    onDrop={enableLocalUpload ? handleDrop : (event) => event.preventDefault()}
                 >
                     {hasUserImage && frameService && (
                         <CropperSection>
@@ -912,40 +947,47 @@ const FrameUI: FunctionComponent<{
                             </Button>
                         </ButtonSpacing>
                     )}
-                    {showMobileQR && mobileUploadAsset && !hasUserImage ? (
+                    {hasUserImage && (
+                        <ButtonSpacing>
+                            <Button fullWidth disabled={busy} onClick={handleRemoveImage}>
+                                Remove Image
+                            </Button>
+                        </ButtonSpacing>
+                    )}
+                    {showMobileQR && mobileUploadSession && !hasUserImage ? (
                         <MobileUploadQR
-                            assetKey={mobileUploadAsset.key ?? ""}
-                            fileLink={mobileUploadAsset.fileLink ?? ""}
-                            fileType={extensions.map((extension) => `image/${extension.replace(".", "")}`).join(",")}
-                            maxSizeBytes={MOBILE_UPLOAD_MAX_BYTES}
-                            whitelistedExtensions={extensions.map((extension) => extension.replace(".", ""))}
+                            session={mobileUploadSession}
                             onCancel={handleToggleMobileQR}
                             onUploadComplete={handleMobileUploadComplete}
                         />
                     ) : (
                         <>
-                            <ButtonSpacing>
-                                <HiddenInput
-                                    ref={inputRef}
-                                    type="file"
-                                    accept={extensions.join(",")}
-                                    onChange={handleFileSelect}
-                                    disabled={busy}
-                                />
-                                <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
-                                    {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
-                                </Button>
-                            </ButtonSpacing>
+                            {enableLocalUpload && (
+                                <>
+                                    <ButtonSpacing>
+                                        <HiddenInput
+                                            ref={inputRef}
+                                            type="file"
+                                            accept={extensions.join(",")}
+                                            onChange={handleFileSelect}
+                                            disabled={busy}
+                                        />
+                                        <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
+                                            {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
+                                        </Button>
+                                    </ButtonSpacing>
+                                    {!hasUserImage && (
+                                        <HelpText variant="p">
+                                            Drag and drop an image here, or choose a file. Accepted types:{" "}
+                                            {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
+                                        </HelpText>
+                                    )}
+                                </>
+                            )}
                             {progress !== undefined && (
                                 <ProgressBar>
                                     <ProgressFill $progress={progress} />
                                 </ProgressBar>
-                            )}
-                            {!hasUserImage && (
-                                <HelpText variant="p">
-                                    Drag and drop an image here, or choose a file. Accepted types:{" "}
-                                    {extensions.map((extension) => extension.slice(1).toUpperCase()).join(", ")}
-                                </HelpText>
                             )}
                             {!hasUserImage && enableMobileUpload && (
                                 <ButtonSpacing>
