@@ -737,6 +737,41 @@ const FrameUI: FunctionComponent<{
         [onActivation, updateColors],
     );
 
+    // Removes the customer's image, returning the frame to its default state and clearing everything derived from it.
+    const handleRemoveImage = useCallback(async () => {
+        setError("");
+        setBusyMessage("Removing image...");
+        workflowManager.setMandatoryFulfilled(step.getId(), false);
+        const updateId = workflowManager.markUpdatePending();
+        onActivation?.();
+
+        try {
+            await step.removeImage();
+            preOptimization.current = undefined;
+            colorCache.current = {};
+            setShowOptimizePrompt(false);
+            setIsEditingColors(false);
+            setColorsConfirmed(false);
+            setCurrentImageAsset(undefined);
+            setFileName(undefined);
+            setHasUserImage(false);
+            setHasBackgroundRemoved(false);
+            setUseOriginal(false);
+            setCanRemoveBackground(false);
+            setImageState("original");
+            setColors(undefined);
+            setOriginalSvgColors([]);
+            setColorOptions([]);
+            setActiveColorIds({ selected: [], hovered: [] });
+        } catch (removeError) {
+            console.error("Error removing the image:", removeError);
+            setError("The image could not be removed. Please try again.");
+        } finally {
+            workflowManager.markUpdateCompleted(updateId);
+            setBusyMessage(undefined);
+        }
+    }, [onActivation, step, workflowManager]);
+
     const handleEditImageClick = useCallback(() => {
         if (colorsConfirmed) {
             setColorsConfirmed(false);
@@ -909,6 +944,13 @@ const FrameUI: FunctionComponent<{
                         <ButtonSpacing>
                             <Button fullWidth disabled={busy} onClick={handleEditImageClick}>
                                 {isEditingColors ? "Confirm Edit" : colorsConfirmed ? "Make Changes" : "Edit Image"}
+                            </Button>
+                        </ButtonSpacing>
+                    )}
+                    {hasUserImage && (
+                        <ButtonSpacing>
+                            <Button fullWidth disabled={busy} onClick={handleRemoveImage}>
+                                Remove Image
                             </Button>
                         </ButtonSpacing>
                     )}
