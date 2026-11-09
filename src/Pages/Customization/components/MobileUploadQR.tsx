@@ -1,12 +1,10 @@
-import { FunctionComponent, useEffect, useState } from "react";
-import { Asset, assetService } from "@spiffcommerce/core";
-import QRCode from "qrcode";
+import { FunctionComponent, useEffect, useRef } from "react";
+import { Asset, MobileUploadSession } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import useTheme from "../../../hooks/useTheme";
 import Typography from "../../../components/typography";
 
-const POLL_INTERVAL_MS = 2000;
 const QR_SIZE = 300;
 
 const Panel = styled.div`
@@ -62,73 +60,22 @@ const Spinner = styled.span<{ $color: string }>`
 `;
 
 const MobileUploadQR: FunctionComponent<{
-    /** The key of the empty asset the phone will upload into. */
-    assetKey: string;
-    /** Where the uploaded file will appear. */
-    fileLink: string;
-    fileType?: string;
-    maxSizeBytes?: number;
-    logoUrl?: string;
-    whitelistedExtensions?: string[];
-    primaryColor?: string;
+    /** The mobile upload session created by core, which supplies the QR code and reports when the file arrives. */
+    session: MobileUploadSession;
     onCancel: () => void;
     onUploadComplete: (asset: Asset) => void;
-}> = ({
-    assetKey,
-    fileLink,
-    fileType,
-    maxSizeBytes,
-    logoUrl,
-    whitelistedExtensions,
-    primaryColor: primaryColorOverride,
-    onCancel,
-    onUploadComplete,
-}) => {
-    // The phone's upload page is given this colour directly, so it needs the real value rather than a CSS variable.
+}> = ({ session, onCancel, onUploadComplete }) => {
     const theme = useTheme();
-    const primaryColor = primaryColorOverride ?? theme.primaryColor;
-    const [qrCodeDataUrl, setQrCodeDataUrl] = useState("");
-    const extensionsKey = whitelistedExtensions?.join(",");
-
-    // The phone uploads straight to the asset, so we just wait for the file to appear.
-    useEffect(() => {
-        let finished = false;
-        const checkForUpload = async () => {
-            try {
-                const response = await fetch(fileLink, { method: "HEAD", mode: "cors" });
-                if (response.ok && !finished) {
-                    finished = true;
-                    window.clearInterval(interval);
-                    onUploadComplete(await assetService.getFromServer(assetKey));
-                }
-            } catch {
-                // Not uploaded yet, keep polling.
-            }
-        };
-        const interval = window.setInterval(checkForUpload, POLL_INTERVAL_MS);
-        return () => {
-            finished = true;
-            window.clearInterval(interval);
-        };
-    }, [assetKey, fileLink, onUploadComplete]);
+    // Kept in a ref so a new callback never restarts the wait, which can't be resumed once cancelled.
+    const onUploadCompleteRef = useRef(onUploadComplete);
+    onUploadCompleteRef.current = onUploadComplete;
 
     useEffect(() => {
-        // The upload page is served by the editor on the same origin as this theme.
-        const params = new URLSearchParams({ assetKey });
-        if (fileType) params.append("fileType", fileType);
-        if (maxSizeBytes) params.append("maxSizeBytes", maxSizeBytes.toString());
-        if (logoUrl) params.append("logo", encodeURIComponent(logoUrl));
-        if (extensionsKey) params.append("whitelistedExtensions", extensionsKey);
-        if (primaryColor) params.append("primaryColor", encodeURIComponent(primaryColor));
-
-        QRCode.toDataURL(`${window.location.origin}/#/upload?${params.toString()}`, {
-            width: QR_SIZE,
-            margin: 2,
-            color: { dark: "#000000", light: "#FFFFFF" },
-        })
-            .then(setQrCodeDataUrl)
-            .catch((error) => console.error("Failed to generate QR code:", error));
-    }, [assetKey, extensionsKey, fileType, logoUrl, maxSizeBytes, primaryColor]);
+        session.waitForUpload().then((asset) => {
+            if (asset) onUploadCompleteRef.current(asset);
+        });
+        return () => session.cancel();
+    }, [session]);
 
     return (
         <Panel>
@@ -137,16 +84,10 @@ const MobileUploadQR: FunctionComponent<{
                 Scan this QR code with your mobile device to upload a photo
             </Typography>
             <QrFrame>
-                {qrCodeDataUrl ? (
-                    <QrImage src={qrCodeDataUrl} alt="QR Code for mobile upload" />
-                ) : (
-                    <Typography variant="p" style={{ color: "#999", margin: 0 }}>
-                        Generating QR code...
-                    </Typography>
-                )}
+                <QrImage src={session.qrCodeDataUrl} alt="QR Code for mobile upload" />
             </QrFrame>
             <Waiting>
-                <Spinner $color={primaryColor} />
+                <Spinner $color={theme.primaryColor} />
                 Waiting for mobile file upload
             </Waiting>
             <Button type="button" fullWidth onClick={onCancel}>

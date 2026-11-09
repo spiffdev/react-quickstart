@@ -8,15 +8,16 @@ import {
     FrameService,
     FrameStep,
     FrameStepHandle,
-    generate,
     ImageState,
     matchHexToPms,
+    MobileUploadSession,
     Variant,
     WorkflowManager,
 } from "@spiffcommerce/core";
 import styled from "styled-components";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
+import useTheme from "../../../hooks/useTheme";
 import useThemeConfiguration from "../../../hooks/useThemeConfiguration";
 import { ActiveColorIds } from "../components/colorIsolation";
 import ImageCropper from "../components/ImageCropper";
@@ -27,7 +28,6 @@ import VariantGallery from "../components/VariantGallery";
 const DEFAULT_EXTENSIONS = [".jpg", ".jpeg", ".png", ".svg", ".pdf", ".eps", ".ai"];
 const VECTOR_MIME_TYPES = ["image/svg+xml", "application/pdf", "application/postscript"];
 const PMS_MAX_DISTANCE = 64;
-const MOBILE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
 
 type FrameData = ReturnType<FrameService["getFrameData"]>;
 type ImageStateName = "original" | "optimized";
@@ -236,7 +236,8 @@ const FrameUI: FunctionComponent<{
     const [colorsConfirmed, setColorsConfirmed] = useState(false);
     const [activeColorIds, setActiveColorIds] = useState<ActiveColorIds>({ selected: [], hovered: [] });
     const [showMobileQR, setShowMobileQR] = useState(false);
-    const [mobileUploadAsset, setMobileUploadAsset] = useState<Asset | undefined>(undefined);
+    const [mobileUploadSession, setMobileUploadSession] = useState<MobileUploadSession | undefined>(undefined);
+    const theme = useTheme();
     const { enableMobileUpload: mobileUploadSetting, enableLocalUpload: localUploadSetting } = useThemeConfiguration();
     // Local upload is on unless it has been explicitly turned off.
     const enableLocalUpload = localUploadSetting !== false;
@@ -442,33 +443,28 @@ const FrameUI: FunctionComponent<{
         [applyUploadedImage, extensions, step, workflowManager],
     );
 
-    // Mobile upload: the phone uploads straight into an empty asset that we create up front.
+    // Mobile upload: core creates an empty asset for the phone to upload into, along with the QR code that links to it.
     const handleToggleMobileQR = useCallback(async () => {
         if (showMobileQR) {
             setShowMobileQR(false);
-            setMobileUploadAsset(undefined);
+            setMobileUploadSession(undefined);
             return;
         }
         try {
-            const asset = await assetService.createAssetWithoutUpload(
-                `mobile-upload-${generate()}-${Date.now()}`,
-                AssetType.Image,
-                true,
-                false,
-            );
+            const session = await step.createMobileUploadSession({ primaryColor: theme.primaryColor });
             setError("");
-            setMobileUploadAsset(asset);
+            setMobileUploadSession(session);
             setShowMobileQR(true);
         } catch (mobileError) {
-            console.error("Failed to create asset for mobile upload:", mobileError);
+            console.error("Failed to start a mobile upload:", mobileError);
             setError("A mobile upload could not be started. Please try again.");
         }
-    }, [showMobileQR]);
+    }, [showMobileQR, step, theme.primaryColor]);
 
     const handleMobileUploadComplete = useCallback(
         async (asset: Asset) => {
             setShowMobileQR(false);
-            setMobileUploadAsset(undefined);
+            setMobileUploadSession(undefined);
             setError("");
             setBusyMessage("Applying image...");
             workflowManager.setMandatoryFulfilled(step.getId(), false);
@@ -916,13 +912,9 @@ const FrameUI: FunctionComponent<{
                             </Button>
                         </ButtonSpacing>
                     )}
-                    {showMobileQR && mobileUploadAsset && !hasUserImage ? (
+                    {showMobileQR && mobileUploadSession && !hasUserImage ? (
                         <MobileUploadQR
-                            assetKey={mobileUploadAsset.key ?? ""}
-                            fileLink={mobileUploadAsset.fileLink ?? ""}
-                            fileType={extensions.map((extension) => `image/${extension.replace(".", "")}`).join(",")}
-                            maxSizeBytes={MOBILE_UPLOAD_MAX_BYTES}
-                            whitelistedExtensions={extensions.map((extension) => extension.replace(".", ""))}
+                            session={mobileUploadSession}
                             onCancel={handleToggleMobileQR}
                             onUploadComplete={handleMobileUploadComplete}
                         />

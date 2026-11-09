@@ -5,7 +5,7 @@ import Button from "./button";
 const Backdrop = styled.div`
     position: absolute;
     inset: 0;
-    z-index: 1000;
+    z-index: 10000; /* Above the loading overlay (9999) */
     display: flex;
     align-items: center;
     justify-content: center;
