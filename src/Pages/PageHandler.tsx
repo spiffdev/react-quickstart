@@ -12,6 +12,7 @@ import PageStepper from "./components/PageStepper";
 import { ConversionDataType, type SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
 import { StakeholderType } from "@spiffcommerce/core";
 import TestOrderBanner from "../components/TestOrderBanner";
+import ConfirmReplaceDialog, { type ReplaceSubject } from "../components/ConfirmReplaceDialog";
 import useThemeConfiguration from "../hooks/useThemeConfiguration";
 import type { QuoteDetails } from "./Customization/components/QuoteForm";
 
@@ -45,6 +46,11 @@ const PageHandler: FunctionComponent<{}> = () => {
     // Experiences made by these pages in this visit. Only these are ever discarded by a new selection, so a
     // reloaded bundle's existing designs are never thrown away.
     const createdExperiences = useRef(new Set<WorkflowExperience>());
+    // "Don't ask again" is deliberately held in memory only, so it lasts until the page is reloaded.
+    const skipReplaceConfirmation = useRef(false);
+    const [pendingReplace, setPendingReplace] = useState<
+        { subject: ReplaceSubject; resolve: (confirmed: boolean) => void } | undefined
+    >(undefined);
 
     useEffect(() => {
         // Whenever the bundle changes (i.e. a new bundle is loaded) we need to reset
@@ -91,6 +97,22 @@ const PageHandler: FunctionComponent<{}> = () => {
         setExperience((current) => (current === selectionExperience ? undefined : current));
         setSelectionExperience(undefined);
     }, [bundle, selectionExperience]);
+
+    // Asks the customer to confirm before their current design is discarded. Resolves true when there is nothing
+    // to discard, or they have chosen not to be asked again.
+    const confirmReplace = useCallback(
+        (subject: ReplaceSubject) => {
+            if (!selectionExperience || skipReplaceConfirmation.current) return Promise.resolve(true);
+            return new Promise<boolean>((resolve) => setPendingReplace({ subject, resolve }));
+        },
+        [selectionExperience],
+    );
+
+    const resolveReplace = (confirmed: boolean, dontAskAgain = false) => {
+        if (confirmed && dontAskAgain) skipReplaceConfirmation.current = true;
+        pendingReplace?.resolve(confirmed);
+        setPendingReplace(undefined);
+    };
 
     // Creates the new experience before the previous one is removed, so a failure never leaves the customer without one.
     const startExperience = useCallback(
@@ -140,6 +162,8 @@ const PageHandler: FunctionComponent<{}> = () => {
                     return;
                 }
 
+                if (!(await confirmReplace("collection"))) return;
+
                 // Assigning is safe to repeat, so if removing the old design fails the customer can just try again.
                 await bundle.assignProductCollection(selected.getId());
                 await removeSelectionExperience();
@@ -149,7 +173,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                 setReachedIndex(pageIndex("product"));
                 setPage("product");
             }, "We couldn't select that collection. Please try again."),
-        [attempt, bundle, collection, removeSelectionExperience],
+        [attempt, bundle, collection, confirmReplace, removeSelectionExperience],
     );
 
     const handleProductSelected = useCallback(
@@ -173,6 +197,8 @@ const PageHandler: FunctionComponent<{}> = () => {
                     return;
                 }
 
+                if (!(await confirmReplace("product"))) return;
+
                 if (workflows.length === 1) {
                     await startExperience(selected, workflows[0]);
                     return;
@@ -184,7 +210,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                 setReachedIndex(pageIndex("workflow"));
                 setPage("workflow");
             }, "We couldn't set up that product. Please try again."),
-        [attempt, product, removeSelectionExperience, selectionExperience, startExperience],
+        [attempt, confirmReplace, product, removeSelectionExperience, selectionExperience, startExperience],
     );
 
     const handleWorkflowSelected = useCallback(
@@ -198,9 +224,11 @@ const PageHandler: FunctionComponent<{}> = () => {
                     return;
                 }
 
+                if (!(await confirmReplace("workflow"))) return;
+
                 await startExperience(product, selected);
             }, "We couldn't start that design. Please try again."),
-        [attempt, product, selectionExperience, startExperience, workflow],
+        [attempt, confirmReplace, product, selectionExperience, startExperience, workflow],
     );
 
     const handleFinish = useCallback(async () => {
@@ -280,7 +308,15 @@ const PageHandler: FunctionComponent<{}> = () => {
         (index === 0 || (index === 1 && !!collection) || (index === 2 && !!product) || (index === 3 && !!experience));
 
     return (
-        <div style={{ height: "100%", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div
+            style={{
+                height: "100%",
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                position: "relative",
+            }}
+        >
             <PageStepper
                 steps={PAGE_STEPS.map((pageStep) => pageStep.label)}
                 currentIndex={pageIndex(page)}
@@ -333,6 +369,13 @@ const PageHandler: FunctionComponent<{}> = () => {
                     </div>
                 )}
             </div>
+            {pendingReplace && (
+                <ConfirmReplaceDialog
+                    subject={pendingReplace.subject}
+                    onConfirm={(dontAskAgain) => resolveReplace(true, dontAskAgain)}
+                    onCancel={() => resolveReplace(false)}
+                />
+            )}
         </div>
     );
 };
