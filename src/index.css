@@ -28,14 +28,17 @@ body {
 }
 
 .app-body {
-    height: 100%;
+    /* Not 100%: on the hosted page the parents have no height, so a percentage collapses to the content. */
+    height: 100vh;
+    height: 100dvh;
     overflow: hidden;
     box-sizing: unset;
     color: var(--theme-text-color);
     background: var(--theme-background-color, transparent);
 }
 
-.app-body * {
+/* :where() gives the reset zero specificity so component styles (e.g. border-box) win regardless of stylesheet order. */
+:where(.app-body *) {
     box-sizing: unset;
     font-family: var(--theme-font-family, var(--Default-Font));
     font-weight: var(--FW-Normal);

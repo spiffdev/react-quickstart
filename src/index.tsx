@@ -73,7 +73,6 @@ const loadDevConfiguration = async (themeBridge: any) => {
             ? loadFromLocalConfigFile(themeBridge)
             : await loadFromSpiffCommerce(),
     };
-    let devOptions: SpiffDevOptions;
     const bundleId = import.meta.env.VITE_BUNDLE_ID;
     const activationId = import.meta.env.VITE_ACTIVATION_ID;
     let activation: ActivationData | undefined;
@@ -113,7 +112,7 @@ const loadDevConfiguration = async (themeBridge: any) => {
     } else {
         throw new Error("You must provide either a VITE_BUNDLE_ID or VITE_ACTIVATION_ID");
     }
-    devOptions = {
+    const devOptions: SpiffDevOptions = {
         ...baseOptions,
         currency: "AUD",
         queryParams,
