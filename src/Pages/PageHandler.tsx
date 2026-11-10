@@ -1,4 +1,6 @@
 import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
+import styled from "styled-components";
+import { UserRound } from "lucide-react";
 import useBundle from "../hooks/useBundle";
 import ProductCollectionSelector from "./ProductCollectionSelector";
 import { CollectionProduct, ProductCollection, ProductWorkflow, WorkflowExperience } from "@spiffcommerce/core";
@@ -10,12 +12,41 @@ import ErrorBanner from "../components/ErrorBanner";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
 import PageStepper from "./components/PageStepper";
 import { ConversionDataType, ConversionLocation, type SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
-import { StakeholderType } from "@spiffcommerce/core";
+import { StakeholderType, type Customer } from "@spiffcommerce/core";
 import TestOrderBanner from "../components/TestOrderBanner";
 import ConfirmReplaceDialog, { type ReplaceSubject } from "../components/ConfirmReplaceDialog";
 import useThemeConfiguration from "../hooks/useThemeConfiguration";
-import type { QuoteDetails } from "./Customization/components/QuoteForm";
+import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
 import ConversionDialog from "../components/ConversionDialog";
+
+// A text button for the stepper bar, so it reads as a link rather than a call to action.
+const DetailsButton = styled.button`
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0;
+    font: inherit;
+    font-size: 14px;
+    color: var(--theme-primary-color);
+    background: none;
+    border: none;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        text-decoration: underline;
+    }
+
+    &:disabled {
+        color: #9e9e9e;
+        cursor: default;
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--theme-primary-color);
+        outline-offset: 4px;
+        border-radius: 4px;
+    }
+`;
 
 type PageType = "collection" | "product" | "workflow" | "experience";
 
@@ -50,7 +81,12 @@ const PageHandler: FunctionComponent<{}> = () => {
     // "Don't ask again" is deliberately held in memory only, so it lasts until the page is reloaded.
     const skipReplaceConfirmation = useRef(false);
     // The conversion prompt currently shown, and the locations it has already been shown at.
-    const [pendingConversion, setPendingConversion] = useState<{ resolve: () => void } | undefined>(undefined);
+    const [pendingConversion, setPendingConversion] = useState<
+        | { resolve: (completed: boolean) => void; manual?: boolean; quote?: boolean; initialValues?: QuoteDetails }
+        | undefined
+    >(undefined);
+    // The bundle's owner, i.e. the customer whose details are already known.
+    const [owner, setOwner] = useState<Customer | undefined>(undefined);
     const consumedConversionLocations = useRef(new Set<ConversionLocation>());
     const [pendingReplace, setPendingReplace] = useState<
         { subject: ReplaceSubject; resolve: (confirmed: boolean) => void } | undefined
@@ -235,6 +271,15 @@ const PageHandler: FunctionComponent<{}> = () => {
         [attempt, confirmReplace, product, selectionExperience, startExperience, workflow],
     );
 
+    const refreshOwner = useCallback(async () => {
+        const stakeholders = await bundle.getAllStakeholders();
+        setOwner(stakeholders.find((stakeholder) => stakeholder.type === StakeholderType.Owner)?.customer);
+    }, [bundle]);
+
+    useEffect(() => {
+        refreshOwner().catch((error) => console.error("Error checking the customer's details:", error));
+    }, [refreshOwner]);
+
     // Records the customer's details against the bundle: as its owner, in its metadata and as its organization.
     const saveDetails = useCallback(
         async (details: QuoteDetails) => {
@@ -246,17 +291,37 @@ const PageHandler: FunctionComponent<{}> = () => {
             };
 
             const email = valueOf(ConversionDataType.Email);
-            const stakeholders = await bundle.getAllStakeholders();
-            if (email && !stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) {
-                await bundle.addStakeholder(
-                    {
-                        emailAddress: email,
-                        firstName: valueOf(ConversionDataType.FirstName),
-                        lastName: valueOf(ConversionDataType.LastName),
-                        phoneNumber: valueOf(ConversionDataType.Phone),
-                    },
-                    StakeholderType.Owner,
+            if (email) {
+                // Stakeholders that aren't in the list are removed, so the other stakeholders are kept as they are
+                // and only the owner is replaced. This also covers the owner changing their email.
+                const stakeholders = await bundle.getAllStakeholders();
+                const others = stakeholders.flatMap((stakeholder) =>
+                    stakeholder.type && stakeholder.type !== StakeholderType.Owner && stakeholder.customer?.emailAddress
+                        ? [
+                              {
+                                  type: stakeholder.type,
+                                  customerDetails: {
+                                      emailAddress: stakeholder.customer.emailAddress,
+                                      firstName: stakeholder.customer.firstName,
+                                      lastName: stakeholder.customer.lastName,
+                                      phoneNumber: stakeholder.customer.phoneNumber,
+                                  },
+                              },
+                          ]
+                        : [],
                 );
+                await bundle.updateStakeholders([
+                    ...others,
+                    {
+                        type: StakeholderType.Owner,
+                        customerDetails: {
+                            emailAddress: email,
+                            firstName: valueOf(ConversionDataType.FirstName),
+                            lastName: valueOf(ConversionDataType.LastName),
+                            phoneNumber: valueOf(ConversionDataType.Phone),
+                        },
+                    },
+                ]);
             }
 
             const metadata = new Map(bundle.getMetadata());
@@ -268,8 +333,9 @@ const PageHandler: FunctionComponent<{}> = () => {
 
             const organizationName = valueOf(ConversionDataType.OrganizationName);
             if (organizationName) await bundle.attachOrganization(organizationName);
+            await refreshOwner();
         },
-        [bundle, conversionConfiguration],
+        [bundle, conversionConfiguration, refreshOwner],
     );
 
     // Asks for the customer's details if the conversion configuration calls for it at this location. Each location is
@@ -281,13 +347,35 @@ const PageHandler: FunctionComponent<{}> = () => {
             const stakeholders = await bundle.getAllStakeholders();
             if (stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) return;
             consumedConversionLocations.current.add(location);
-            await new Promise<void>((resolve) => setPendingConversion({ resolve }));
+            await new Promise<void>((resolve) => setPendingConversion({ resolve: () => resolve() }));
         },
         [bundle, conversionConfiguration],
     );
 
-    const closeConversion = () => {
-        pendingConversion?.resolve();
+    // The customer can offer or update their details at any time when the configuration allows it.
+    const manualConversionAvailable = !!conversionConfiguration?.locations?.includes(ConversionLocation.Manual);
+
+    // What the customer has already entered, so it can be shown and changed. Details are stored under the
+    // configured identifier for each field, falling back to its type.
+    const existingDetails = useCallback((): QuoteDetails => {
+        const metadata = bundle.getMetadata();
+        const fromOwner: Partial<Record<ConversionDataType, string | undefined>> = {
+            [ConversionDataType.Email]: owner?.emailAddress,
+            [ConversionDataType.FirstName]: owner?.firstName,
+            [ConversionDataType.LastName]: owner?.lastName,
+            [ConversionDataType.Phone]: owner?.phoneNumber,
+        };
+        const values: QuoteDetails = {};
+        for (const item of conversionConfiguration?.requestedDataItems ?? []) {
+            const id = fieldId(item);
+            const value = metadata.get(id) ?? fromOwner[item.type];
+            if (value) values[id] = value;
+        }
+        return values;
+    }, [bundle, conversionConfiguration, owner]);
+
+    const closeConversion = (completed = true) => {
+        pendingConversion?.resolve(completed);
         setPendingConversion(undefined);
     };
 
@@ -321,7 +409,17 @@ const PageHandler: FunctionComponent<{}> = () => {
         }
     }, [bundle, requestConversionIfRequired]);
 
+    // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
+    // This resolves with whether the quote was requested, which is false when the customer cancels.
     const handleRequestQuote = useCallback(
+        () =>
+            new Promise<boolean>((resolve) =>
+                setPendingConversion({ resolve, quote: true, initialValues: existingDetails() }),
+            ),
+        [existingDetails],
+    );
+
+    const confirmQuote = useCallback(
         async (details: QuoteDetails) => {
             try {
                 await saveDetails(details);
@@ -336,6 +434,18 @@ const PageHandler: FunctionComponent<{}> = () => {
             }
         },
         [bundle, saveDetails],
+    );
+
+    const saveConversionDetails = useCallback(
+        async (details: QuoteDetails) => {
+            try {
+                await saveDetails(details);
+            } catch (error) {
+                console.error("Error saving the customer's details:", error);
+                throw new Error("We couldn't save your details. Please try again.");
+            }
+        },
+        [saveDetails],
     );
 
     // A page can be returned to once it has been reached, as long as what it needs still exists.
@@ -362,6 +472,25 @@ const PageHandler: FunctionComponent<{}> = () => {
                     setErrorMessage(undefined);
                     setPage(PAGE_STEPS[index].page);
                 }}
+                actions={
+                    manualConversionAvailable ? (
+                        <DetailsButton
+                            disabled={!!pendingConversion}
+                            onClick={() =>
+                                void new Promise<void>((resolve) =>
+                                    setPendingConversion({
+                                        resolve: () => resolve(),
+                                        manual: true,
+                                        initialValues: existingDetails(),
+                                    }),
+                                )
+                            }
+                        >
+                            Your details
+                            <UserRound size={16} aria-hidden="true" />
+                        </DetailsButton>
+                    ) : undefined
+                }
             />
             {bundle.getTest() && <TestOrderBanner />}
             {errorMessage && <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(undefined)} />}
@@ -408,12 +537,21 @@ const PageHandler: FunctionComponent<{}> = () => {
             </div>
             {pendingConversion && (
                 <ConversionDialog
-                    mandatory={!!conversionConfiguration?.mandatory}
+                    // A quote can be cancelled, but it can't go ahead without the customer's details.
+                    mandatory={
+                        !pendingConversion.quote && !pendingConversion.manual && !!conversionConfiguration?.mandatory
+                    }
+                    initialValues={pendingConversion.initialValues}
+                    submitLabel={
+                        pendingConversion.quote ? "Confirm your quote" : pendingConversion.manual ? "Save" : undefined
+                    }
+                    submittingLabel={pendingConversion.quote ? "Requesting quote..." : undefined}
                     onSubmit={async (details) => {
-                        await saveDetails(details);
+                        await (pendingConversion.quote ? confirmQuote(details) : saveConversionDetails(details));
                         closeConversion();
                     }}
-                    onSkip={closeConversion}
+                    onSkip={() => closeConversion(false)}
+                    skipLabel={pendingConversion.quote ? "Cancel" : undefined}
                 />
             )}
             {pendingReplace && (

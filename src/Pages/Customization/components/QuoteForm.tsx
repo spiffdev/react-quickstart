@@ -61,13 +61,21 @@ const QuoteForm: FunctionComponent<{
     onSubmit: (details: QuoteDetails) => void;
     submitLabel?: string;
     submittingLabel?: string;
-}> = ({ submitting, onSubmit, submitLabel = "Request a Quote", submittingLabel = "Requesting quote..." }) => {
+    /** Details to start the form with. */
+    initialValues?: QuoteDetails;
+}> = ({
+    submitting,
+    onSubmit,
+    submitLabel = "Request a Quote",
+    submittingLabel = "Requesting quote...",
+    initialValues,
+}) => {
     const { conversionConfiguration } = useThemeConfiguration();
     const fields = useMemo<ConversionData[]>(
         () => conversionConfiguration?.requestedDataItems ?? [{ type: ConversionDataType.Email, mandatory: true }],
         [conversionConfiguration],
     );
-    const [values, setValues] = useState<QuoteDetails>({});
+    const [values, setValues] = useState<QuoteDetails>(initialValues ?? {});
 
     const missing = fields.filter((field) => field.mandatory && !values[fieldId(field)]?.trim());
 

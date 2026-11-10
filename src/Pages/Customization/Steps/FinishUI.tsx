@@ -5,7 +5,6 @@ import Button from "../../../components/button";
 import useCurrency from "../../../hooks/useCurrency";
 import Typography from "../../../components/typography";
 import TermsScreen from "../components/TermsScreen";
-import QuoteForm, { type QuoteDetails } from "../components/QuoteForm";
 
 const Container = styled.div`
     padding: 16px;
@@ -107,7 +106,8 @@ const FinishUI: FunctionComponent<{
     addToCartLabel?: string;
     allowCart?: boolean;
     allowQuote?: boolean;
-    onRequestQuote?: (details: QuoteDetails) => void | Promise<void>;
+    /** Resolves false when the customer backs out of the quote, so they can carry on with their design. */
+    onRequestQuote?: () => void | boolean | Promise<void | boolean>;
 }> = ({
     termsMarkdown,
     exportedData,
@@ -151,22 +151,25 @@ const FinishUI: FunctionComponent<{
         }
     }, [onFinished]);
 
-    const [showQuoteForm, setShowQuoteForm] = useState(false);
+    const [quoting, setQuoting] = useState(false);
 
-    const handleQuote = useCallback(
-        async (details: QuoteDetails) => {
-            setFinishError("");
-            setFinishing(true);
-            try {
-                await onRequestQuote?.(details);
-            } catch (error) {
-                console.error("Error requesting a quote:", error);
-                setFinishError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+    // Confirming the quote's details happens in a dialog opened by `onRequestQuote`.
+    const handleQuote = useCallback(async () => {
+        setFinishError("");
+        setFinishing(true);
+        setQuoting(true);
+        try {
+            if ((await onRequestQuote?.()) === false) {
                 setFinishing(false);
+                setQuoting(false);
             }
-        },
-        [onRequestQuote],
-    );
+        } catch (error) {
+            console.error("Error requesting a quote:", error);
+            setFinishError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+            setFinishing(false);
+            setQuoting(false);
+        }
+    }, [onRequestQuote]);
 
     const handleDownloadPreview = useCallback(async () => {
         setDownloading(true);
@@ -261,21 +264,16 @@ const FinishUI: FunctionComponent<{
             )}
             {allowCart && (
                 <Button fullWidth disabled={(!!termsMarkdown && !isConfirmed) || finishing} onClick={handleFinish}>
-                    {finishing && !showQuoteForm ? "Adding to cart..." : addToCartLabel || "Complete Design"}
+                    {finishing && !quoting ? "Adding to cart..." : addToCartLabel || "Complete Design"}
                 </Button>
             )}
-            {allowQuote && !showQuoteForm && (
+            {allowQuote && (
                 <ButtonGroup>
-                    <Button
-                        fullWidth
-                        disabled={(!!termsMarkdown && !isConfirmed) || finishing}
-                        onClick={() => setShowQuoteForm(true)}
-                    >
+                    <Button fullWidth disabled={(!!termsMarkdown && !isConfirmed) || finishing} onClick={handleQuote}>
                         Request a Quote
                     </Button>
                 </ButtonGroup>
             )}
-            {allowQuote && showQuoteForm && <QuoteForm submitting={finishing} onSubmit={handleQuote} />}
             {finishError && <ErrorText variant="p">{finishError}</ErrorText>}
         </Container>
     );

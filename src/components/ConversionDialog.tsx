@@ -50,7 +50,21 @@ const ConversionDialog: FunctionComponent<{
     mandatory: boolean;
     onSubmit: (details: QuoteDetails) => Promise<void>;
     onSkip: () => void;
-}> = ({ mandatory, onSubmit, onSkip }) => {
+    /** Details the customer has already entered, which they can change. */
+    initialValues?: QuoteDetails;
+    submitLabel?: string;
+    submittingLabel?: string;
+    /** Overrides the label of the button that closes the dialog without saving. */
+    skipLabel?: string;
+}> = ({
+    mandatory,
+    onSubmit,
+    onSkip,
+    initialValues,
+    submitLabel = "Continue",
+    submittingLabel = "Saving...",
+    skipLabel,
+}) => {
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState<string | undefined>(undefined);
 
@@ -61,7 +75,7 @@ const ConversionDialog: FunctionComponent<{
             await onSubmit(details);
         } catch (caught) {
             console.error("Error saving the customer's details:", caught);
-            setError("We couldn't save your details. Please try again.");
+            setError(caught instanceof Error ? caught.message : "We couldn't save your details. Please try again.");
             setSubmitting(false);
         }
     };
@@ -74,12 +88,13 @@ const ConversionDialog: FunctionComponent<{
                 <QuoteForm
                     submitting={submitting}
                     onSubmit={handleSubmit}
-                    submitLabel="Continue"
-                    submittingLabel="Saving..."
+                    initialValues={initialValues}
+                    submitLabel={submitLabel}
+                    submittingLabel={submittingLabel}
                 />
                 {!mandatory && (
                     <SkipButton fullWidth disabled={submitting} onClick={onSkip}>
-                        Skip
+                        {skipLabel ?? (initialValues && Object.keys(initialValues).length > 0 ? "Cancel" : "Skip")}
                     </SkipButton>
                 )}
             </Dialog>

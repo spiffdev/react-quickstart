@@ -1,4 +1,4 @@
-import { FunctionComponent } from "react";
+import { FunctionComponent, ReactNode } from "react";
 import styled, { css } from "styled-components";
 
 type StepState = "complete" | "current" | "upcoming";
@@ -16,6 +16,8 @@ const reducedMotion = css`
 `;
 
 const Nav = styled.nav`
+    display: flex;
+    align-items: center;
     flex: none;
     border-bottom: 1px solid #e0e0e0;
     background-color: #fff;
@@ -23,6 +25,8 @@ const Nav = styled.nav`
 
 const List = styled.ol`
     display: flex;
+    flex: 1 1 0;
+    min-width: 0;
     align-items: center;
     margin: 0;
     padding: 12px 16px;
@@ -30,6 +34,25 @@ const List = styled.ol`
 
     @media (max-width: 768px) {
         padding: 12px;
+    }
+`;
+
+// Separates the steps from the actions beside them.
+const Divider = styled.div`
+    flex: none;
+    align-self: stretch;
+    width: 1px;
+    background-color: #9e9e9e;
+`;
+
+const Actions = styled.div`
+    display: flex;
+    flex: none;
+    align-items: center;
+    padding: 0 16px;
+
+    @media (max-width: 768px) {
+        padding: 0 12px;
     }
 `;
 
@@ -159,7 +182,9 @@ const PageStepper: FunctionComponent<{
     /** Which steps the customer can go to. */
     enabledSteps: boolean[];
     onStepSelected: (index: number) => void;
-}> = ({ steps, currentIndex, enabledSteps, onStepSelected }) => {
+    /** Shown beside the steps, after a divider. */
+    actions?: ReactNode;
+}> = ({ steps, currentIndex, enabledSteps, onStepSelected, actions }) => {
     return (
         <Nav aria-label="Progress">
             <List>
@@ -188,6 +213,12 @@ const PageStepper: FunctionComponent<{
                     );
                 })}
             </List>
+            {actions && (
+                <>
+                    <Divider aria-hidden="true" />
+                    <Actions>{actions}</Actions>
+                </>
+            )}
         </Nav>
     );
 };

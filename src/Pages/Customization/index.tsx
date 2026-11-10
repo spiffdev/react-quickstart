@@ -27,7 +27,6 @@ import {
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 import LoadingOverlay from "../components/LoadingOverlay";
-import type { QuoteDetails } from "./components/QuoteForm";
 import StepHelp from "./components/StepHelp";
 import ThreeDPreview from "./components/ThreeDPreview";
 import {
@@ -146,7 +145,7 @@ const StepHandler: FunctionComponent<{
     exportedData: ExportedStepData[];
     onActivate: (stepName: string) => void;
     onFinished: () => void | Promise<void>;
-    onRequestQuote: (details: QuoteDetails) => void | Promise<void>;
+    onRequestQuote: () => void | boolean | Promise<void | boolean>;
 }> = ({ step, workflowExperience, selectionCost, exportedData, onActivate, onFinished, onRequestQuote }) => {
     const { addToCartLabel, allowQuoteRequests, allowCartRequests } = useThemeConfiguration();
     // Adding to the cart is the default, so it stays available unless it's switched off and quotes are on.
@@ -259,7 +258,7 @@ const StepHandler: FunctionComponent<{
 const Customization: FunctionComponent<{
     workflowExperience: WorkflowExperience;
     onNext: () => void | Promise<void>;
-    onRequestQuote: (details: QuoteDetails) => void | Promise<void>;
+    onRequestQuote: () => void | boolean | Promise<void | boolean>;
 }> = ({ workflowExperience, onNext, onRequestQuote }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
@@ -326,13 +325,10 @@ const Customization: FunctionComponent<{
     }, [handleFinishChecks, onNext]);
 
     // A quote needs the same checks as adding to the cart.
-    const handleQuote = useCallback(
-        async (details: QuoteDetails) => {
-            await handleFinishChecks();
-            await onRequestQuote(details);
-        },
-        [handleFinishChecks, onRequestQuote],
-    );
+    const handleQuote = useCallback(async () => {
+        await handleFinishChecks();
+        return onRequestQuote();
+    }, [handleFinishChecks, onRequestQuote]);
 
     if (traversableScenes.length === 0) {
         // TODO: spinner
