@@ -1,6 +1,7 @@
 import { FunctionComponent, useCallback, useState } from "react";
 import { ExportedStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
+import { Download, FileText, ShoppingCart } from "lucide-react";
 import Button from "../../../components/button";
 import useCurrency from "../../../hooks/useCurrency";
 import Typography from "../../../components/typography";
@@ -227,7 +228,12 @@ const FinishUI: FunctionComponent<{
             )}
             {onDownloadPreview && (
                 <ButtonGroup>
-                    <Button fullWidth disabled={downloading} onClick={handleDownloadPreview}>
+                    <Button
+                        fullWidth
+                        disabled={downloading}
+                        icon={downloading ? undefined : <Download size={18} aria-hidden="true" />}
+                        onClick={handleDownloadPreview}
+                    >
                         {downloading ? "Preparing preview..." : "Download Preview"}
                     </Button>
                 </ButtonGroup>
@@ -263,13 +269,23 @@ const FinishUI: FunctionComponent<{
                 </>
             )}
             {allowCart && (
-                <Button fullWidth disabled={(!!termsMarkdown && !isConfirmed) || finishing} onClick={handleFinish}>
+                <Button
+                    fullWidth
+                    disabled={(!!termsMarkdown && !isConfirmed) || finishing}
+                    icon={finishing && !quoting ? undefined : <ShoppingCart size={18} aria-hidden="true" />}
+                    onClick={handleFinish}
+                >
                     {finishing && !quoting ? "Adding to cart..." : addToCartLabel || "Complete Design"}
                 </Button>
             )}
             {allowQuote && (
                 <ButtonGroup>
-                    <Button fullWidth disabled={(!!termsMarkdown && !isConfirmed) || finishing} onClick={handleQuote}>
+                    <Button
+                        fullWidth
+                        disabled={(!!termsMarkdown && !isConfirmed) || finishing}
+                        icon={<FileText size={18} aria-hidden="true" />}
+                        onClick={handleQuote}
+                    >
                         Request a Quote
                     </Button>
                 </ButtonGroup>
