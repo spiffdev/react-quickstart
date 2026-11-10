@@ -1,13 +1,21 @@
-import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
+import { FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
 import { UserRound } from "lucide-react";
 import useBundle from "../hooks/useBundle";
 import ProductCollectionSelector from "./ProductCollectionSelector";
-import { CollectionProduct, ProductCollection, ProductWorkflow, WorkflowExperience } from "@spiffcommerce/core";
+import {
+    CollectionProduct,
+    ExportedStepData,
+    ProductCollection,
+    ProductWorkflow,
+    WorkflowExperience,
+} from "@spiffcommerce/core";
 import ProductSelector from "./ProductSelector";
 import useClient from "../hooks/useClient";
 import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
+import ReviewPage from "./Review";
+import ThankYouPage from "./ThankYou";
 import ErrorBanner from "../components/ErrorBanner";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
 import PageStepper from "./components/PageStepper";
@@ -48,10 +56,13 @@ const DetailsButton = styled.button`
     }
 `;
 
-type PageType = "collection" | "product" | "workflow" | "experience";
+type PageType = "collection" | "product" | "workflow" | "experience" | "review" | "thankyou";
 
-// The pages in the order the customer visits them, and the heading each is shown under.
-const PAGE_STEPS: { page: PageType; label: string }[] = [
+type PageStep = { page: PageType; label: string };
+
+// The pages that are always present, in the order the customer visits them, and the heading each is shown under.
+// The optional review and thank you pages follow these, so these indexes never change.
+const PAGE_STEPS: PageStep[] = [
     { page: "collection", label: "Collection" },
     { page: "product", label: "Product" },
     { page: "workflow", label: "Design" },
@@ -60,10 +71,30 @@ const PAGE_STEPS: { page: PageType; label: string }[] = [
 
 const pageIndex = (page: PageType) => PAGE_STEPS.findIndex((step) => step.page === page);
 
+const REVIEW_STEP: PageStep = { page: "review", label: "Review" };
+const THANK_YOU_STEP: PageStep = { page: "thankyou", label: "Thank you" };
+
 const PageHandler: FunctionComponent<{}> = () => {
     const client = useClient();
     const bundle = useBundle();
-    const { conversionConfiguration } = useThemeConfiguration();
+    const {
+        conversionConfiguration,
+        reviewPageEnabled,
+        thankYouPageEnabled,
+        thankYouMessage,
+        thankYouCloseLabel,
+        addToCartLabel,
+    } = useThemeConfiguration();
+    // The thank you page doesn't depend on the review page, so each is added independently.
+    const steps = useMemo(
+        () => [
+            ...PAGE_STEPS,
+            ...(reviewPageEnabled ? [REVIEW_STEP] : []),
+            ...(thankYouPageEnabled ? [THANK_YOU_STEP] : []),
+        ],
+        [reviewPageEnabled, thankYouPageEnabled],
+    );
+    const stepIndex = useCallback((target: PageType) => steps.findIndex((step) => step.page === target), [steps]);
     const [page, setPage] = useState<PageType>("collection");
     const [collection, setCollection] = useState<ProductCollection | undefined>(undefined);
     const [product, setProduct] = useState<CollectionProduct | undefined>(undefined);
@@ -74,6 +105,16 @@ const PageHandler: FunctionComponent<{}> = () => {
     const [selectionExperience, setSelectionExperience] = useState<WorkflowExperience | undefined>(undefined);
     // The furthest page the customer can return to using the stepper.
     const [reachedIndex, setReachedIndex] = useState(0);
+    // The details of the design on the personalise page, for the review page. Tagged with the experience they're for.
+    const [summary, setSummary] = useState<
+        { experienceId: string; exportedData: ExportedStepData[]; selectionCost: number } | undefined
+    >(undefined);
+    // Set once the design has been handed off, after which the earlier pages can't be returned to.
+    const [completion, setCompletion] = useState<{ kind: "design" } | { kind: "quote"; quoteId: string } | undefined>(
+        undefined,
+    );
+    // The thank you page's preparation of the hand-off.
+    const preparation = useRef<Promise<() => void> | undefined>(undefined);
     const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
     // Experiences made by these pages in this visit. Only these are ever discarded by a new selection, so a
     // reloaded bundle's existing designs are never thrown away.
@@ -101,6 +142,9 @@ const PageHandler: FunctionComponent<{}> = () => {
         setProduct(undefined);
         setWorkflow(undefined);
         setSelectionExperience(undefined);
+        setSummary(undefined);
+        setCompletion(undefined);
+        preparation.current = undefined;
 
         // A reloaded bundle already has products, so pick up where the customer left off.
         const experiences = bundle.getWorkflowExperiences();
@@ -385,29 +429,86 @@ const PageHandler: FunctionComponent<{}> = () => {
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
     }, [onExperiencePage, requestConversionIfRequired]);
 
-    const handleFinish = useCallback(async () => {
+    // A preview image is only needed for the first experience, and is rendered to an offscreen canvas (never 3D) so
+    // it doesn't depend on a live preview being on screen.
+    const takeScreenshot = useCallback(
+        async (wfe: WorkflowExperience) => {
+            if (wfe.getTransaction().id !== bundle.getWorkflowExperiences()[0]?.getTransaction().id) return undefined;
+            try {
+                return await wfe.createPreviewImage(false, 1024);
+            } catch (error) {
+                console.error("Error creating the preview image:", error);
+                return undefined;
+            }
+        },
+        [bundle],
+    );
+
+    // Finishes the bundle. Resolves with what to do to hand it off, which is left to the caller so the thank you
+    // page can wait for the customer to leave.
+    const finishBundle = useCallback(async () => {
+        const result = await bundle.finish(undefined, takeScreenshot);
+        const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
+        if (bundle.getTest()) {
+            // Test orders are placed directly and the window is closed rather than handing off to the cart.
+            await bundle.placeOrder();
+            return () => spiffThemeLoader.close();
+        }
+        return () => spiffThemeLoader.addToEcommerceCart(result);
+    }, [bundle, takeScreenshot]);
+
+    // Completes the design. With a thank you page that page prepares the hand-off and the customer's exit performs
+    // it, otherwise it all happens now. Throws a customer-readable message on failure.
+    const completeDesign = useCallback(async () => {
         try {
             await requestConversionIfRequired(ConversionLocation.OnEnd);
-            // A screenshot can only be taken from the live preview when there is a single experience.
-            const takeScreenshot =
-                bundle.getWorkflowExperienceCount() === 1
-                    ? (wfe: WorkflowExperience, use3D?: boolean) => wfe.createPreviewImage(use3D, 1024)
-                    : undefined;
-            const result = await bundle.finish(undefined, takeScreenshot);
-            const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
-            if (bundle.getTest()) {
-                // Test orders are placed directly and the window is closed rather than handing off to the cart.
-                await bundle.placeOrder();
-                spiffThemeLoader.close();
-            } else {
-                spiffThemeLoader.addToEcommerceCart(result);
+            if (thankYouPageEnabled) {
+                preparation.current = undefined;
+                setCompletion({ kind: "design" });
+                setPage("thankyou");
+                return;
             }
+            (await finishBundle())();
         } catch (error) {
             console.error("Error completing the design:", error);
             // The finish step shows this message under its button.
             throw new Error("We couldn't add your design to the cart. Please try again.");
         }
-    }, [bundle, requestConversionIfRequired]);
+    }, [finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
+
+    // Prepares the hand-off for the thank you page. Only ever runs once per visit, however often it's asked for.
+    const prepareHandOff = useCallback((): Promise<() => void> => {
+        if (!preparation.current) {
+            const quote = completion?.kind === "quote";
+            // A quote isn't handed off yet, so leaving simply closes the experience.
+            const prepared = quote
+                ? Promise.resolve(() => ((window as any).SpiffThemeLoader as SpiffThemeLoader).close())
+                : finishBundle();
+            preparation.current = prepared;
+            // A failure can be tried again.
+            prepared.catch((error) => {
+                console.error("Error preparing the design:", error);
+                if (preparation.current === prepared) preparation.current = undefined;
+            });
+        }
+        return preparation.current;
+    }, [completion, finishBundle]);
+
+    // Finishing the personalise page leads to the review page when there is one, and otherwise completes the design.
+    const handleFinish = useCallback(async () => {
+        if (reviewPageEnabled) {
+            setReachedIndex((reached) => Math.max(reached, stepIndex("review")));
+            setPage("review");
+            return;
+        }
+        await completeDesign();
+    }, [reviewPageEnabled, completeDesign, stepIndex]);
+
+    const handleSummaryChanged = useCallback(
+        (changed: { exportedData: ExportedStepData[]; selectionCost: number }) =>
+            experience && setSummary({ experienceId: experience.getTransaction().id, ...changed }),
+        [experience],
+    );
 
     // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
     // This resolves with whether the quote was requested, which is false when the customer cancels.
@@ -424,6 +525,13 @@ const PageHandler: FunctionComponent<{}> = () => {
             try {
                 await saveDetails(details);
                 const quoteId = await bundle.generateQuoteId();
+                if (thankYouPageEnabled) {
+                    // The thank you page takes over from here. Quotes aren't handed off yet.
+                    preparation.current = undefined;
+                    setCompletion({ kind: "quote", quoteId });
+                    setPage("thankyou");
+                    return;
+                }
                 await bundle.finish();
                 const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
                 spiffThemeLoader.completeQuote({ bundleId: bundle.getId(), quoteId });
@@ -433,7 +541,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                 throw new Error("We couldn't request your quote. Please try again.");
             }
         },
-        [bundle, saveDetails],
+        [bundle, saveDetails, thankYouPageEnabled],
     );
 
     const saveConversionDetails = useCallback(
@@ -449,10 +557,23 @@ const PageHandler: FunctionComponent<{}> = () => {
     );
 
     // A page can be returned to once it has been reached, as long as what it needs still exists.
-    const canVisit = (index: number) =>
-        index <= reachedIndex &&
-        PAGE_STEPS[index].page !== page &&
-        (index === 0 || (index === 1 && !!collection) || (index === 2 && !!product) || (index === 3 && !!experience));
+    const canVisit = (index: number) => {
+        const target = steps[index].page;
+        if (completion || index > reachedIndex || target === page) return false;
+        switch (target) {
+            case "collection":
+                return true;
+            case "product":
+                return !!collection;
+            case "workflow":
+                return !!product;
+            case "experience":
+            case "review":
+                return !!experience;
+            default:
+                return false;
+        }
+    };
 
     return (
         <div
@@ -465,12 +586,12 @@ const PageHandler: FunctionComponent<{}> = () => {
             }}
         >
             <PageStepper
-                steps={PAGE_STEPS.map((pageStep) => pageStep.label)}
-                currentIndex={pageIndex(page)}
-                enabledSteps={PAGE_STEPS.map((_, index) => canVisit(index))}
+                steps={steps.map((pageStep) => pageStep.label)}
+                currentIndex={stepIndex(page)}
+                enabledSteps={steps.map((_, index) => canVisit(index))}
                 onStepSelected={(index) => {
                     setErrorMessage(undefined);
-                    setPage(PAGE_STEPS[index].page);
+                    setPage(steps[index].page);
                 }}
                 actions={
                     manualConversionAvailable ? (
@@ -530,9 +651,31 @@ const PageHandler: FunctionComponent<{}> = () => {
                                 workflowExperience={experience}
                                 onNext={handleFinish}
                                 onRequestQuote={handleRequestQuote}
+                                onSummaryChanged={handleSummaryChanged}
                             />
                         </div>
                     </div>
+                )}
+                {page === "review" && experience && (
+                    <ReviewPage
+                        workflowExperience={experience}
+                        exportedData={
+                            summary?.experienceId === experience.getTransaction().id ? summary.exportedData : undefined
+                        }
+                        selectionCost={
+                            summary?.experienceId === experience.getTransaction().id ? summary.selectionCost : 0
+                        }
+                        onConfirm={completeDesign}
+                        confirmLabel={addToCartLabel}
+                    />
+                )}
+                {page === "thankyou" && completion && (
+                    <ThankYouPage
+                        message={thankYouMessage}
+                        closeLabel={thankYouCloseLabel}
+                        quoteId={completion.kind === "quote" ? completion.quoteId : undefined}
+                        onPrepare={prepareHandOff}
+                    />
                 )}
             </div>
             {pendingConversion && (

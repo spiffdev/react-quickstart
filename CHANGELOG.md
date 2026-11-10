@@ -2,6 +2,16 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-10 — Review and thank you pages
+
+- New optional **Review** page (`src/Pages/Review/index.tsx`), after Personalise: a preview image, the design's chosen options and the price, with a button (using the "Add to Cart Button Text" setting) that completes the design. Enabled by the new `reviewPageEnabled` setting.
+- New optional **Thank you** page (`src/Pages/ThankYou/index.tsx`), the last page: a customisable message and a button that leaves the experience. It doesn't need the review page. Enabled by the new `thankYouPageEnabled` setting, with `thankYouMessage` and `thankYouCloseLabel`. Once it is reached, earlier pages can no longer be returned to.
+- Hand-off with the thank you page: the page *prepares* the hand-off as it loads (finishes the bundle, and places the order for test orders) and the button performs it (adds to the cart, or closes the window for test orders). Requesting a quote also opens the page; it saves the customer's details and generates the quote number, but doesn't finish the bundle or call `completeQuote` yet, and the button just closes the experience. Without the thank you page everything happens as before, when the previous page continues.
+- Preview images for `bundle.finish` are now rendered to an offscreen canvas (never from the live 3D preview), and only for the bundle's first experience.
+- `configurationSchema.ts`: the four new settings, in new "Review" and "Thank You" dashboard pages.
+- `PageHandler.tsx`: the stepper includes the enabled optional pages, and finishing Personalise goes to the review page when it's enabled.
+- `Customization/index.tsx`: new `onSummaryChanged` prop, used to pass the design's details to the review page.
+
 ## 2026-11-10 — Conversion configuration and button icons
 
 - New dependency `lucide-react` `^1.70.0` for icons.

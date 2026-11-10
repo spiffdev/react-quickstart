@@ -259,7 +259,9 @@ const Customization: FunctionComponent<{
     workflowExperience: WorkflowExperience;
     onNext: () => void | Promise<void>;
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
-}> = ({ workflowExperience, onNext, onRequestQuote }) => {
+    /** Called whenever the details of the design change. */
+    onSummaryChanged?: (summary: { exportedData: ExportedStepData[]; selectionCost: number }) => void;
+}> = ({ workflowExperience, onNext, onRequestQuote, onSummaryChanged }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
@@ -318,6 +320,10 @@ const Customization: FunctionComponent<{
             }
         }
     }, [mandatorySteps, traversableScenes, workflowExperience]);
+
+    useEffect(() => {
+        onSummaryChanged?.({ exportedData, selectionCost });
+    }, [exportedData, selectionCost, onSummaryChanged]);
 
     const handleFinish = useCallback(async () => {
         await handleFinishChecks();

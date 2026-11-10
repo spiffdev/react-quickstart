@@ -59,6 +59,22 @@ export interface ThemeConfiguration {
      * The text of the button that adds the design to the cart.
      */
     addToCartLabel?: string;
+    /**
+     * Adds a page after the personalise page that summarises the design before it is completed.
+     */
+    reviewPageEnabled?: boolean;
+    /**
+     * Adds a page after the review page (or the personalise page when there is no review) that thanks the customer.
+     */
+    thankYouPageEnabled?: boolean;
+    /**
+     * The message shown on the thank you page.
+     */
+    thankYouMessage?: string;
+    /**
+     * The text of the button that closes the experience from the thank you page.
+     */
+    thankYouCloseLabel?: string;
 }
 
 export const configurationSchema: ThemeConfigurationSchema = {
@@ -159,6 +175,35 @@ export const configurationSchema: ThemeConfigurationSchema = {
             defaultValue: "Complete Design",
             description: "The text shown on the button that adds the design to the cart.",
         },
+        {
+            type: FieldType.Boolean,
+            key: "reviewPageEnabled",
+            title: "Enable Review Page",
+            defaultValue: "false",
+            description: "When true, a page summarising the design is shown after the Personalise page.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "thankYouPageEnabled",
+            title: "Enable Thank You Page",
+            defaultValue: "false",
+            description:
+                "When true, a thank you page is shown once the design has been completed. It doesn't need the review page to be enabled.",
+        },
+        {
+            type: FieldType.Text,
+            key: "thankYouMessage",
+            title: "Thank You Message",
+            defaultValue: "Your design has been received.",
+            description: "The message shown on the thank you page.",
+        },
+        {
+            type: FieldType.Text,
+            key: "thankYouCloseLabel",
+            title: "Close Button Text",
+            defaultValue: "Close",
+            description: "The text shown on the thank you page's button that closes the experience.",
+        },
     ],
 };
 
@@ -175,7 +220,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
         {
             key: "journey",
             title: "Customer Journey",
-            pageKeys: ["personalise"],
+            pageKeys: ["personalise", "review", "thank-you"],
             reorderable: false,
         },
     ],
@@ -250,6 +295,32 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                 {
                     title: "Testing",
                     fields: ["enableTestOrders"],
+                },
+            ],
+        },
+        {
+            key: "review",
+            title: "Review",
+            subtitle: "An optional summary of the design, shown after the Personalise page.",
+            icon: "sliders",
+            toggleable: false,
+            sections: [
+                {
+                    title: "Review Page",
+                    fields: ["reviewPageEnabled"],
+                },
+            ],
+        },
+        {
+            key: "thank-you",
+            title: "Thank You",
+            subtitle: "An optional closing page, shown once the design has been completed.",
+            icon: "sliders",
+            toggleable: false,
+            sections: [
+                {
+                    title: "Thank You Page",
+                    fields: ["thankYouPageEnabled", "thankYouMessage", "thankYouCloseLabel"],
                 },
             ],
         },
