@@ -1,4 +1,5 @@
 import { FunctionComponent, ReactNode } from "react";
+import { Check } from "lucide-react";
 import styled, { css } from "styled-components";
 
 type StepState = "complete" | "current" | "upcoming";
@@ -202,7 +203,7 @@ const PageStepper: FunctionComponent<{
                                 <Marker $state={state} $available={enabled}>
                                     <MarkerSymbol $visible={state !== "complete"}>{index + 1}</MarkerSymbol>
                                     <MarkerSymbol $visible={state === "complete"} aria-hidden="true">
-                                        ✓
+                                        <Check size={16} strokeWidth={3} />
                                     </MarkerSymbol>
                                 </Marker>
                                 <Label $state={state} $available={enabled}>
