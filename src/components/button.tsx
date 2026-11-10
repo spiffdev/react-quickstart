@@ -1,4 +1,4 @@
-import { FunctionComponent } from "react";
+import { FunctionComponent, ReactNode } from "react";
 import styled from "styled-components";
 
 // TODO: import theme config and use values
@@ -15,6 +15,10 @@ const StyledButton = styled.button<{ $fullWidth?: boolean }>`
     transition: all 0.2s;
     width: ${(props) => (props.$fullWidth ? "100%" : "auto")};
     box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
 
     &:hover:not(:disabled) {
         background-color: var(--theme-primary-color-hover);
@@ -30,12 +34,15 @@ const StyledButton = styled.button<{ $fullWidth?: boolean }>`
 
 interface ButtonProps extends React.ComponentProps<"button"> {
     fullWidth?: boolean;
+    /** Shown after the label. */
+    icon?: ReactNode;
 }
 
-const Button: FunctionComponent<ButtonProps> = ({ children, fullWidth, ...props }) => {
+const Button: FunctionComponent<ButtonProps> = ({ children, fullWidth, icon, ...props }) => {
     return (
         <StyledButton type="button" $fullWidth={fullWidth} {...props}>
             {children}
+            {icon}
         </StyledButton>
     );
 };

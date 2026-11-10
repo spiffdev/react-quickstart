@@ -15,6 +15,19 @@ import {
     WorkflowManager,
 } from "@spiffcommerce/core";
 import styled from "styled-components";
+import {
+    Check,
+    Eraser,
+    Image as ImageIcon,
+    Pencil,
+    Replace,
+    Smartphone,
+    Sparkles,
+    Trash2,
+    Undo2,
+    Upload,
+    X,
+} from "lucide-react";
 import Button from "../../../components/button";
 import Typography from "../../../components/typography";
 import useTheme from "../../../hooks/useTheme";
@@ -882,7 +895,12 @@ const FrameUI: FunctionComponent<{
                             {!showOptimizePrompt ? (
                                 <>
                                     <OptimizationText variant="p">Needs optimisation for print</OptimizationText>
-                                    <Button fullWidth disabled={busy} onClick={() => setShowOptimizePrompt(true)}>
+                                    <Button
+                                        fullWidth
+                                        disabled={busy}
+                                        icon={<Sparkles size={18} aria-hidden="true" />}
+                                        onClick={() => setShowOptimizePrompt(true)}
+                                    >
                                         Optimize image
                                     </Button>
                                 </>
@@ -897,16 +915,33 @@ const FrameUI: FunctionComponent<{
                                         <Button
                                             fullWidth
                                             disabled={!canRemoveBackground || busy}
+                                            icon={
+                                                backgroundIsRemoved ? (
+                                                    <Undo2 size={18} aria-hidden="true" />
+                                                ) : (
+                                                    <Eraser size={18} aria-hidden="true" />
+                                                )
+                                            }
                                             onClick={() => optimize(true)}
                                         >
                                             {backgroundIsRemoved ? "Restore BG first" : "Remove BG first"}
                                         </Button>
-                                        <Button fullWidth disabled={busy} onClick={() => optimize(false)}>
+                                        <Button
+                                            fullWidth
+                                            disabled={busy}
+                                            icon={<ImageIcon size={18} aria-hidden="true" />}
+                                            onClick={() => optimize(false)}
+                                        >
                                             Keep background
                                         </Button>
                                     </PromptButtons>
                                     <ButtonSpacing>
-                                        <Button fullWidth disabled={busy} onClick={() => setShowOptimizePrompt(false)}>
+                                        <Button
+                                            fullWidth
+                                            disabled={busy}
+                                            icon={<X size={18} aria-hidden="true" />}
+                                            onClick={() => setShowOptimizePrompt(false)}
+                                        >
                                             Cancel
                                         </Button>
                                     </ButtonSpacing>
@@ -942,14 +977,30 @@ const FrameUI: FunctionComponent<{
                     )}
                     {hasUserImage && (
                         <ButtonSpacing>
-                            <Button fullWidth disabled={busy} onClick={handleEditImageClick}>
+                            <Button
+                                fullWidth
+                                disabled={busy}
+                                icon={
+                                    isEditingColors ? (
+                                        <Check size={18} aria-hidden="true" />
+                                    ) : (
+                                        <Pencil size={18} aria-hidden="true" />
+                                    )
+                                }
+                                onClick={handleEditImageClick}
+                            >
                                 {isEditingColors ? "Confirm Edit" : colorsConfirmed ? "Make Changes" : "Edit Image"}
                             </Button>
                         </ButtonSpacing>
                     )}
                     {hasUserImage && (
                         <ButtonSpacing>
-                            <Button fullWidth disabled={busy} onClick={handleRemoveImage}>
+                            <Button
+                                fullWidth
+                                disabled={busy}
+                                icon={<Trash2 size={18} aria-hidden="true" />}
+                                onClick={handleRemoveImage}
+                            >
                                 Remove Image
                             </Button>
                         </ButtonSpacing>
@@ -972,7 +1023,18 @@ const FrameUI: FunctionComponent<{
                                             onChange={handleFileSelect}
                                             disabled={busy}
                                         />
-                                        <Button onClick={() => inputRef.current?.click()} disabled={busy} fullWidth>
+                                        <Button
+                                            onClick={() => inputRef.current?.click()}
+                                            disabled={busy}
+                                            fullWidth
+                                            icon={
+                                                busyMessage ? undefined : hasUserImage ? (
+                                                    <Replace size={18} aria-hidden="true" />
+                                                ) : (
+                                                    <Upload size={18} aria-hidden="true" />
+                                                )
+                                            }
+                                        >
                                             {busyMessage ?? (hasUserImage ? "Replace Image" : "Upload Image")}
                                         </Button>
                                     </ButtonSpacing>
@@ -991,7 +1053,12 @@ const FrameUI: FunctionComponent<{
                             )}
                             {!hasUserImage && enableMobileUpload && (
                                 <ButtonSpacing>
-                                    <Button fullWidth disabled={busy} onClick={handleToggleMobileQR}>
+                                    <Button
+                                        fullWidth
+                                        disabled={busy}
+                                        icon={<Smartphone size={18} aria-hidden="true" />}
+                                        onClick={handleToggleMobileQR}
+                                    >
                                         Upload from your mobile
                                     </Button>
                                 </ButtonSpacing>
@@ -1000,14 +1067,30 @@ const FrameUI: FunctionComponent<{
                     )}
                     {showBackgroundButton && (
                         <ButtonSpacing>
-                            <Button onClick={handleBackgroundToggle} disabled={busy} fullWidth>
+                            <Button
+                                onClick={handleBackgroundToggle}
+                                disabled={busy}
+                                fullWidth
+                                icon={
+                                    hasBackgroundRemoved && !useOriginal ? (
+                                        <Undo2 size={18} aria-hidden="true" />
+                                    ) : (
+                                        <Eraser size={18} aria-hidden="true" />
+                                    )
+                                }
+                            >
                                 {backgroundButtonLabel}
                             </Button>
                         </ButtonSpacing>
                     )}
                     {showConfirmColors && (
                         <ButtonSpacing>
-                            <Button fullWidth disabled={busy} onClick={handleConfirmColors}>
+                            <Button
+                                fullWidth
+                                disabled={busy}
+                                icon={<Check size={18} aria-hidden="true" />}
+                                onClick={handleConfirmColors}
+                            >
                                 Confirm Colors
                             </Button>
                         </ButtonSpacing>
