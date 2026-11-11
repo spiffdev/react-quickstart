@@ -959,10 +959,10 @@
     "@babylonjs/loaders" "8.53.0"
     babylonjs-gltf2interface "8.53.0"
 
-"@spiffcommerce/theme-bridge@1.28.1-alpha.0":
-  version "1.28.1-alpha.0"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.28.1-alpha.0.tgz#1e1a6c0daef94bc380b1d3cb3cb4720fbc21295c"
-  integrity sha512-/IU3i9pvqOKWL1fQxaxzYK/0cMCF+ggGU7CoxYn9CNx+s9MOrNppymXuwoDVk52QVyT4VCnAcVjHOMcQ1fPZEQ==
+"@spiffcommerce/theme-bridge@1.29.0":
+  version "1.29.0"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.29.0.tgz#852d2667b69ee09bd9d8faf0f5e3ea1e88a72240"
+  integrity sha512-ozNhZ4mKITD7yxkTt8BgP4sUI6dllCWzrLbrh4aOLELaS8km+5gMNw68hhhGOQ39xvjMGNOYr6gXwua0RBiwGg==
   dependencies:
     "@spiffcommerce/core" "^44.19.0"
 
