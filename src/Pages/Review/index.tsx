@@ -4,6 +4,7 @@ import { ShoppingCart } from "lucide-react";
 import { ExportedStepData, WorkflowExperience } from "@spiffcommerce/core";
 import Button from "../../components/button";
 import Typography from "../../components/typography";
+import { createDesignPreviewImage, withScreenshotPreview } from "../Customization/previewScreenshot";
 import useCurrency from "../../hooks/useCurrency";
 
 const PREVIEW_RESOLUTION = 512;
@@ -111,8 +112,9 @@ const ReviewPage: FunctionComponent<{
     useEffect(() => {
         let cancelled = false;
         setPreviewUrl(undefined);
-        workflowExperience
-            .createPreviewImage(false, PREVIEW_RESOLUTION)
+        withScreenshotPreview(workflowExperience, () =>
+            createDesignPreviewImage(workflowExperience, PREVIEW_RESOLUTION),
+        )
             .then((url) => !cancelled && setPreviewUrl(url))
             // The summary is still useful without an image.
             .catch((e) => console.error("Error creating the review preview:", e));

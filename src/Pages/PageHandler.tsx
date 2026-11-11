@@ -14,6 +14,7 @@ import ProductSelector from "./ProductSelector";
 import useClient from "../hooks/useClient";
 import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
+import { createDesignPreviewImage, withScreenshotPreview } from "./Customization/previewScreenshot";
 import ReviewPage from "./Review";
 import ThankYouPage from "./ThankYou";
 import ErrorBanner from "../components/ErrorBanner";
@@ -424,13 +425,13 @@ const PageHandler: FunctionComponent<{}> = () => {
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
     }, [onExperiencePage, requestConversionIfRequired]);
 
-    // A preview image is only needed for the first experience, and is rendered to an offscreen canvas (never 3D) so
-    // it doesn't depend on a live preview being on screen.
+    // A preview image is only needed for the first experience. It comes from the 3D scene when the workflow is set up
+    // for that, which `finishBundle` makes sure is loaded.
     const takeScreenshot = useCallback(
-        async (wfe: WorkflowExperience) => {
+        async (wfe: WorkflowExperience, use3D?: boolean) => {
             if (wfe.getTransaction().id !== bundle.getWorkflowExperiences()[0]?.getTransaction().id) return undefined;
             try {
-                return await wfe.createPreviewImage(false, 1024);
+                return await createDesignPreviewImage(wfe, 1024, use3D);
             } catch (error) {
                 console.error("Error creating the preview image:", error);
                 return undefined;
@@ -442,7 +443,11 @@ const PageHandler: FunctionComponent<{}> = () => {
     // Finishes the bundle. Resolves with what to do to hand it off, which is left to the caller so the thank you
     // page can wait for the customer to leave.
     const finishBundle = useCallback(async () => {
-        const result = await bundle.finish(undefined, takeScreenshot);
+        const first = bundle.getWorkflowExperiences()[0];
+        const finish = () => bundle.finish(undefined, takeScreenshot);
+        // Whether the first experience's preview is a 3D image is decided as the bundle finishes, from whether its
+        // model is loaded, so it needs to be loaded for the whole of it.
+        const result = await (first ? withScreenshotPreview(first, finish) : finish());
         const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
         if (bundle.getTest()) {
             // Test orders are placed directly and the window is closed rather than handing off to the cart.

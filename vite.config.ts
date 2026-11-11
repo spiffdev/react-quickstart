@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
 import svgr from "vite-plugin-svgr";
+import ViteRestart from "vite-plugin-restart";
 // @ts-expect-error - spiffThemePlugin export may not be in type definitions yet
 import { spiffThemePlugin } from "@spiffcommerce/theme-bridge/plugin";
 import { configurationSchema, pageSettings } from "./src/configurationSchema";
@@ -15,7 +16,12 @@ export default defineConfig((env) => {
             __LOCAL_DEV_CONFIGURATION__: themeConfiguration,
             "globalThis.__DEV__": JSON.stringify(false),
         },
-        plugins: [svgr(), spiffThemePlugin({ configurationSchema, pageSettings, includePreloadChunks: false })],
+        plugins: [
+            svgr(),
+            // The local configuration file is read when the config loads, so editing it needs a server restart.
+            ViteRestart({ restart: [".env.*.json"] }),
+            spiffThemePlugin({ configurationSchema, pageSettings, includePreloadChunks: false }),
+        ],
         build: {
             emptyOutDir: true,
             rollupOptions: {

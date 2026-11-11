@@ -37,7 +37,7 @@ const getFallbackEnvironmentFile = () => {
 };
 
 let previewService: SpiffCommerce3DPreviewService | undefined;
-const getPreviewService = () => {
+export const getPreviewService = () => {
     previewService ??= new SpiffCommerce3DPreviewService({
         environmentFile: getFallbackEnvironmentFile(),
         transparentBackground: true,
