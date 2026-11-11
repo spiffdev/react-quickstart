@@ -140,19 +140,38 @@ const Scroll = styled.div`
 // Whether the action bar replaces the total bar: when stacked, and in short landscape.
 const actionBarLayouts = `${MEDIA.stacked}, ${MEDIA.short}`;
 
-const ActionBar = styled.div`
+// Collapses out of the way (rather than just fading) so the steps can use the room.
+const ActionBarShell = styled.div<{ $hidden: boolean }>`
     display: none;
     flex: none;
+    grid-template-rows: ${(props) => (props.$hidden ? "0fr" : "1fr")};
+    visibility: ${(props) => (props.$hidden ? "hidden" : "visible")};
+    transition:
+        grid-template-rows 0.2s ease,
+        visibility 0s linear ${(props) => (props.$hidden ? "0.2s" : "0s")};
+
+    @media ${actionBarLayouts} {
+        display: grid;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
+    }
+`;
+
+const ActionBarClip = styled.div`
+    min-height: 0;
+    overflow: hidden;
+`;
+
+const ActionBar = styled.div`
+    display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 12px;
     padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
     background-color: #fff;
     border-top: 1px solid #e0e0e0;
-
-    @media ${actionBarLayouts} {
-        display: flex;
-    }
 `;
 
 const ActionBarTotal = styled.div`
@@ -332,6 +351,7 @@ const Customization: FunctionComponent<{
     const [mandatorySteps, setMandatorySteps] = useState<MandatorySteps>({});
     const activeStepName = useRef<string | undefined>(undefined);
     const formatPrice = useCurrency();
+    const [finishInView, setFinishInView] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
     const { stacked } = useLayoutMode();
     const keyboardViewportHeight = useKeyboardViewportHeight();
@@ -405,6 +425,21 @@ const Customization: FunctionComponent<{
         return onRequestQuote();
     }, [handleFinishChecks, onRequestQuote]);
 
+    // Once the finish step is on screen the action bar has nothing left to offer, so it gets out of the way.
+    useEffect(() => {
+        const container = scrollRef.current;
+        const finish = container?.querySelector("[data-finish-scene]");
+        if (!container || !finish) {
+            setFinishInView(false);
+            return;
+        }
+        const observer = new IntersectionObserver(([entry]) => setFinishInView(entry.isIntersecting), {
+            root: container,
+        });
+        observer.observe(finish);
+        return () => observer.disconnect();
+    }, [traversableScenes]);
+
     // The action bar can't complete the design itself (there are terms to accept), so it takes the customer to the finish step.
     const scrollToFinish = useCallback(() => {
         scrollRef.current?.querySelector("[data-finish-scene]")?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -451,19 +486,23 @@ const Customization: FunctionComponent<{
                             );
                         })}
                     </Scroll>
-                    <ActionBar>
-                        <ActionBarTotal>
-                            {showPricing && formatPrice && totalPrice > 0 && (
-                                <>
-                                    <Typography variant="span">Total</Typography>
-                                    <Typography variant="span">{formatPrice(totalPrice)}</Typography>
-                                </>
-                            )}
-                        </ActionBarTotal>
-                        <Button onClick={scrollToFinish}>
-                            {reviewPageEnabled ? "Review" : addToCartLabel || "Add to cart"}
-                        </Button>
-                    </ActionBar>
+                    <ActionBarShell $hidden={finishInView}>
+                        <ActionBarClip>
+                            <ActionBar>
+                                <ActionBarTotal>
+                                    {showPricing && formatPrice && totalPrice > 0 && (
+                                        <>
+                                            <Typography variant="span">Total</Typography>
+                                            <Typography variant="span">{formatPrice(totalPrice)}</Typography>
+                                        </>
+                                    )}
+                                </ActionBarTotal>
+                                <Button onClick={scrollToFinish}>
+                                    {reviewPageEnabled ? "Review" : addToCartLabel || "Add to cart"}
+                                </Button>
+                            </ActionBar>
+                        </ActionBarClip>
+                    </ActionBarShell>
                 </Sidebar>
             </Layout>
         </PricingProvider>
