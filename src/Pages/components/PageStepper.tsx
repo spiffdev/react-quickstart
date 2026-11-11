@@ -234,8 +234,14 @@ const PageStepper: FunctionComponent<{
         center(hasCentered.current);
         hasCentered.current = true;
 
-        // Rotating the device or resizing the window changes how much fits.
-        const observer = new ResizeObserver(() => center(false));
+        // Rotating the device or resizing the window changes how much fits. An observer reports once as soon as it
+        // starts watching, which would cut the smooth scroll above short, so only a real change in width counts.
+        let width = list.clientWidth;
+        const observer = new ResizeObserver(() => {
+            if (list.clientWidth === width) return;
+            width = list.clientWidth;
+            center(false);
+        });
         observer.observe(list);
         return () => observer.disconnect();
     }, [currentIndex, short]);
