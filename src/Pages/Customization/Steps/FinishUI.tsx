@@ -1,7 +1,7 @@
 import { FunctionComponent, useCallback, useState } from "react";
 import { ExportedStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
-import { Download, FileText, ShoppingCart } from "lucide-react";
+import { ClipboardCheck, Download, FileText, ShoppingCart } from "lucide-react";
 import Button from "../../../components/button";
 import useCurrency from "../../../hooks/useCurrency";
 import Typography from "../../../components/typography";
@@ -105,6 +105,8 @@ const FinishUI: FunctionComponent<{
     onFinished?: () => void | Promise<void>;
     /** The text of the add to cart button. */
     addToCartLabel?: string;
+    /** When true the button leads to a review of the design rather than adding it to the cart. */
+    reviewNext?: boolean;
     allowCart?: boolean;
     allowQuote?: boolean;
     /** Resolves false when the customer backs out of the quote, so they can carry on with their design. */
@@ -118,6 +120,7 @@ const FinishUI: FunctionComponent<{
     onDownloadPreview,
     onFinished,
     addToCartLabel,
+    reviewNext = false,
     allowCart = true,
     allowQuote = false,
     onRequestQuote,
@@ -272,10 +275,20 @@ const FinishUI: FunctionComponent<{
                 <Button
                     fullWidth
                     disabled={(!!termsMarkdown && !isConfirmed) || finishing}
-                    icon={finishing && !quoting ? undefined : <ShoppingCart size={18} aria-hidden="true" />}
+                    icon={
+                        finishing && !quoting ? undefined : reviewNext ? (
+                            <ClipboardCheck size={18} aria-hidden="true" />
+                        ) : (
+                            <ShoppingCart size={18} aria-hidden="true" />
+                        )
+                    }
                     onClick={handleFinish}
                 >
-                    {finishing && !quoting ? "Adding to cart..." : addToCartLabel || "Complete Design"}
+                    {reviewNext
+                        ? "Review your design"
+                        : finishing && !quoting
+                          ? "Adding to cart..."
+                          : addToCartLabel || "Complete Design"}
                 </Button>
             )}
             {allowQuote && (
