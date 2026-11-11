@@ -1,6 +1,6 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import styled from "styled-components";
-import { ShoppingCart } from "lucide-react";
+import { FileText, ShoppingCart } from "lucide-react";
 import { ExportedStepData, WorkflowExperience } from "@spiffcommerce/core";
 import Button from "../../components/button";
 import Typography from "../../components/typography";
@@ -77,6 +77,10 @@ const RowValue = styled.div`
     text-align: right;
 `;
 
+const QuoteButton = styled(Button)`
+    margin-top: 12px;
+`;
+
 const ErrorText = styled(Typography)`
     margin: 12px 0 0 0;
     font-size: 13px;
@@ -103,10 +107,24 @@ const ReviewPage: FunctionComponent<{
     /** Completes the design. Rejects with a customer-readable message when that fails. */
     onConfirm: () => Promise<void>;
     confirmLabel?: string;
-}> = ({ workflowExperience, exportedData, selectionCost, onConfirm, confirmLabel }) => {
+    allowCart?: boolean;
+    allowQuote?: boolean;
+    /** Resolves false when the customer backs out of the quote, so they can carry on. */
+    onRequestQuote?: () => void | boolean | Promise<void | boolean>;
+}> = ({
+    workflowExperience,
+    exportedData,
+    selectionCost,
+    onConfirm,
+    confirmLabel,
+    allowCart = true,
+    allowQuote = false,
+    onRequestQuote,
+}) => {
     const currencyFormatter = useCurrency();
     const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
     const [confirming, setConfirming] = useState(false);
+    const [quoting, setQuoting] = useState(false);
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -134,6 +152,24 @@ const ReviewPage: FunctionComponent<{
             setConfirming(false);
         }
     }, [onConfirm]);
+
+    // Confirming the quote's details happens in a dialog opened by `onRequestQuote`.
+    const handleQuote = useCallback(async () => {
+        setError("");
+        setConfirming(true);
+        setQuoting(true);
+        try {
+            if ((await onRequestQuote?.()) === false) {
+                setConfirming(false);
+                setQuoting(false);
+            }
+        } catch (e) {
+            console.error("Error requesting a quote:", e);
+            setError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+            setConfirming(false);
+            setQuoting(false);
+        }
+    }, [onRequestQuote]);
 
     const product = workflowExperience.getProduct();
     const basePrice = product?.basePrice || 0;
@@ -187,14 +223,26 @@ const ReviewPage: FunctionComponent<{
                             )}
                         </Rows>
                     )}
-                    <Button
-                        fullWidth
-                        disabled={confirming || !exportedData}
-                        icon={confirming ? undefined : <ShoppingCart size={18} aria-hidden="true" />}
-                        onClick={handleConfirm}
-                    >
-                        {confirming ? "Please wait..." : confirmLabel || "Complete Design"}
-                    </Button>
+                    {allowCart && (
+                        <Button
+                            fullWidth
+                            disabled={confirming || !exportedData}
+                            icon={confirming && !quoting ? undefined : <ShoppingCart size={18} aria-hidden="true" />}
+                            onClick={handleConfirm}
+                        >
+                            {confirming && !quoting ? "Please wait..." : confirmLabel || "Complete Design"}
+                        </Button>
+                    )}
+                    {allowQuote && (
+                        <QuoteButton
+                            fullWidth
+                            disabled={confirming || !exportedData}
+                            icon={<FileText size={18} aria-hidden="true" />}
+                            onClick={handleQuote}
+                        >
+                            Request a Quote
+                        </QuoteButton>
+                    )}
                     {error && <ErrorText role="alert">{error}</ErrorText>}
                 </Summary>
             </Content>

@@ -105,7 +105,7 @@ const FinishUI: FunctionComponent<{
     onFinished?: () => void | Promise<void>;
     /** The text of the add to cart button. */
     addToCartLabel?: string;
-    /** When true the button leads to a review of the design rather than adding it to the cart. */
+    /** When true the button leads to a review of the design, where the design is completed or a quote requested. */
     reviewNext?: boolean;
     allowCart?: boolean;
     allowQuote?: boolean;
@@ -271,7 +271,7 @@ const FinishUI: FunctionComponent<{
                     />
                 </>
             )}
-            {allowCart && (
+            {(allowCart || reviewNext) && (
                 <Button
                     fullWidth
                     disabled={(!!termsMarkdown && !isConfirmed) || finishing}
@@ -291,7 +291,7 @@ const FinishUI: FunctionComponent<{
                           : addToCartLabel || "Complete Design"}
                 </Button>
             )}
-            {allowQuote && (
+            {allowQuote && !reviewNext && (
                 <ButtonGroup>
                     <Button
                         fullWidth

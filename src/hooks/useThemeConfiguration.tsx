@@ -11,6 +11,16 @@ const ThemeConfigurationContext = createContext<ThemeConfiguration>({});
 const useThemeConfiguration = () => useContext(ThemeConfigurationContext);
 
 /**
+ * How the customer can complete their design. Adding to the cart is the default, so it stays available unless it's
+ * switched off and quotes are on.
+ */
+export const useCheckoutOptions = () => {
+    const { allowQuoteRequests, allowCartRequests } = useThemeConfiguration();
+    const allowQuote = !!allowQuoteRequests;
+    return { allowQuote, allowCart: allowCartRequests !== false || !allowQuote };
+};
+
+/**
  * Applies the partner's page settings (which pages they've switched on or off, and the order of pages in each group)
  * on top of the theme's own description of its pages. The theme version's description is used when the platform
  * sends one, and otherwise the one in `configurationSchema.ts`.

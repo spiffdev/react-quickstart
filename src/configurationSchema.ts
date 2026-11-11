@@ -41,6 +41,9 @@ export interface ThemeConfiguration {
     enableMobileUpload?: boolean;
     /**
      * Places orders as test bundles, which are excluded from reporting and billing. A warning banner is shown.
+     *
+     * The platform does allow an application to create orders itself, but this theme only does so for testing.
+     * Real orders are handed off to the e-commerce platform's cart instead.
      */
     enableTestOrders?: boolean;
     /**

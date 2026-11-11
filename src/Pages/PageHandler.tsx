@@ -24,7 +24,7 @@ import { ConversionDataType, ConversionLocation, type SpiffThemeLoader } from "@
 import { StakeholderType, type Customer } from "@spiffcommerce/core";
 import TestOrderBanner from "../components/TestOrderBanner";
 import ConfirmReplaceDialog, { type ReplaceSubject } from "../components/ConfirmReplaceDialog";
-import useThemeConfiguration, { usePageEnabled } from "../hooks/useThemeConfiguration";
+import useThemeConfiguration, { useCheckoutOptions, usePageEnabled } from "../hooks/useThemeConfiguration";
 import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
 import ConversionDialog from "../components/ConversionDialog";
 
@@ -59,6 +59,14 @@ const DetailsButton = styled.button`
 
 type PageType = "collection" | "product" | "workflow" | "experience" | "review" | "thankyou";
 
+/** What the thank you page waits for before the customer can leave. */
+export type PreparedHandOff = {
+    /** Hands the design off, which ends the experience. */
+    leave: () => void;
+    /** The number of the order that was placed, if the theme placed one. */
+    orderNumber?: string;
+};
+
 type PageStep = { page: PageType; label: string };
 
 // The pages that are always present, in the order the customer visits them, and the heading each is shown under.
@@ -79,6 +87,7 @@ const PageHandler: FunctionComponent<{}> = () => {
     const client = useClient();
     const bundle = useBundle();
     const { conversionConfiguration, thankYouMessage, thankYouCloseLabel, addToCartLabel } = useThemeConfiguration();
+    const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
     const thankYouPageEnabled = usePageEnabled("thank-you");
     // The thank you page doesn't depend on the review page, so each is added independently.
@@ -110,7 +119,7 @@ const PageHandler: FunctionComponent<{}> = () => {
         undefined,
     );
     // The thank you page's preparation of the hand-off.
-    const preparation = useRef<Promise<() => void> | undefined>(undefined);
+    const preparation = useRef<Promise<PreparedHandOff> | undefined>(undefined);
     const [errorMessage, setErrorMessage] = useState<string | undefined>(undefined);
     // Experiences made by these pages in this visit. Only these are ever discarded by a new selection, so a
     // reloaded bundle's existing designs are never thrown away.
@@ -450,11 +459,13 @@ const PageHandler: FunctionComponent<{}> = () => {
         const result = await (first ? withScreenshotPreview(first, finish) : finish());
         const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
         if (bundle.getTest()) {
+            // The platform allows an application to create orders itself, but this theme only does so for testing. Real
+            // orders are always handed off to the e-commerce platform's cart below, which is where they're placed.
             // Test orders are placed directly and the window is closed rather than handing off to the cart.
-            await bundle.placeOrder();
-            return () => spiffThemeLoader.close();
+            const order = await bundle.placeOrder();
+            return { leave: () => spiffThemeLoader.close(), orderNumber: String(order.internalId) };
         }
-        return () => spiffThemeLoader.addToEcommerceCart(result);
+        return { leave: () => spiffThemeLoader.addToEcommerceCart(result) };
     }, [bundle, takeScreenshot]);
 
     // Completes the design. With a thank you page that page prepares the hand-off and the customer's exit performs
@@ -468,7 +479,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                 setPage("thankyou");
                 return;
             }
-            (await finishBundle())();
+            (await finishBundle()).leave();
         } catch (error) {
             console.error("Error completing the design:", error);
             // The finish step shows this message under its button.
@@ -477,12 +488,14 @@ const PageHandler: FunctionComponent<{}> = () => {
     }, [finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
 
     // Prepares the hand-off for the thank you page. Only ever runs once per visit, however often it's asked for.
-    const prepareHandOff = useCallback((): Promise<() => void> => {
+    const prepareHandOff = useCallback((): Promise<PreparedHandOff> => {
         if (!preparation.current) {
             const quote = completion?.kind === "quote";
             // A quote isn't handed off yet, so leaving simply closes the experience.
             const prepared = quote
-                ? Promise.resolve(() => ((window as any).SpiffThemeLoader as SpiffThemeLoader).close())
+                ? Promise.resolve<PreparedHandOff>({
+                      leave: () => ((window as any).SpiffThemeLoader as SpiffThemeLoader).close(),
+                  })
                 : finishBundle();
             preparation.current = prepared;
             // A failure can be tried again.
@@ -667,6 +680,9 @@ const PageHandler: FunctionComponent<{}> = () => {
                         }
                         onConfirm={completeDesign}
                         confirmLabel={addToCartLabel}
+                        allowCart={allowCart}
+                        allowQuote={allowQuote}
+                        onRequestQuote={handleRequestQuote}
                     />
                 )}
                 {page === "thankyou" && completion && (

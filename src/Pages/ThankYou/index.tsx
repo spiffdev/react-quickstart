@@ -3,6 +3,7 @@ import styled from "styled-components";
 import { CircleCheck } from "lucide-react";
 import Button from "../../components/button";
 import Typography from "../../components/typography";
+import type { PreparedHandOff } from "../PageHandler";
 
 const Page = styled.div`
     height: 100%;
@@ -49,10 +50,10 @@ const ThankYouPage: FunctionComponent<{
     /** The quote the customer requested, if that's how they finished. */
     quoteId?: string;
     /** Prepares the hand-off, resolving with what to do when the customer leaves. */
-    onPrepare: () => Promise<() => void>;
+    onPrepare: () => Promise<PreparedHandOff>;
 }> = ({ message, closeLabel, quoteId, onPrepare }) => {
     const [state, setState] = useState<"preparing" | "ready" | "failed" | "leaving">("preparing");
-    const [handOff, setHandOff] = useState<(() => void) | undefined>(undefined);
+    const [handOff, setHandOff] = useState<PreparedHandOff | undefined>(undefined);
     const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
@@ -61,7 +62,7 @@ const ThankYouPage: FunctionComponent<{
         onPrepare()
             .then((prepared) => {
                 if (cancelled) return;
-                setHandOff(() => prepared);
+                setHandOff(prepared);
                 setState("ready");
             })
             .catch(() => !cancelled && setState("failed"));
@@ -73,7 +74,7 @@ const ThankYouPage: FunctionComponent<{
     const leave = useCallback(() => {
         setState("leaving");
         try {
-            handOff?.();
+            handOff?.leave();
         } catch (error) {
             console.error("Error leaving the experience:", error);
             setState("ready");
@@ -85,6 +86,7 @@ const ThankYouPage: FunctionComponent<{
             <CircleCheck size={48} color="var(--theme-primary-color)" aria-hidden="true" />
             <Heading variant="h2">Thank you!</Heading>
             {quoteId && <Message>Quote # {quoteId}</Message>}
+            {handOff?.orderNumber && <Message>Order # {handOff.orderNumber}</Message>}
             <Message>{message || "Your design has been received."}</Message>
             {state === "preparing" && <Message role="status">Finishing up your design...</Message>}
             {state === "failed" && (

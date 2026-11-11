@@ -1,7 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import useCurrency from "../../hooks/useCurrency";
-import useThemeConfiguration, { usePageEnabled } from "../../hooks/useThemeConfiguration";
+import useThemeConfiguration, { useCheckoutOptions, usePageEnabled } from "../../hooks/useThemeConfiguration";
 import { PricingProvider } from "../../hooks/usePricing";
 import { canDownloadPreview, downloadPreview } from "./downloadPreview";
 import {
@@ -147,11 +147,9 @@ const StepHandler: FunctionComponent<{
     onFinished: () => void | Promise<void>;
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
 }> = ({ step, workflowExperience, selectionCost, exportedData, onActivate, onFinished, onRequestQuote }) => {
-    const { addToCartLabel, allowQuoteRequests, allowCartRequests } = useThemeConfiguration();
+    const { addToCartLabel } = useThemeConfiguration();
+    const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
-    // Adding to the cart is the default, so it stays available unless it's switched off and quotes are on.
-    const allowQuote = !!allowQuoteRequests;
-    const allowCart = allowCartRequests !== false || !allowQuote;
     const renderStepComponent = () => {
         // The finish step has no handle.
         if (step.type === StepType.Finish) {
