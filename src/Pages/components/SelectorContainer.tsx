@@ -1,4 +1,5 @@
 import { FunctionComponent, ReactNode } from "react";
+import { MEDIA } from "../../layout";
 import styled from "styled-components";
 import LoadingOverlay from "./LoadingOverlay";
 import useDebounce from "../../hooks/useDebounce";
@@ -20,7 +21,7 @@ const Grid = styled.div`
     gap: 10px;
     flex-wrap: wrap;
 
-    @media (max-width: 768px) {
+    @media ${MEDIA.compact} {
         padding: 16px;
         justify-content: center;
     }

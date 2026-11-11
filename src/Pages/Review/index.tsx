@@ -1,4 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
+import { MEDIA } from "../../layout";
 import styled, { keyframes } from "styled-components";
 import { FileText, ShoppingCart } from "lucide-react";
 import { ExportedStepData, WorkflowExperience } from "@spiffcommerce/core";
@@ -23,7 +24,7 @@ const Content = styled.div`
     max-width: 960px;
     margin: 0 auto;
 
-    @media (max-width: 768px) {
+    @media ${MEDIA.compact} {
         flex-direction: column;
         gap: 16px;
     }
@@ -64,7 +65,7 @@ const PreviewSkeleton = styled.div`
         animation: none;
     }
 
-    @media (max-width: 768px) {
+    @media ${MEDIA.compact} {
         flex: none;
         width: 100%;
     }

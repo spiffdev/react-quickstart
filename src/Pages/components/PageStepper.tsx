@@ -1,6 +1,8 @@
-import { FunctionComponent, ReactNode } from "react";
-import { Check } from "lucide-react";
+import { FunctionComponent, ReactNode, useEffect, useRef } from "react";
+import { Check, ChevronLeft } from "lucide-react";
 import styled, { css } from "styled-components";
+import { MEDIA } from "../../layout";
+import { useLayoutMode } from "../../hooks/useLayout";
 
 type StepState = "complete" | "current" | "upcoming";
 
@@ -32,8 +34,17 @@ const List = styled.ol`
     margin: 0;
     padding: 12px 16px;
     list-style: none;
+    /* When the steps don't fit they scroll, and the current one is kept in the middle. */
+    position: relative;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
 
-    @media (max-width: 768px) {
+    &::-webkit-scrollbar {
+        display: none;
+    }
+
+    @media ${MEDIA.compact} {
         padding: 12px;
     }
 `;
@@ -52,7 +63,7 @@ const Actions = styled.div`
     align-items: center;
     padding: 0 16px;
 
-    @media (max-width: 768px) {
+    @media ${MEDIA.compact} {
         padding: 0 12px;
     }
 `;
@@ -74,7 +85,7 @@ const Item = styled.li<{ $complete: boolean }>`
         height: 2px;
         margin: 0 12px;
 
-        @media (max-width: 768px) {
+        @media ${MEDIA.compact} {
             margin: 0 8px;
         }
         background:
@@ -169,9 +180,26 @@ const Label = styled.span<{ $state: StepState; $available: boolean }>`
     ${reducedMotion}
 
     /* Only the current page keeps its label on narrow screens, so the markers fit. */
-    @media (max-width: 768px) {
+    @media ${MEDIA.compact} {
         ${(props) => props.$state !== "current" && "display: none;"}
     }
+`;
+
+// Phones in landscape have no height to spare, so the steps collapse to a single line.
+const CompactProgress = styled.div`
+    display: flex;
+    align-items: center;
+    flex: 1 1 0;
+    min-width: 0;
+    gap: 8px;
+    padding: 4px 12px;
+    font-size: 14px;
+`;
+
+const CompactLabel = styled.span`
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 `;
 
 /**
@@ -186,34 +214,76 @@ const PageStepper: FunctionComponent<{
     /** Shown beside the steps, after a divider. */
     actions?: ReactNode;
 }> = ({ steps, currentIndex, enabledSteps, onStepSelected, actions }) => {
+    const { short } = useLayoutMode();
+    const listRef = useRef<HTMLOListElement>(null);
+    const hasCentered = useRef(false);
+
+    // Keeps the current step in the middle of the list when the steps are too wide to all be in view.
+    useEffect(() => {
+        const list = listRef.current;
+        if (!list) return;
+
+        const center = (animate: boolean) => {
+            const current = list.querySelector<HTMLElement>('[aria-current="step"]');
+            if (!current) return;
+            const left = current.offsetLeft - (list.clientWidth - current.offsetWidth) / 2;
+            const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+            list.scrollTo({ left: Math.max(0, left), behavior: animate && !reduceMotion ? "smooth" : "auto" });
+        };
+
+        center(hasCentered.current);
+        hasCentered.current = true;
+
+        // Rotating the device or resizing the window changes how much fits.
+        const observer = new ResizeObserver(() => center(false));
+        observer.observe(list);
+        return () => observer.disconnect();
+    }, [currentIndex, short]);
+    const previousEnabled = currentIndex > 0 && !!enabledSteps[currentIndex - 1];
     return (
         <Nav aria-label="Progress">
-            <List>
-                {steps.map((label, index) => {
-                    const state: StepState =
-                        index < currentIndex ? "complete" : index === currentIndex ? "current" : "upcoming";
-                    const enabled = !!enabledSteps[index];
-                    return (
-                        <Item
-                            key={label}
-                            $complete={state === "complete"}
-                            aria-current={state === "current" ? "step" : undefined}
-                        >
-                            <StepButton type="button" disabled={!enabled} onClick={() => onStepSelected(index)}>
-                                <Marker $state={state} $available={enabled}>
-                                    <MarkerSymbol $visible={state !== "complete"}>{index + 1}</MarkerSymbol>
-                                    <MarkerSymbol $visible={state === "complete"} aria-hidden="true">
-                                        <Check size={16} strokeWidth={3} />
-                                    </MarkerSymbol>
-                                </Marker>
-                                <Label $state={state} $available={enabled}>
-                                    {label}
-                                </Label>
-                            </StepButton>
-                        </Item>
-                    );
-                })}
-            </List>
+            {short ? (
+                <CompactProgress>
+                    <StepButton
+                        type="button"
+                        aria-label="Previous step"
+                        disabled={!previousEnabled}
+                        onClick={() => onStepSelected(currentIndex - 1)}
+                    >
+                        <ChevronLeft size={20} />
+                    </StepButton>
+                    <CompactLabel aria-current="step">
+                        Step {currentIndex + 1} of {steps.length} · <strong>{steps[currentIndex]}</strong>
+                    </CompactLabel>
+                </CompactProgress>
+            ) : (
+                <List ref={listRef}>
+                    {steps.map((label, index) => {
+                        const state: StepState =
+                            index < currentIndex ? "complete" : index === currentIndex ? "current" : "upcoming";
+                        const enabled = !!enabledSteps[index];
+                        return (
+                            <Item
+                                key={label}
+                                $complete={state === "complete"}
+                                aria-current={state === "current" ? "step" : undefined}
+                            >
+                                <StepButton type="button" disabled={!enabled} onClick={() => onStepSelected(index)}>
+                                    <Marker $state={state} $available={enabled}>
+                                        <MarkerSymbol $visible={state !== "complete"}>{index + 1}</MarkerSymbol>
+                                        <MarkerSymbol $visible={state === "complete"} aria-hidden="true">
+                                            <Check size={16} strokeWidth={3} />
+                                        </MarkerSymbol>
+                                    </Marker>
+                                    <Label $state={state} $available={enabled}>
+                                        {label}
+                                    </Label>
+                                </StepButton>
+                            </Item>
+                        );
+                    })}
+                </List>
+            )}
             {actions && (
                 <>
                     <Divider aria-hidden="true" />

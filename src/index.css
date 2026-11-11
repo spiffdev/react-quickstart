@@ -43,3 +43,11 @@ body {
     font-family: var(--theme-font-family, var(--Default-Font));
     font-weight: var(--FW-Normal);
 }
+
+/* Touch screens need larger targets. Zero specificity, so a component can still size its own buttons. */
+@media (pointer: coarse) {
+    :where(.app-body button, .app-body [role="button"]) {
+        min-height: 44px;
+        min-width: 44px;
+    }
+}

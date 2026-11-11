@@ -26,6 +26,9 @@ import {
 } from "@spiffcommerce/core";
 import Card from "../../components/card";
 import Typography from "../../components/typography";
+import Button from "../../components/button";
+import { MEDIA, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, SIDEBAR_MIN_WIDTH_TOUCH } from "../../layout";
+import { useKeyboardViewportHeight, useLayoutMode } from "../../hooks/useLayout";
 import LoadingOverlay from "../components/LoadingOverlay";
 import StepHelp from "./components/StepHelp";
 import ThreeDPreview from "./components/ThreeDPreview";
@@ -58,9 +61,8 @@ const STEP_TYPES_WITH_MANDATORY_SUPPORT = [
 
 const DEFAULT_SIDEBAR_WIDTH_PERCENTAGE = 25;
 
-const MOBILE_BREAKPOINT = "768px";
-// Between mobile and this width the preview and sidebar share the screen evenly.
-const TABLET_BREAKPOINT = "1024px";
+// The preview's height when the keyboard is open in a stacked layout, just enough to keep the design in sight.
+const KEYBOARD_PREVIEW_HEIGHT = "96px";
 
 const Layout = styled.div`
     height: 100%;
@@ -69,51 +71,109 @@ const Layout = styled.div`
     flex-direction: row;
 
     /* The preview stays pinned on top while the steps scroll beneath it. */
-    @media (max-width: ${MOBILE_BREAKPOINT}) {
+    @media ${MEDIA.stacked} {
         flex-direction: column;
     }
 `;
 
-const PreviewPane = styled.div`
+const PreviewPane = styled.div<{ $collapsed: boolean }>`
     flex: 1 1 0;
     min-width: 0;
     height: 100%;
 
-    @media (min-width: 769px) and (max-width: ${TABLET_BREAKPOINT}) {
-        flex: 0 0 50%;
+    /* Phones in landscape and small tablets give the preview a little more than half. */
+    @media ${MEDIA.split} and ${MEDIA.short}, ${MEDIA.split} and ${MEDIA.medium} {
+        flex: 0 0 55%;
     }
 
-    @media (max-width: ${MOBILE_BREAKPOINT}) {
-        flex: 0 0 40%;
-        height: auto;
-        min-height: 0;
+    /* About 4:3, clamped so tall screens don't spend all their height on the preview. */
+    @media ${MEDIA.stacked} {
+        flex: none;
+        height: ${(props) => (props.$collapsed ? KEYBOARD_PREVIEW_HEIGHT : "clamp(32dvh, 75vw, 42dvh)")};
+        transition: height 0.2s ease;
+
+        @media ${MEDIA.medium} {
+            height: ${(props) => (props.$collapsed ? KEYBOARD_PREVIEW_HEIGHT : "clamp(40dvh, 75vw, 50dvh)")};
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            transition: none;
+        }
     }
 `;
 
+// Holds the scrolling steps and, on small screens, the action bar beneath them.
 const Sidebar = styled.div<{ $widthPercentage: number }>`
     position: relative;
     height: 100%;
-    overflow: auto;
-    flex: 0 0 ${(props) => props.$widthPercentage}%;
-    min-width: 0;
-    gap: 5px;
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    min-height: 0;
+    /* Percentages mean very different things on a phone and a 4K monitor, so the width is bounded. */
+    flex: 0 0 clamp(${SIDEBAR_MIN_WIDTH}px, ${(props) => props.$widthPercentage}%, ${SIDEBAR_MAX_WIDTH}px);
 
-    @media (min-width: 769px) and (max-width: ${TABLET_BREAKPOINT}) {
-        flex: 0 0 50%;
+    @media ${MEDIA.coarse} {
+        flex-basis: clamp(${SIDEBAR_MIN_WIDTH_TOUCH}px, ${(props) => props.$widthPercentage}%, ${SIDEBAR_MAX_WIDTH}px);
     }
 
-    @media (max-width: ${MOBILE_BREAKPOINT}) {
+    @media ${MEDIA.split} and ${MEDIA.short}, ${MEDIA.split} and ${MEDIA.medium} {
+        flex: 1 1 0;
+    }
+
+    @media ${MEDIA.stacked} {
         flex: 1 1 0;
         height: auto;
-        min-height: 0;
-        -webkit-overflow-scrolling: touch;
     }
+`;
+
+const Scroll = styled.div`
+    flex: 1 1 0;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    -webkit-overflow-scrolling: touch;
+`;
+
+// Whether the action bar replaces the total bar: when stacked, and in short landscape.
+const actionBarLayouts = `${MEDIA.stacked}, ${MEDIA.short}`;
+
+const ActionBar = styled.div`
+    display: none;
+    flex: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 16px calc(8px + env(safe-area-inset-bottom, 0px));
+    background-color: #fff;
+    border-top: 1px solid #e0e0e0;
+
+    @media ${actionBarLayouts} {
+        display: flex;
+    }
+`;
+
+const ActionBarTotal = styled.div`
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    font-weight: 600;
 `;
 
 const SceneTitle = styled(Typography)`
     font-size: var(--theme-scene-heading-size);
+
+    /* Keeps the customer oriented while they scroll through a long scene. */
+    @media ${MEDIA.stacked} {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        margin: -15px -15px 0;
+        padding: 10px 15px;
+        background-color: #fff;
+    }
 `;
 
 const StepTitle = styled(Typography)`
@@ -136,6 +196,10 @@ const TotalBar = styled.div`
     background-color: #fff;
     border-bottom: 1px solid #e0e0e0;
     font-weight: 600;
+
+    @media ${actionBarLayouts} {
+        display: none;
+    }
 `;
 
 const StepHandler: FunctionComponent<{
@@ -268,6 +332,11 @@ const Customization: FunctionComponent<{
     const [mandatorySteps, setMandatorySteps] = useState<MandatorySteps>({});
     const activeStepName = useRef<string | undefined>(undefined);
     const formatPrice = useCurrency();
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const { stacked } = useLayoutMode();
+    const keyboardViewportHeight = useKeyboardViewportHeight();
+    const { addToCartLabel } = useThemeConfiguration();
+    const reviewPageEnabled = usePageEnabled("review");
     const sidebarWidthPercentage = useThemeConfiguration().sidebarWidthPercentage || DEFAULT_SIDEBAR_WIDTH_PERCENTAGE;
 
     const workflow = workflowExperience.getWorkflow();
@@ -336,6 +405,11 @@ const Customization: FunctionComponent<{
         return onRequestQuote();
     }, [handleFinishChecks, onRequestQuote]);
 
+    // The action bar can't complete the design itself (there are terms to accept), so it takes the customer to the finish step.
+    const scrollToFinish = useCallback(() => {
+        scrollRef.current?.querySelector("[data-finish-scene]")?.scrollIntoView({ behavior: "smooth", block: "end" });
+    }, []);
+
     if (traversableScenes.length === 0) {
         // TODO: spinner
         return <LoadingOverlay />;
@@ -343,37 +417,53 @@ const Customization: FunctionComponent<{
 
     return (
         <PricingProvider showPricing={showPricing} showPlus={showPlus}>
-            <Layout>
-                <PreviewPane>
+            {/* The keyboard can cover the layout without resizing it, so match the layout to what's visible. */}
+            <Layout style={keyboardViewportHeight ? { height: keyboardViewportHeight } : undefined}>
+                <PreviewPane $collapsed={stacked && keyboardViewportHeight !== undefined}>
                     <ThreeDPreview workflowExperience={workflowExperience} />
                 </PreviewPane>
                 <Sidebar $widthPercentage={sidebarWidthPercentage}>
-                    {showPricing && formatPrice && totalPrice > 0 && (
-                        <TotalBar>
-                            <Typography variant="span">Total</Typography>
-                            <Typography variant="span">{formatPrice(totalPrice)}</Typography>
-                        </TotalBar>
-                    )}
-                    {traversableScenes.map((scene) => {
-                        const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
-                        return (
-                            <Card key={scene.name}>
-                                {!isFinishScene && <SceneTitle variant="h2">{scene.title}</SceneTitle>}
-                                {scene.renderableSteps.map((step) => (
-                                    <StepHandler
-                                        key={step.stepName}
-                                        step={step}
-                                        workflowExperience={workflowExperience}
-                                        selectionCost={selectionCost}
-                                        exportedData={exportedData}
-                                        onActivate={handleActivation}
-                                        onFinished={handleFinish}
-                                        onRequestQuote={handleQuote}
-                                    />
-                                ))}
-                            </Card>
-                        );
-                    })}
+                    <Scroll ref={scrollRef}>
+                        {showPricing && formatPrice && totalPrice > 0 && (
+                            <TotalBar>
+                                <Typography variant="span">Total</Typography>
+                                <Typography variant="span">{formatPrice(totalPrice)}</Typography>
+                            </TotalBar>
+                        )}
+                        {traversableScenes.map((scene) => {
+                            const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
+                            return (
+                                <Card key={scene.name} data-finish-scene={isFinishScene ? "" : undefined}>
+                                    {!isFinishScene && <SceneTitle variant="h2">{scene.title}</SceneTitle>}
+                                    {scene.renderableSteps.map((step) => (
+                                        <StepHandler
+                                            key={step.stepName}
+                                            step={step}
+                                            workflowExperience={workflowExperience}
+                                            selectionCost={selectionCost}
+                                            exportedData={exportedData}
+                                            onActivate={handleActivation}
+                                            onFinished={handleFinish}
+                                            onRequestQuote={handleQuote}
+                                        />
+                                    ))}
+                                </Card>
+                            );
+                        })}
+                    </Scroll>
+                    <ActionBar>
+                        <ActionBarTotal>
+                            {showPricing && formatPrice && totalPrice > 0 && (
+                                <>
+                                    <Typography variant="span">Total</Typography>
+                                    <Typography variant="span">{formatPrice(totalPrice)}</Typography>
+                                </>
+                            )}
+                        </ActionBarTotal>
+                        <Button onClick={scrollToFinish}>
+                            {reviewPageEnabled ? "Review" : addToCartLabel || "Add to cart"}
+                        </Button>
+                    </ActionBar>
                 </Sidebar>
             </Layout>
         </PricingProvider>

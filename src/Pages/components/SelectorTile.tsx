@@ -1,4 +1,5 @@
 import { FunctionComponent } from "react";
+import { MEDIA } from "../../layout";
 import styled from "styled-components";
 import Button from "../../components/button";
 import Card from "../../components/card";
@@ -9,7 +10,7 @@ const TileCard = styled(Card)<{ $selected?: boolean }>`
     height: 400px;
     max-width: 100%;
 
-    @media (max-width: 768px) {
+    @media ${MEDIA.compact} {
         width: 100%;
         height: 320px;
     }
