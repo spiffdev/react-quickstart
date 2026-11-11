@@ -922,38 +922,10 @@
   dependencies:
     tslib "^2.6.2"
 
-"@spiffcommerce/core@44.19.0":
+"@spiffcommerce/core@44.19.0", "@spiffcommerce/core@^44.19.0":
   version "44.19.0"
   resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.19.0.tgz#0deac10d944d71d092412317d6173b4f30c9e77c"
   integrity sha512-o8kPdwqkLet7fn/4F3kjv9QawHInRSj9+l/uH37YRjlQCd9K1Bcynzd8IiLJUcOeOD87Ki6oFFE6dX0AZ2S8og==
-  dependencies:
-    "@adobe/css-tools" "^4.5.0"
-    "@apollo/client" "^3.11.8"
-    "@aws-sdk/client-cognito-identity-provider" "^3.840.0"
-    currency-codes "^2.2.0"
-    data-uri-to-buffer "^6.0.2"
-    dinero.js "^1.9.1"
-    exifr "^7.1.3"
-    fuse.js "^7.0.0"
-    graphql "^16.8.0"
-    handlebars "^4.7.8"
-    html-entities "^2.6.0"
-    lodash.chunk "^4.2.0"
-    lodash.clonedeep "^4.5.0"
-    lodash.debounce "^4.0.8"
-    lodash.isequal "^4.5.0"
-    lodash.omit "^4.5.0"
-    opentype.js "^1.3.4"
-    qrcode "^1.5.3"
-    react "^18"
-    react-dom "^18"
-    svg-path-bbox "^1.2.4"
-    unicode-default-word-boundary "^13.0.0"
-
-"@spiffcommerce/core@^44.13.0":
-  version "44.16.2"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.16.2.tgz#d72cb9b167c0e91d85ea28b498a2ec7c3b9da05d"
-  integrity sha512-gkYgOURDm/1Im9OOkI12oFljRr3hg0k+cYd0UnltGv9D8zGrwx+w+3md3fKr6sKop/s3e7lj7eYmFU5A8TY2Cg==
   dependencies:
     "@adobe/css-tools" "^4.5.0"
     "@apollo/client" "^3.11.8"
@@ -987,12 +959,12 @@
     "@babylonjs/loaders" "8.53.0"
     babylonjs-gltf2interface "8.53.0"
 
-"@spiffcommerce/theme-bridge@1.28.0":
-  version "1.28.0"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.28.0.tgz#a2fbf1d68f6327157573893415ae21746c18a656"
-  integrity sha512-DfwsMm4yLx3PtwlJT1cMcjJBC3NetoQfUs1uUFbVWU9J7MdX8KHm81+5a+548ysWGcJ8whKRjJOa0DRoq8q4sw==
+"@spiffcommerce/theme-bridge@1.28.1-alpha.0":
+  version "1.28.1-alpha.0"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.28.1-alpha.0.tgz#1e1a6c0daef94bc380b1d3cb3cb4720fbc21295c"
+  integrity sha512-/IU3i9pvqOKWL1fQxaxzYK/0cMCF+ggGU7CoxYn9CNx+s9MOrNppymXuwoDVk52QVyT4VCnAcVjHOMcQ1fPZEQ==
   dependencies:
-    "@spiffcommerce/core" "^44.13.0"
+    "@spiffcommerce/core" "^44.19.0"
 
 "@svgr/babel-plugin-add-jsx-attribute@8.0.0":
   version "8.0.0"

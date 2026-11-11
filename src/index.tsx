@@ -6,6 +6,7 @@ import {
     type SpiffDevOptions,
     type ThemeContextBundleOptions,
     themeInstallConfigurationGraphQlToResource,
+    type ThemeInstallConfigurationOverrides,
     ThemeInstallConfigurationResource,
     ThemeContextBundleOptionsNew,
 } from "@spiffcommerce/theme-bridge";
@@ -57,7 +58,8 @@ if (import.meta.env.DEV) {
  * When in a development environment, load the configuration most relevant to the users needs.
  * This will either load the configuration from the local file or from the Spiff Commerce API.
  * The configuration is loaded in the following order:
- * - When __LOCAL_DEV_CONFIGURATION__ is available via a json file matching the name of the env file being used.
+ * - When __LOCAL_DEV_CONFIGURATION__ is available via a json file matching the name of the env file being used
+ *   (e.g. .env.dev.json). It lists only the overrides to the schema's defaults.
  * - When VITE_THEME_INSTALL_ID and VITE_THEME_CONFIGURATION_ID are provided, it will load the explicit configuration from the Spiff Commerce API.
  * - When VITE_APPLICATION_KEY is provided, it will load the configuration from the Spiff Commerce API.
  * @param themeBridge Used to load the configuration from the Spiff Commerce API
@@ -70,7 +72,7 @@ const loadDevConfiguration = async (themeBridge: any) => {
     const baseOptions: Pick<SpiffDevOptions, "applicationKey" | "configuration"> = {
         applicationKey: import.meta.env.VITE_APPLICATION_KEY || "",
         configuration: __LOCAL_DEV_CONFIGURATION__
-            ? loadFromLocalConfigFile(themeBridge)
+            ? await loadFromLocalConfigFile(themeBridge)
             : await loadFromSpiffCommerce(),
     };
     const bundleId = import.meta.env.VITE_BUNDLE_ID;
@@ -123,18 +125,19 @@ const loadDevConfiguration = async (themeBridge: any) => {
     themeBridge.setSpiffDevOptions("app", devOptions);
 };
 
-const loadFromLocalConfigFile = (themeDev: any): ThemeInstallConfigurationResource => {
+const loadFromLocalConfigFile = async (themeBridge: any): Promise<ThemeInstallConfigurationResource> => {
     console.log("Loading configuration from local file");
-    // __LOCAL_DEV_CONFIGURATION__ is a global variable that is set by the vite plugin. It is the content of the local env configuration json file.
-    const configurationBase = themeDev.exampleThemeInstallConfig({});
-    const devConfig: Partial<ThemeInstallConfigurationResource> = __LOCAL_DEV_CONFIGURATION__
-        ? themeInstallConfigurationGraphQlToResource(__LOCAL_DEV_CONFIGURATION__)
-        : {};
-    return {
-        ...configurationBase,
-        ...devConfig,
-        fields: [...configurationBase.fields, ...(devConfig.fields ?? [])],
-    };
+    // __LOCAL_DEV_CONFIGURATION__ is a global variable that is set by the vite plugin. It is the content of the local
+    // env configuration json file, which only lists the overrides to apply on top of the schema's defaults:
+    // { "fields": { "<field key>": <value> }, "pageSettings": { "pages": { "<page key>": { "enabled": true } } } }
+    const overrides: ThemeInstallConfigurationOverrides = __LOCAL_DEV_CONFIGURATION__;
+    // Imported here as the schema needs theme-bridge at runtime, which is only available during development.
+    const { configurationSchema, pageSettings } = await import("./configurationSchema");
+    return themeBridge.generateThemeInstallConfigurationFromOverrides({
+        schema: configurationSchema,
+        pageSettings,
+        overrides,
+    });
 };
 
 const loadFromSpiffCommerce = async () => {

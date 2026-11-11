@@ -60,14 +60,6 @@ export interface ThemeConfiguration {
      */
     addToCartLabel?: string;
     /**
-     * Adds a page after the personalise page that summarises the design before it is completed.
-     */
-    reviewPageEnabled?: boolean;
-    /**
-     * Adds a page after the review page (or the personalise page when there is no review) that thanks the customer.
-     */
-    thankYouPageEnabled?: boolean;
-    /**
      * The message shown on the thank you page.
      */
     thankYouMessage?: string;
@@ -174,21 +166,6 @@ export const configurationSchema: ThemeConfigurationSchema = {
             title: "Add to Cart Button Text",
             defaultValue: "Complete Design",
             description: "The text shown on the button that adds the design to the cart.",
-        },
-        {
-            type: FieldType.Boolean,
-            key: "reviewPageEnabled",
-            title: "Enable Review Page",
-            defaultValue: "false",
-            description: "When true, a page summarising the design is shown after the Personalise page.",
-        },
-        {
-            type: FieldType.Boolean,
-            key: "thankYouPageEnabled",
-            title: "Enable Thank You Page",
-            defaultValue: "false",
-            description:
-                "When true, a thank you page is shown once the design has been completed. It doesn't need the review page to be enabled.",
         },
         {
             type: FieldType.Text,
@@ -301,30 +278,27 @@ export const pageSettings: ThemeConfigurationPageSettings = {
         {
             key: "review",
             title: "Review",
-            subtitle: "An optional summary of the design, shown after the Personalise page.",
+            subtitle: "A summary of the design, shown after the Personalise page.",
             icon: "sliders",
-            toggleable: false,
-            sections: [
-                {
-                    title: "Review Page",
-                    fields: ["reviewPageEnabled"],
-                },
-            ],
+            // Whether the page is shown is set by the page's toggle, and the page is off until it is switched on.
+            toggleable: true,
+            disabled: true,
+            sections: [],
         },
         {
             key: "thank-you",
             title: "Thank You",
-            subtitle: "An optional closing page, shown once the design has been completed.",
+            subtitle: "A closing page, shown once the design has been completed. It doesn't need the review page.",
             icon: "sliders",
-            toggleable: false,
+            // Whether the page is shown is set by the page's toggle, and the page is off until it is switched on.
+            toggleable: true,
+            disabled: true,
             sections: [
                 {
                     title: "Thank You Page",
-                    fields: ["thankYouPageEnabled", "thankYouMessage", "thankYouCloseLabel"],
+                    fields: ["thankYouMessage", "thankYouCloseLabel"],
                 },
             ],
         },
     ],
 };
-
-// TODO: pages example

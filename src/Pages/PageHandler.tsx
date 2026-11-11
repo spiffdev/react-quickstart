@@ -23,7 +23,7 @@ import { ConversionDataType, ConversionLocation, type SpiffThemeLoader } from "@
 import { StakeholderType, type Customer } from "@spiffcommerce/core";
 import TestOrderBanner from "../components/TestOrderBanner";
 import ConfirmReplaceDialog, { type ReplaceSubject } from "../components/ConfirmReplaceDialog";
-import useThemeConfiguration from "../hooks/useThemeConfiguration";
+import useThemeConfiguration, { usePageEnabled } from "../hooks/useThemeConfiguration";
 import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
 import ConversionDialog from "../components/ConversionDialog";
 
@@ -77,14 +77,9 @@ const THANK_YOU_STEP: PageStep = { page: "thankyou", label: "Thank you" };
 const PageHandler: FunctionComponent<{}> = () => {
     const client = useClient();
     const bundle = useBundle();
-    const {
-        conversionConfiguration,
-        reviewPageEnabled,
-        thankYouPageEnabled,
-        thankYouMessage,
-        thankYouCloseLabel,
-        addToCartLabel,
-    } = useThemeConfiguration();
+    const { conversionConfiguration, thankYouMessage, thankYouCloseLabel, addToCartLabel } = useThemeConfiguration();
+    const reviewPageEnabled = usePageEnabled("review");
+    const thankYouPageEnabled = usePageEnabled("thank-you");
     // The thank you page doesn't depend on the review page, so each is added independently.
     const steps = useMemo(
         () => [
