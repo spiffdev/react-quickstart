@@ -2,6 +2,18 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-11 — Responsive layout for phones and tablets
+
+- New `src/layout.ts`: the single source of truth for responsive layout. Orientation decides the layout mode (**stacked**: preview above the steps, in portrait or under 700px wide; **split**: preview beside the steps, in landscape from 700px) and width decides the size tier (compact under 600, medium 600–1023, expanded from 1024). A **short** modifier (height 500px or less) covers phones in landscape. Exports `MEDIA` (the media query strings) and the sidebar width bounds.
+- New `src/hooks/useLayout.ts`: `useMediaQuery`, `useLayoutMode` and `useKeyboardViewportHeight` (the visible height while the on-screen keyboard is open for a text field). CSS media queries are still preferred wherever JavaScript isn't needed.
+- `Customization/index.tsx`:
+  - Stacked: the preview is pinned on top at about 4:3 (clamped to 32–42dvh on phones, 40–50dvh on tablets in portrait) and the steps scroll below it. Scene titles stick to the top while their scene scrolls. When the keyboard is open for a text field the layout matches the visible area and the preview collapses to a thin strip.
+  - Split: the sidebar uses `sidebarWidthPercentage`, now clamped to 360–560px (400px minimum on touch screens). Phones in landscape and 700–1023px landscape screens use a fixed 55/45 preview/sidebar split instead.
+  - New sticky action bar in stacked and short layouts, with the total and a Review (or add to cart) button that scrolls to the finish step. It replaces the sticky total bar there, and collapses out of the way once the finish step is in view.
+- `PageStepper.tsx`: the steps scroll horizontally when they don't fit, and the current page is kept centred (smoothly, except on first load and with reduced motion). On short landscape screens the steps collapse to "Step n of m" with a back button.
+- `PageStepper.tsx`, `SelectorContainer.tsx`, `SelectorTile.tsx`, `Review/index.tsx`: the hard-coded 768px queries now use the compact tier (under 600px), so tablets in portrait get the roomier layout.
+- `index.css`: on touch screens buttons have a minimum size of 44px (zero specificity, so components can still size their own).
+
 ## 2026-11-10 — Review and thank you pages
 
 - New optional **Review** page (`src/Pages/Review/index.tsx`), after Personalise: a preview image, the design's chosen options and the price, with a button (using the "Add to Cart Button Text" setting) that completes the design. Switched on with the "Review" page toggle in the dashboard's page settings (off by default).
