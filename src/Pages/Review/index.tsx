@@ -1,5 +1,5 @@
 import { FunctionComponent, useCallback, useEffect, useState } from "react";
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
 import { FileText, ShoppingCart } from "lucide-react";
 import { ExportedStepData, WorkflowExperience } from "@spiffcommerce/core";
 import Button from "../../components/button";
@@ -38,6 +38,36 @@ const PreviewImage = styled.img`
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     background-color: #fff;
+`;
+
+const shimmer = keyframes`
+    from {
+        background-position: 100% 0;
+    }
+    to {
+        background-position: -100% 0;
+    }
+`;
+
+// Holds the image's place (the preview is square) while it's being rendered.
+const PreviewSkeleton = styled.div`
+    flex: 1 1 0;
+    min-width: 0;
+    max-height: 480px;
+    aspect-ratio: 1;
+    align-self: flex-start;
+    border-radius: 8px;
+    background: linear-gradient(90deg, #eeeeee 25%, #f7f7f7 50%, #eeeeee 75%) 100% 0 / 200% 100%;
+    animation: ${shimmer} 1.4s linear infinite;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+
+    @media (max-width: 768px) {
+        flex: none;
+        width: 100%;
+    }
 `;
 
 const Summary = styled.div`
@@ -123,6 +153,8 @@ const ReviewPage: FunctionComponent<{
 }) => {
     const currencyFormatter = useCurrency();
     const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
+    // The image may fail to render, in which case the summary is shown without it.
+    const [previewFailed, setPreviewFailed] = useState(false);
     const [confirming, setConfirming] = useState(false);
     const [quoting, setQuoting] = useState(false);
     const [error, setError] = useState("");
@@ -130,12 +162,20 @@ const ReviewPage: FunctionComponent<{
     useEffect(() => {
         let cancelled = false;
         setPreviewUrl(undefined);
+        setPreviewFailed(false);
         withScreenshotPreview(workflowExperience, () =>
             createDesignPreviewImage(workflowExperience, PREVIEW_RESOLUTION),
         )
-            .then((url) => !cancelled && setPreviewUrl(url))
-            // The summary is still useful without an image.
-            .catch((e) => console.error("Error creating the review preview:", e));
+            .then((url) => {
+                if (cancelled) return;
+                // An empty image counts as a failure, so the skeleton doesn't stay up for good.
+                if (url) setPreviewUrl(url);
+                else setPreviewFailed(true);
+            })
+            .catch((e) => {
+                console.error("Error creating the review preview:", e);
+                if (!cancelled) setPreviewFailed(true);
+            });
         return () => {
             cancelled = true;
         };
@@ -187,7 +227,11 @@ const ReviewPage: FunctionComponent<{
     return (
         <Page>
             <Content>
-                {previewUrl && <PreviewImage src={previewUrl} alt="Preview of your design" />}
+                {previewUrl ? (
+                    <PreviewImage src={previewUrl} alt="Preview of your design" />
+                ) : (
+                    !previewFailed && <PreviewSkeleton role="status" aria-label="Loading preview of your design" />
+                )}
                 <Summary>
                     <Heading variant="h2">{product?.name ? `Review ${product.name}` : "Review Your Design"}</Heading>
                     {(rows.length > 0 || formatPrice) && (
