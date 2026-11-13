@@ -58,47 +58,28 @@ const CancelButton = styled(Button)`
     }
 `;
 
-export type ReplaceSubject = "product" | "collection" | "workflow";
-
-// The customer sees workflows as "designs", so that is the word used for them.
-const COPY: Record<ReplaceSubject, { title: string; message: string; confirm: string }> = {
-    product: {
-        title: "Change product?",
-        message:
-            "Changing your product will remove your current design. This can't be undone. Do you want to continue?",
-        confirm: "Change product",
-    },
-    collection: {
-        title: "Change collection?",
-        message:
-            "Changing your collection will remove your current design. This can't be undone. Do you want to continue?",
-        confirm: "Change collection",
-    },
-    workflow: {
-        title: "Choose a different design?",
-        message:
-            "Choosing a different design will remove your current one. This can't be undone. Do you want to continue?",
-        confirm: "Change design",
-    },
+const COPY = {
+    title: "Change collection?",
+    message:
+        "Changing your collection will remove everything in your cart, along with any designs you have made. This can't be undone. Do you want to continue?",
+    confirm: "Change collection",
 };
 
 /**
- * Warns the customer that changing their selection discards the design they have made so far.
+ * Warns the customer that changing their collection discards everything in their cart.
  * "Don't ask again" is only reported to the caller, which keeps it in memory.
  */
 const ConfirmReplaceDialog: FunctionComponent<{
-    subject: ReplaceSubject;
     onConfirm: (dontAskAgain: boolean) => void;
     onCancel: () => void;
-}> = ({ subject, onConfirm, onCancel }) => {
+}> = ({ onConfirm, onCancel }) => {
     const [dontAskAgain, setDontAskAgain] = useState(false);
-    const copy = COPY[subject];
 
     return (
         <Backdrop>
             <Dialog role="alertdialog" aria-modal="true" aria-labelledby="confirm-replace-title">
-                <Title id="confirm-replace-title">{copy.title}</Title>
-                <Message>{copy.message}</Message>
+                <Title id="confirm-replace-title">{COPY.title}</Title>
+                <Message>{COPY.message}</Message>
                 <Remember>
                     <input
                         type="checkbox"
@@ -109,7 +90,7 @@ const ConfirmReplaceDialog: FunctionComponent<{
                 </Remember>
                 <Actions>
                     <CancelButton onClick={onCancel}>Cancel</CancelButton>
-                    <Button onClick={() => onConfirm(dontAskAgain)}>{copy.confirm}</Button>
+                    <Button onClick={() => onConfirm(dontAskAgain)}>{COPY.confirm}</Button>
                 </Actions>
             </Dialog>
         </Backdrop>

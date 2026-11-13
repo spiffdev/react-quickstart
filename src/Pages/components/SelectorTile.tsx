@@ -2,6 +2,7 @@ import { FunctionComponent } from "react";
 import { MEDIA } from "../../layout";
 import styled from "styled-components";
 import Button from "../../components/button";
+import DropdownButton, { type DropdownItem } from "../../components/DropdownButton";
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 
@@ -36,14 +37,22 @@ const SelectorTile: FunctionComponent<{
     /** Marks the choice the customer already made, when they come back to this page. */
     selected?: boolean;
     onClick: () => void;
-}> = ({ imageUrl, title, selected, onClick }) => {
+    /**
+     * When there is more than one choice, the button offers them in a menu and calls `onChoose` instead of `onClick`.
+     */
+    choices?: DropdownItem[];
+    onChoose?: (id: string) => void;
+}> = ({ imageUrl, title, selected, onClick, choices, onChoose }) => {
+    const label = <Typography>{selected ? "Selected" : "Select"}</Typography>;
     return (
         <TileCard $selected={selected}>
             <ImageContainer>{imageUrl ? <TileImage src={imageUrl} /> : undefined}</ImageContainer>
             <Typography>{title}</Typography>
-            <Button onClick={() => onClick()}>
-                <Typography>{selected ? "Selected" : "Select"}</Typography>
-            </Button>
+            {choices && choices.length > 1 && onChoose ? (
+                <DropdownButton label={label} items={choices} onSelect={onChoose} />
+            ) : (
+                <Button onClick={() => onClick()}>{label}</Button>
+            )}
         </TileCard>
     );
 };

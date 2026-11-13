@@ -2,6 +2,16 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-13 — Multiple workflow experiences (cart)
+
+- The journey is now **collection → products → personalise → review → thank you**. The separate "Design" (workflow selector) page is gone.
+- The **collection page is skipped when there is only one collection**: it is selected automatically. If that fails, the collection page is shown so the customer can retry.
+- The **product page has a cart on the side** (below the products on narrow screens). A product's Select button adds a design to the bundle; when the product has more than one workflow the button opens a dropdown of workflow names (`components/DropdownButton.tsx`). Products can be added repeatedly, and each cart line can be removed. Continue opens the personalise page, where the existing experience switcher moves between the designs.
+- Each cart line has a **quantity control** (− / typed value / +, minimum 1, applied on blur or Enter via `setQuantity`). Line prices and the total are multiplied by quantity.
+- Cart prices follow each workflow's `showPricing` flag, and the total is only shown when every line's price is. Products added by a product step are not listed in the cart.
+- Changing collection with a non-empty cart asks for confirmation, then removes every design in the bundle.
+- Not handled yet: workflow prices in the dropdown (core's `ProductWorkflow` has no price or `showPricing` before an experience exists), per-product minimum order quantities, a combined review of all designs, and a polished multi-experience customisation page.
+
 ## 2026-11-13 — Product steps, and hiding single-variant steps
 
 - New **product step** (`Steps/ProductUI.tsx`): a gallery of the step's products (with the step's search and category settings). Choosing one adds a child transaction to the bundle (or raises the quantity of a non-personalisable product). Added products are listed above the gallery with a Remove button and, for personalisable products, a Personalise button that opens that product's experience (use the experience switcher to come back). The step's maximum disables the gallery once reached, and the minimum is checked when finishing or requesting a quote.
