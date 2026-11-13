@@ -45,13 +45,18 @@ const parentId = (experience: WorkflowExperience) => experience.getTransaction()
 const ExperienceSwitcher: FunctionComponent<{
     experiences: WorkflowExperience[];
     active: WorkflowExperience | undefined;
+    /**
+     * Shows the products added to a design as smaller tabs under it. When false every experience gets a tab in the
+     * one row.
+     */
+    groupChildren?: boolean;
     onSelect: (experience: WorkflowExperience) => void;
-}> = ({ experiences, active, onSelect }) => {
+}> = ({ experiences, active, groupChildren = true, onSelect }) => {
     const ids = new Set(experiences.map(experienceId));
     // A child whose parent isn't in the bundle has nowhere to sit, so it's shown with the others.
     const isChild = (experience: WorkflowExperience) => {
         const parent = parentId(experience);
-        return !!parent && ids.has(parent);
+        return groupChildren && !!parent && ids.has(parent);
     };
     const parents = experiences.filter((experience) => !isChild(experience));
     // The design whose products are on show: the active one, or the one the active product was added to.

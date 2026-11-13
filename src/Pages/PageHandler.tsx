@@ -14,6 +14,8 @@ import ProductSelector from "./ProductSelector";
 import useClient from "../hooks/useClient";
 import useActivation from "../hooks/useActivation";
 import LoadingOverlay from "./components/LoadingOverlay";
+import SingleProductSelector from "./ProductSelector/SingleProductSelector";
+import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
 import { createDesignPreviewImage, withScreenshotPreview } from "./Customization/previewScreenshot";
 import ReviewPage from "./Review";
@@ -24,7 +26,7 @@ import PageStepper from "./components/PageStepper";
 import { ConversionDataType, ConversionLocation, type SpiffThemeLoader } from "@spiffcommerce/theme-bridge";
 import { StakeholderType, type Customer } from "@spiffcommerce/core";
 import TestOrderBanner from "../components/TestOrderBanner";
-import ConfirmReplaceDialog from "../components/ConfirmReplaceDialog";
+import ConfirmReplaceDialog, { type ReplaceSubject } from "../components/ConfirmReplaceDialog";
 import useThemeConfiguration, { useCheckoutOptions, usePageEnabled } from "../hooks/useThemeConfiguration";
 import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
 import ConversionDialog from "../components/ConversionDialog";
@@ -58,7 +60,7 @@ const DetailsButton = styled.button`
     }
 `;
 
-type PageType = "collection" | "product" | "experience" | "review" | "thankyou";
+type PageType = "collection" | "product" | "workflow" | "experience" | "review" | "thankyou";
 
 /** What the thank you page waits for before the customer can leave. */
 export type PreparedHandOff = {
@@ -74,12 +76,14 @@ type PageStep = { page: PageType; label: string };
 // out when there's only one collection, and the review and thank you pages when they're switched off.
 const COLLECTION_STEP: PageStep = { page: "collection", label: "Collection" };
 const PRODUCT_STEP: PageStep = { page: "product", label: "Products" };
+// Only in single product mode, where a product with several workflows asks which one to start.
+const WORKFLOW_STEP: PageStep = { page: "workflow", label: "Design" };
 const EXPERIENCE_STEP: PageStep = { page: "experience", label: "Personalise" };
 const REVIEW_STEP: PageStep = { page: "review", label: "Review" };
 const THANK_YOU_STEP: PageStep = { page: "thankyou", label: "Thank you" };
 
 // How far through the journey a page is, which stays the same whichever pages are left out.
-const PAGE_ORDER: PageType[] = ["collection", "product", "experience", "review", "thankyou"];
+const PAGE_ORDER: PageType[] = ["collection", "product", "workflow", "experience", "review", "thankyou"];
 const pageRank = (page: PageType) => PAGE_ORDER.indexOf(page);
 
 const PageHandler: FunctionComponent<{}> = () => {
@@ -90,6 +94,9 @@ const PageHandler: FunctionComponent<{}> = () => {
     const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
     const thankYouPageEnabled = usePageEnabled("thank-you");
+    // In single product mode the customer works on one design at a time: they choose a product (and a workflow, if it
+    // has several) and that replaces the previous choice. Otherwise they build a cart of any number of designs.
+    const singleMode = !!activation.singleProductMode;
     // With a single collection there's nothing to choose, so it's selected for the customer. If that fails the customer
     // is shown the collection page instead, so they can try again.
     const [autoSelectFailed, setAutoSelectFailed] = useState(false);
@@ -103,15 +110,23 @@ const PageHandler: FunctionComponent<{}> = () => {
         () => [
             ...(autoSelectCollection ? [] : [COLLECTION_STEP]),
             PRODUCT_STEP,
+            ...(singleMode ? [WORKFLOW_STEP] : []),
             EXPERIENCE_STEP,
             ...(reviewPageEnabled ? [REVIEW_STEP] : []),
             ...(thankYouPageEnabled ? [THANK_YOU_STEP] : []),
         ],
-        [autoSelectCollection, reviewPageEnabled, thankYouPageEnabled],
+        [autoSelectCollection, singleMode, reviewPageEnabled, thankYouPageEnabled],
     );
     const stepIndex = useCallback((target: PageType) => steps.findIndex((step) => step.page === target), [steps]);
     const [page, setPage] = useState<PageType>("collection");
     const [collection, setCollection] = useState<ProductCollection | undefined>(undefined);
+    // Single product mode: the product and workflow chosen, and the experience they created.
+    const [product, setProduct] = useState<CollectionProduct | undefined>(undefined);
+    const [workflow, setWorkflow] = useState<ProductWorkflow | undefined>(undefined);
+    const [selectionExperience, setSelectionExperience] = useState<WorkflowExperience | undefined>(undefined);
+    // Experiences made by the selection pages in this visit. Only these are ever discarded by a new selection, so a
+    // reloaded bundle's existing designs are never thrown away.
+    const createdExperiences = useRef(new Set<WorkflowExperience>());
     // The experience shown on the personalise page.
     const [experience, setExperience] = useState<WorkflowExperience | undefined>(undefined);
     // Product steps add and remove experiences from the bundle, which the experience switcher needs to reflect.
@@ -152,15 +167,19 @@ const PageHandler: FunctionComponent<{}> = () => {
     // The bundle's owner, i.e. the customer whose details are already known.
     const [owner, setOwner] = useState<Customer | undefined>(undefined);
     const consumedConversionLocations = useRef(new Set<ConversionLocation>());
-    const [pendingReplace, setPendingReplace] = useState<{ resolve: (confirmed: boolean) => void } | undefined>(
-        undefined,
-    );
+    const [pendingReplace, setPendingReplace] = useState<
+        { subject: ReplaceSubject; resolve: (confirmed: boolean) => void } | undefined
+    >(undefined);
 
     useEffect(() => {
         // Whenever the bundle changes (i.e. a new bundle is loaded) we need to reset
         const bundleCollection = bundle.getProductCollection();
+        createdExperiences.current.clear();
         setErrorMessage(undefined);
         setCollection(bundleCollection);
+        setProduct(undefined);
+        setWorkflow(undefined);
+        setSelectionExperience(undefined);
         setCompletion(undefined);
         preparation.current = undefined;
 
@@ -215,14 +234,30 @@ const PageHandler: FunctionComponent<{}> = () => {
         }
     }, []);
 
-    // Changing collection discards everything in the cart, so the customer is asked first. Resolves true when there is
-    // nothing to discard, or they have chosen not to be asked again.
-    const confirmReplace = useCallback(() => {
-        if (bundle.getWorkflowExperiences().length === 0 || skipReplaceConfirmation.current) {
-            return Promise.resolve(true);
+    // A new selection replaces whatever the previous one led to (single product mode). Nothing is cleared unless the
+    // removal succeeds.
+    const removeSelectionExperience = useCallback(async () => {
+        if (!selectionExperience) return;
+        if (createdExperiences.current.has(selectionExperience)) {
+            await bundle.removeWorkflowExperience(selectionExperience);
+            createdExperiences.current.delete(selectionExperience);
         }
-        return new Promise<boolean>((resolve) => setPendingReplace({ resolve }));
-    }, [bundle]);
+        setExperience((current) => (current === selectionExperience ? undefined : current));
+        setSelectionExperience(undefined);
+    }, [bundle, selectionExperience]);
+
+    // Asks the customer to confirm before their current design (or in multi product mode, their cart) is discarded.
+    // Resolves true when there is nothing to discard, or they have chosen not to be asked again.
+    const confirmReplace = useCallback(
+        (subject: ReplaceSubject) => {
+            const hasSomethingToDiscard = singleMode
+                ? !!selectionExperience
+                : bundle.getWorkflowExperiences().length > 0;
+            if (!hasSomethingToDiscard || skipReplaceConfirmation.current) return Promise.resolve(true);
+            return new Promise<boolean>((resolve) => setPendingReplace({ subject, resolve }));
+        },
+        [bundle, selectionExperience, singleMode],
+    );
 
     const resolveReplace = (confirmed: boolean, dontAskAgain = false) => {
         if (confirmed && dontAskAgain) skipReplaceConfirmation.current = true;
@@ -240,19 +275,119 @@ const PageHandler: FunctionComponent<{}> = () => {
                     return;
                 }
 
-                if (!(await confirmReplace())) return;
+                if (!(await confirmReplace(singleMode ? "collection" : "cart"))) return;
 
-                // Assigning is safe to repeat, so if emptying the cart fails the customer can just try again.
+                // Assigning is safe to repeat, so if removing the old designs fails the customer can just try again.
                 await bundle.assignProductCollection(selected.getId());
-                const discarded = bundle.getWorkflowExperiences();
-                if (discarded.length > 0) await bundle.removeWorkflowExperiences(discarded);
-                refreshExperiences();
+                if (singleMode) {
+                    await removeSelectionExperience();
+                    setProduct(undefined);
+                    setWorkflow(undefined);
+                } else {
+                    const discarded = bundle.getWorkflowExperiences();
+                    if (discarded.length > 0) await bundle.removeWorkflowExperiences(discarded);
+                    refreshExperiences();
+                    setExperience(undefined);
+                }
                 setCollection(selected);
-                setExperience(undefined);
                 setReachedRank(pageRank("product"));
                 setPage("product");
             }, "We couldn't select that collection. Please try again."),
-        [attempt, bundle, collection, confirmReplace, refreshExperiences],
+        [attempt, bundle, collection, confirmReplace, refreshExperiences, removeSelectionExperience, singleMode],
+    );
+
+    // Single product mode: creates the new experience before the previous one is removed, so a failure never leaves
+    // the customer without one.
+    const startExperience = useCallback(
+        async (selectedProduct: CollectionProduct, selectedWorkflow: ProductWorkflow) => {
+            const [created] = await client.getWorkflowExperiences([
+                {
+                    type: "integration",
+                    workflowId: selectedWorkflow.getId(),
+                    integrationProductId: selectedProduct.getCurrentIntegration().id,
+                },
+            ]);
+            if (!created) {
+                throw new Error("No workflow experience was created.");
+            }
+            await bundle.addWorkflowExperience(created);
+            createdExperiences.current.add(created);
+
+            let leftoverWarning: string | undefined;
+            try {
+                await removeSelectionExperience();
+            } catch (error) {
+                console.error("Error removing the previous design from the bundle:", error);
+                leftoverWarning =
+                    "Your new design is ready, but the previous one could not be removed from your bundle.";
+            }
+
+            setProduct(selectedProduct);
+            setWorkflow(selectedWorkflow);
+            setSelectionExperience(created);
+            setExperience(created);
+            setReachedRank(pageRank("experience"));
+            setPage("experience");
+            if (leftoverWarning) {
+                setErrorMessage(leftoverWarning);
+            }
+        },
+        [bundle, client, removeSelectionExperience],
+    );
+
+    const handleProductSelected = useCallback(
+        (selected: CollectionProduct) =>
+            attempt(async () => {
+                const workflows = selected.getAllWorkflows();
+                if (workflows.length === 0) {
+                    throw new Error("The selected product has no designs available.");
+                }
+
+                if (product?.getId() === selected.getId()) {
+                    if (workflows.length > 1) {
+                        setReachedRank((reached) => Math.max(reached, pageRank("workflow")));
+                        setPage("workflow");
+                    } else if (selectionExperience) {
+                        setExperience(selectionExperience);
+                        setPage("experience");
+                    } else {
+                        await startExperience(selected, workflows[0]);
+                    }
+                    return;
+                }
+
+                if (!(await confirmReplace("product"))) return;
+
+                if (workflows.length === 1) {
+                    await startExperience(selected, workflows[0]);
+                    return;
+                }
+
+                await removeSelectionExperience();
+                setProduct(selected);
+                setWorkflow(undefined);
+                setReachedRank(pageRank("workflow"));
+                setPage("workflow");
+            }, "We couldn't set up that product. Please try again."),
+        [attempt, confirmReplace, product, removeSelectionExperience, selectionExperience, startExperience],
+    );
+
+    const handleWorkflowSelected = useCallback(
+        (selected: ProductWorkflow) =>
+            attempt(async () => {
+                if (!product) return;
+
+                if (selectionExperience && workflow?.getId() === selected.getId()) {
+                    setExperience(selectionExperience);
+                    setPage("experience");
+                    return;
+                }
+
+                if (!(await confirmReplace("workflow"))) return;
+
+                await startExperience(product, selected);
+            }, "We couldn't start that design. Please try again."),
+        [attempt, confirmReplace, product, selectionExperience, startExperience, workflow],
     );
 
     // Adds a design of the product to the cart. The customer stays on the product page to add more.
@@ -569,6 +704,8 @@ const PageHandler: FunctionComponent<{}> = () => {
                 return true;
             case "product":
                 return !!collection;
+            case "workflow":
+                return !!product;
             case "experience":
             case "review":
                 return !!experienceToOpen();
@@ -629,7 +766,21 @@ const PageHandler: FunctionComponent<{}> = () => {
                             onCollectionSelected={handleCollectionSelected}
                         />
                     ))}
-                {page === "product" && collection && (
+                {page === "product" && collection && singleMode && (
+                    <SingleProductSelector
+                        collection={collection}
+                        selectedProductId={product?.getId()}
+                        onProductSelected={handleProductSelected}
+                    />
+                )}
+                {page === "workflow" && product && (
+                    <WorkflowSelector
+                        product={product}
+                        selectedWorkflowId={workflow?.getId()}
+                        onWorkflowSelected={handleWorkflowSelected}
+                    />
+                )}
+                {page === "product" && collection && !singleMode && (
                     <ProductSelector
                         collection={collection}
                         experiences={cartExperiences}
@@ -645,6 +796,8 @@ const PageHandler: FunctionComponent<{}> = () => {
                             <ExperienceSwitcher
                                 experiences={switcherExperiences}
                                 active={experience}
+                                // Products added to a design are only grouped under it when building a cart.
+                                groupChildren={!singleMode}
                                 onSelect={setExperience}
                             />
                         )}
@@ -700,6 +853,7 @@ const PageHandler: FunctionComponent<{}> = () => {
             )}
             {pendingReplace && (
                 <ConfirmReplaceDialog
+                    subject={pendingReplace.subject}
                     onConfirm={(dontAskAgain) => resolveReplace(true, dontAskAgain)}
                     onCancel={() => resolveReplace(false)}
                 />
