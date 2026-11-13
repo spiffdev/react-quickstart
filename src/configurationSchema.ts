@@ -201,7 +201,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             // The two personalise pages can be shown in either order. Both always come before the review page.
             key: "personalisation",
             title: "Personalisation",
-            pageKeys: ["personalise", "shared-personalise"],
+            pageKeys: ["shared-personalise", "personalise"],
             reorderable: true,
         },
         {
