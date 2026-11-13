@@ -32,6 +32,7 @@ import Button from "../../components/button";
 import { MEDIA, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH, SIDEBAR_MIN_WIDTH_TOUCH } from "../../layout";
 import { useKeyboardViewportHeight, useLayoutMode } from "../../hooks/useLayout";
 import LoadingOverlay from "../components/LoadingOverlay";
+import GlobalPropertyOverride from "./components/GlobalPropertyOverride";
 import StepHelp from "./components/StepHelp";
 import ThreeDPreview from "./components/ThreeDPreview";
 import {
@@ -283,7 +284,8 @@ const StepHandler: FunctionComponent<{
 
     const { addToCartLabel } = useThemeConfiguration();
     const { allowCart, allowQuote } = useCheckoutOptions();
-    const renderStepComponent = () => {
+    // `shared` is true when the step's shared properties are in charge, so only what is never shared can be edited.
+    const renderStepComponent = (shared = false) => {
         // The finish step has no handle.
         if (step.type === StepType.Finish) {
             const workflow = workflowExperience.getWorkflow();
@@ -370,6 +372,8 @@ const StepHandler: FunctionComponent<{
         if (handle instanceof FrameStepHandle) {
             return (
                 <FrameUI
+                    key={String(shared)}
+                    imageShared={shared}
                     step={handle}
                     workflowManager={workflowExperience.getWorkflowManager()}
                     onActivation={onActivation}
@@ -388,15 +392,29 @@ const StepHandler: FunctionComponent<{
 
     if (hidden) return null;
 
+    // A frame's position and scale are never shared (only its image is), so there's always something to edit.
+    const hasUnsharedControls = workflowExperience.getStepById(step.stepName) instanceof FrameStepHandle;
+    const heading = !isFinishStep && (
+        <StepHeading>
+            <StepTitle variant="h3">{step.stepTitle}</StepTitle>
+            {step.helpText && <StepHelp helpText={step.helpText} />}
+        </StepHeading>
+    );
+
     return (
         <div>
-            {!isFinishStep && (
-                <StepHeading>
-                    <StepTitle variant="h3">{step.stepTitle}</StepTitle>
-                    {step.helpText && <StepHelp helpText={step.helpText} />}
-                </StepHeading>
+            {isFinishStep ? (
+                renderStepComponent()
+            ) : (
+                <GlobalPropertyOverride
+                    stepName={step.stepName}
+                    workflowExperience={workflowExperience}
+                    heading={heading}
+                    keepControls={hasUnsharedControls}
+                >
+                    {renderStepComponent}
+                </GlobalPropertyOverride>
             )}
-            {renderStepComponent()}
         </div>
     );
 };

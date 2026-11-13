@@ -215,7 +215,11 @@ const FrameUI: FunctionComponent<{
     step: FrameStepHandle;
     workflowManager: WorkflowManager;
     onActivation?: () => void;
-}> = ({ step, workflowManager, onActivation }) => {
+    /**
+     * The image is set on the shared page, so it can't be changed here. Only where the image sits in the frame can be.
+     */
+    imageShared?: boolean;
+}> = ({ step, workflowManager, onActivation, imageShared = false }) => {
     const inputRef = useRef<HTMLInputElement>(null);
     const preOptimization = useRef<{ asset: Asset; state: "original" | "removeBG" } | undefined>(undefined);
     // The latest colors, readable synchronously so several colors can be changed in one go.
@@ -846,7 +850,18 @@ const FrameUI: FunctionComponent<{
                     />
                 </>
             )}
-            {currentFrameStep !== FrameStep.SelectFrame && (
+            {currentFrameStep !== FrameStep.SelectFrame && imageShared && hasUserImage && frameService && (
+                <CropperSection>
+                    <ImageCropper
+                        frameService={frameService}
+                        overlayImageUrl={step.hasOverlayImageUrl() || undefined}
+                        showScale
+                        showRotation={false}
+                        activeColorIds={activeColorIds}
+                    />
+                </CropperSection>
+            )}
+            {currentFrameStep !== FrameStep.SelectFrame && !imageShared && (
                 <UploadZone
                     $dragging={dragging}
                     onDragOver={(event) => {
