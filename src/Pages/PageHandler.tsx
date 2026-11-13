@@ -19,6 +19,7 @@ import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
 import { createDesignPreviewImage, withScreenshotPreview } from "./Customization/previewScreenshot";
 import ReviewPage from "./Review";
+import SharedPersonalisation from "./SharedPersonalisation";
 import ThankYouPage from "./ThankYou";
 import ErrorBanner from "../components/ErrorBanner";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
@@ -27,7 +28,11 @@ import { ConversionDataType, ConversionLocation, type SpiffThemeLoader } from "@
 import { StakeholderType, type Customer } from "@spiffcommerce/core";
 import TestOrderBanner from "../components/TestOrderBanner";
 import ConfirmReplaceDialog, { type ReplaceSubject } from "../components/ConfirmReplaceDialog";
-import useThemeConfiguration, { useCheckoutOptions, usePageEnabled } from "../hooks/useThemeConfiguration";
+import useThemeConfiguration, {
+    useCheckoutOptions,
+    useGroupPageKeys,
+    usePageEnabled,
+} from "../hooks/useThemeConfiguration";
 import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
 import ConversionDialog from "../components/ConversionDialog";
 
@@ -60,7 +65,7 @@ const DetailsButton = styled.button`
     }
 `;
 
-type PageType = "collection" | "product" | "workflow" | "experience" | "review" | "thankyou";
+type PageType = "collection" | "product" | "workflow" | "experience" | "shared" | "review" | "thankyou";
 
 /** What the thank you page waits for before the customer can leave. */
 export type PreparedHandOff = {
@@ -79,12 +84,21 @@ const PRODUCT_STEP: PageStep = { page: "product", label: "Products" };
 // Only in single product mode, where a product with several workflows asks which one to start.
 const WORKFLOW_STEP: PageStep = { page: "workflow", label: "Design" };
 const EXPERIENCE_STEP: PageStep = { page: "experience", label: "Personalise" };
+// The options shared by every product, which come from the activation's Global Property Configuration.
+const SHARED_STEP: PageStep = { page: "shared", label: "Shared" };
 const REVIEW_STEP: PageStep = { page: "review", label: "Review" };
 const THANK_YOU_STEP: PageStep = { page: "thankyou", label: "Thank you" };
 
-// How far through the journey a page is, which stays the same whichever pages are left out.
-const PAGE_ORDER: PageType[] = ["collection", "product", "workflow", "experience", "review", "thankyou"];
-const pageRank = (page: PageType) => PAGE_ORDER.indexOf(page);
+// How far through the journey a page is, which stays the same whichever pages are left out. The two personalise pages
+// can be in either order.
+const pageRankIn = (page: PageType, sharedFirst: boolean) =>
+    (sharedFirst
+        ? ["collection", "product", "workflow", "shared", "experience", "review", "thankyou"]
+        : ["collection", "product", "workflow", "experience", "shared", "review", "thankyou"]
+    ).indexOf(page);
+
+// A page which isn't in the partner's order comes last.
+const orderIndex = (keys: string[], key: string) => (keys.includes(key) ? keys.indexOf(key) : Infinity);
 
 const PageHandler: FunctionComponent<{
     /** The product to personalise when it has already been chosen (single product mode only). */
@@ -97,6 +111,20 @@ const PageHandler: FunctionComponent<{
     const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
     const thankYouPageEnabled = usePageEnabled("thank-you");
+    // The shared page only exists when the partner has switched it on and there are shared properties to show.
+    const sharedPageEnabled = usePageEnabled("shared-personalise");
+    const personaliseOrder = useGroupPageKeys("personalisation");
+    // Only the activation's own configuration counts, not one inherited from a product collection.
+    const sharedPageShown = sharedPageEnabled && !!activation.globalPropertyConfiguration;
+    const sharedFirst =
+        sharedPageShown &&
+        orderIndex(personaliseOrder, "shared-personalise") < orderIndex(personaliseOrder, "personalise");
+    const pageRank = useCallback((page: PageType) => pageRankIn(page, sharedFirst), [sharedFirst]);
+    // The page where the customer starts personalising.
+    const firstPersonalisePage: PageType = sharedFirst ? "shared" : "experience";
+    // Read by the effect which starts a bundle off, which mustn't run again just because these change.
+    const startingPoint = useRef({ firstPersonalisePage, pageRank });
+    startingPoint.current = { firstPersonalisePage, pageRank };
     // In single product mode the customer works on one design at a time: they choose a product (and a workflow, if it
     // has several) and that replaces the previous choice. Otherwise they build a cart of any number of designs.
     const singleMode = !!activation.singleProductMode;
@@ -119,7 +147,9 @@ const PageHandler: FunctionComponent<{
             ...(autoSelectCollection || presetProduct ? [] : [COLLECTION_STEP]),
             ...(presetProduct ? [] : [PRODUCT_STEP]),
             ...(singleMode && !(presetProduct && presetWorkflows.length === 1) ? [WORKFLOW_STEP] : []),
+            ...(sharedFirst ? [SHARED_STEP] : []),
             EXPERIENCE_STEP,
+            ...(sharedPageShown && !sharedFirst ? [SHARED_STEP] : []),
             ...(reviewPageEnabled ? [REVIEW_STEP] : []),
             ...(thankYouPageEnabled ? [THANK_YOU_STEP] : []),
         ],
@@ -128,6 +158,8 @@ const PageHandler: FunctionComponent<{
             presetProduct,
             presetWorkflows.length,
             singleMode,
+            sharedFirst,
+            sharedPageShown,
             reviewPageEnabled,
             thankYouPageEnabled,
         ],
@@ -203,17 +235,21 @@ const PageHandler: FunctionComponent<{
         const experiences = bundle.getWorkflowExperiences();
         if (experiences.length > 0) {
             setExperience(experiences[0]);
-            setPage("experience");
-            setReachedRank(pageRank("experience"));
+            setPage(startingPoint.current.firstPersonalisePage);
+            setReachedRank(startingPoint.current.pageRank(startingPoint.current.firstPersonalisePage));
         } else {
             setExperience(undefined);
             if (presetProduct) {
                 // There is no product to choose, only (perhaps) which of its designs to start.
                 setPage("workflow");
-                setReachedRank(pageRank("workflow"));
+                setReachedRank(startingPoint.current.pageRank("workflow"));
             } else {
                 setPage(bundleCollection ? "product" : "collection");
-                setReachedRank(bundleCollection ? pageRank("product") : pageRank("collection"));
+                setReachedRank(
+                    bundleCollection
+                        ? startingPoint.current.pageRank("product")
+                        : startingPoint.current.pageRank("collection"),
+                );
             }
         }
     }, [bundle, presetProduct]);
@@ -242,7 +278,7 @@ const PageHandler: FunctionComponent<{
         return () => {
             cancelled = true;
         };
-    }, [autoSelectCollection, bundle, onlyCollectionId]);
+    }, [autoSelectCollection, bundle, onlyCollectionId, pageRank]);
 
     // Runs a change to the bundle. React state is only updated by `action` once every call it makes has succeeded,
     // so a failure leaves the page exactly as it was and the customer can simply try again.
@@ -315,7 +351,16 @@ const PageHandler: FunctionComponent<{
                 setReachedRank(pageRank("product"));
                 setPage("product");
             }, "We couldn't select that collection. Please try again."),
-        [attempt, bundle, collection, confirmReplace, refreshExperiences, removeSelectionExperience, singleMode],
+        [
+            attempt,
+            bundle,
+            collection,
+            confirmReplace,
+            pageRank,
+            refreshExperiences,
+            removeSelectionExperience,
+            singleMode,
+        ],
     );
 
     // Single product mode: creates the new experience before the previous one is removed, so a failure never leaves
@@ -348,13 +393,13 @@ const PageHandler: FunctionComponent<{
             setWorkflow(selectedWorkflow);
             setSelectionExperience(created);
             setExperience(created);
-            setReachedRank(pageRank("experience"));
-            setPage("experience");
+            setReachedRank(pageRank(firstPersonalisePage));
+            setPage(firstPersonalisePage);
             if (leftoverWarning) {
                 setErrorMessage(leftoverWarning);
             }
         },
-        [bundle, client, removeSelectionExperience],
+        [bundle, client, firstPersonalisePage, pageRank, removeSelectionExperience],
     );
 
     const handleProductSelected = useCallback(
@@ -371,7 +416,7 @@ const PageHandler: FunctionComponent<{
                         setPage("workflow");
                     } else if (selectionExperience) {
                         setExperience(selectionExperience);
-                        setPage("experience");
+                        setPage(firstPersonalisePage);
                     } else {
                         await startExperience(selected, workflows[0]);
                     }
@@ -391,7 +436,16 @@ const PageHandler: FunctionComponent<{
                 setReachedRank(pageRank("workflow"));
                 setPage("workflow");
             }, "We couldn't set up that product. Please try again."),
-        [attempt, confirmReplace, product, removeSelectionExperience, selectionExperience, startExperience],
+        [
+            attempt,
+            confirmReplace,
+            firstPersonalisePage,
+            pageRank,
+            product,
+            removeSelectionExperience,
+            selectionExperience,
+            startExperience,
+        ],
     );
 
     const handleWorkflowSelected = useCallback(
@@ -401,7 +455,7 @@ const PageHandler: FunctionComponent<{
 
                 if (selectionExperience && workflow?.getId() === selected.getId()) {
                     setExperience(selectionExperience);
-                    setPage("experience");
+                    setPage(firstPersonalisePage);
                     return;
                 }
 
@@ -409,7 +463,7 @@ const PageHandler: FunctionComponent<{
 
                 await startExperience(product, selected);
             }, "We couldn't start that design. Please try again."),
-        [attempt, confirmReplace, product, selectionExperience, startExperience, workflow],
+        [attempt, confirmReplace, firstPersonalisePage, product, selectionExperience, startExperience, workflow],
     );
 
     // Adds a design of the product to the cart. The customer stays on the product page to add more.
@@ -609,10 +663,10 @@ const PageHandler: FunctionComponent<{
         const toOpen = experienceToOpen();
         if (!toOpen) return;
         setExperience(toOpen);
-        setReachedRank((reached) => Math.max(reached, pageRank("experience")));
-        setPage("experience");
-    }, [experienceToOpen]);
-    const onExperiencePage = page === "experience" && !!experience;
+        setReachedRank((reached) => Math.max(reached, pageRank(firstPersonalisePage)));
+        setPage(firstPersonalisePage);
+    }, [experienceToOpen, firstPersonalisePage, pageRank]);
+    const onExperiencePage = (page === "experience" || page === "shared") && !!experience;
     useEffect(() => {
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
     }, [onExperiencePage, requestConversionIfRequired]);
@@ -690,15 +744,29 @@ const PageHandler: FunctionComponent<{
         return preparation.current;
     }, [completion, finishBundle]);
 
-    // Finishing the personalise page leads to the review page when there is one, and otherwise completes the design.
-    const handleFinish = useCallback(async () => {
-        if (reviewPageEnabled) {
-            setReachedRank((reached) => Math.max(reached, pageRank("review")));
-            setPage("review");
-            return;
-        }
-        await completeDesign();
-    }, [reviewPageEnabled, completeDesign]);
+    // Moves on from a personalise page to whatever follows it: the other personalise page, then the review page when
+    // there is one, and otherwise the design is completed.
+    const advanceFrom = useCallback(
+        async (from: "experience" | "shared") => {
+            const next = steps[steps.findIndex((step) => step.page === from) + 1]?.page;
+            if (next === "experience" || next === "shared" || next === "review") {
+                setReachedRank((reached) => Math.max(reached, pageRank(next)));
+                setPage(next);
+                return;
+            }
+            await completeDesign();
+        },
+        [completeDesign, pageRank, steps],
+    );
+    const handleFinish = useCallback(() => advanceFrom("experience"), [advanceFrom]);
+    const handleSharedFinish = useCallback(() => advanceFrom("shared"), [advanceFrom]);
+    // What the customer is heading to when they leave a personalise page.
+    const nextAfter = (from: "experience" | "shared") => steps[steps.findIndex((step) => step.page === from) + 1]?.page;
+    // The same, when it is another page of the design rather than the end of it.
+    const personaliseSuccessor = (from: "experience" | "shared") => {
+        const next = nextAfter(from);
+        return next === "review" || next === "shared" ? next : undefined;
+    };
 
     // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
     // This resolves with whether the quote was requested, which is false when the customer cancels.
@@ -758,6 +826,7 @@ const PageHandler: FunctionComponent<{
             case "workflow":
                 return !!product;
             case "experience":
+            case "shared":
             case "review":
                 return !!experienceToOpen();
             default:
@@ -782,7 +851,9 @@ const PageHandler: FunctionComponent<{
                 onStepSelected={(index) => {
                     setErrorMessage(undefined);
                     const target = steps[index].page;
-                    if (target === "experience" || target === "review") setExperience(experienceToOpen());
+                    if (target === "experience" || target === "shared" || target === "review") {
+                        setExperience(experienceToOpen());
+                    }
                     setPage(target);
                 }}
                 actions={
@@ -858,12 +929,31 @@ const PageHandler: FunctionComponent<{
                                 key={experience.getTransaction().id}
                                 workflowExperience={experience}
                                 onNext={handleFinish}
+                                nextPage={personaliseSuccessor("experience")}
                                 onRequestQuote={handleRequestQuote}
                                 onOpenExperience={setExperience}
                                 onUpdatingChange={handleProductsUpdating}
                             />
                         </div>
                     </div>
+                )}
+                {page === "shared" && experience && (
+                    <SharedPersonalisation
+                        key={experience.getTransaction().id}
+                        experience={experience}
+                        onNext={handleSharedFinish}
+                        nextLabel={
+                            nextAfter("shared") === "experience"
+                                ? "Continue"
+                                : nextAfter("shared") === "review"
+                                  ? "Review your design"
+                                  : allowCart
+                                    ? addToCartLabel || "Complete Design"
+                                    : undefined
+                        }
+                        allowQuote={allowQuote && !["experience", "review"].includes(nextAfter("shared") ?? "")}
+                        onRequestQuote={handleRequestQuote}
+                    />
                 )}
                 {page === "review" && switcherExperiences.length > 0 && (
                     <ReviewPage
