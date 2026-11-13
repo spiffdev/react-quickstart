@@ -1,4 +1,4 @@
-import { FunctionComponent, useState } from "react";
+import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
 import { WorkflowExperience } from "@spiffcommerce/core";
 import { Minus, Plus, Trash2 } from "lucide-react";
 import styled from "styled-components";
@@ -112,27 +112,59 @@ const QuantityInput = styled.input`
     }
 `;
 
-/** A quantity which is only applied once the customer has finished typing it. */
+// How long the buttons wait after the last press before the quantity is applied.
+const QUANTITY_DEBOUNCE_MS = 500;
+
+/**
+ * A quantity which is applied once the customer has stopped changing it: after a pause when using the buttons, and
+ * when they finish typing (blur or Enter). The value shown follows the customer's changes straight away.
+ */
 const QuantityControl: FunctionComponent<{
     name: string;
     quantity: number;
     disabled?: boolean;
     onChange: (quantity: number) => void;
 }> = ({ name, quantity, disabled, onChange }) => {
-    // What is being typed, while it differs from the quantity.
+    // What the customer has entered, until it has been applied.
     const [draft, setDraft] = useState<string | undefined>(undefined);
-    const commit = () => {
-        const parsed = Math.floor(Number(draft));
-        setDraft(undefined);
-        if (draft !== undefined && parsed >= 1 && parsed !== quantity) onChange(parsed);
+    const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+    // The latest props, for the timer and for unmounting, which would otherwise see the ones from when they were set.
+    const latest = useRef({ quantity, onChange });
+    latest.current = { quantity, onChange };
+    const pending = useRef<number | undefined>(undefined);
+
+    const flush = useCallback(() => {
+        clearTimeout(timer.current);
+        const value = pending.current;
+        pending.current = undefined;
+        if (value !== undefined && value >= 1 && value !== latest.current.quantity) latest.current.onChange(value);
+        else setDraft(undefined);
+    }, []);
+
+    // Once the change has been applied (or has failed) the quantity is the source of truth again.
+    useEffect(() => {
+        if (!disabled && pending.current === undefined) setDraft(undefined);
+    }, [disabled]);
+
+    // A change which hasn't been applied yet isn't lost if the cart goes away, e.g. by continuing straight away.
+    useEffect(() => flush, [flush]);
+
+    const shown = Math.floor(Number(draft ?? quantity));
+    const step = (delta: number) => {
+        const next = Math.max(1, shown + delta);
+        setDraft(String(next));
+        pending.current = next;
+        clearTimeout(timer.current);
+        timer.current = setTimeout(flush, QUANTITY_DEBOUNCE_MS);
     };
+
     return (
         <Stepper>
             <StepperButton
                 type="button"
                 aria-label={`Decrease quantity of ${name}`}
-                disabled={disabled || quantity <= 1}
-                onClick={() => onChange(quantity - 1)}
+                disabled={disabled || shown <= 1}
+                onClick={() => step(-1)}
             >
                 <Minus size={14} aria-hidden="true" />
             </StepperButton>
@@ -142,15 +174,20 @@ const QuantityControl: FunctionComponent<{
                 aria-label={`Quantity of ${name}`}
                 disabled={disabled}
                 value={draft ?? quantity}
-                onChange={(event) => setDraft(event.target.value)}
-                onBlur={commit}
+                onChange={(event) => {
+                    // Typing is applied when finished, not part way through a number.
+                    clearTimeout(timer.current);
+                    setDraft(event.target.value);
+                    pending.current = Math.floor(Number(event.target.value));
+                }}
+                onBlur={flush}
                 onKeyDown={(event) => event.key === "Enter" && event.currentTarget.blur()}
             />
             <StepperButton
                 type="button"
                 aria-label={`Increase quantity of ${name}`}
                 disabled={disabled}
-                onClick={() => onChange(quantity + 1)}
+                onClick={() => step(1)}
             >
                 <Plus size={14} aria-hidden="true" />
             </StepperButton>
