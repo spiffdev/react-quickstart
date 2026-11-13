@@ -138,6 +138,8 @@ const ProductUI: FunctionComponent<{
                 if (added.length !== 1 || sameProduct.length < 2) return;
                 const name = `${added[0].product?.name ?? variant.getName()} (${sameProduct.length})`;
                 try {
+                    // We only rename the new transaction just for visual clarity with our current UI.
+                    // Different themes may not display the names of the items at all, so this isn't required at all.
                     await nameTransaction(added[0].id, name);
                     added[0].designName = name;
                 } catch (err) {
