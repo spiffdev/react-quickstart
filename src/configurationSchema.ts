@@ -198,9 +198,16 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             reorderable: false,
         },
         {
+            // The two personalise pages can be shown in either order. Both always come before the review page.
+            key: "personalisation",
+            title: "Personalisation",
+            pageKeys: ["personalise", "shared-personalise"],
+            reorderable: true,
+        },
+        {
             key: "journey",
             title: "Customer Journey",
-            pageKeys: ["personalise", "review", "thank-you"],
+            pageKeys: ["review", "thank-you"],
             reorderable: false,
         },
     ],
@@ -277,6 +284,17 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                     fields: ["enableTestOrders"],
                 },
             ],
+        },
+        {
+            key: "shared-personalise",
+            title: "Shared Personalise",
+            subtitle:
+                "Options shared by every product in the design, such as one image used by all of them. Only shown when the activation has a Global Property Configuration.",
+            icon: "sliders",
+            // Whether the page is shown is set by the page's toggle, and the page is off until it is switched on.
+            toggleable: true,
+            disabled: true,
+            sections: [],
         },
         {
             key: "review",

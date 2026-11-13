@@ -1,7 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import useCurrency from "../../hooks/useCurrency";
-import useThemeConfiguration, { useCheckoutOptions, usePageEnabled } from "../../hooks/useThemeConfiguration";
+import useThemeConfiguration, { useCheckoutOptions } from "../../hooks/useThemeConfiguration";
 import { PricingProvider } from "../../hooks/usePricing";
 import { countProducts } from "./Steps/ProductUI";
 import { canDownloadPreview, downloadPreview } from "./downloadPreview";
@@ -232,6 +232,8 @@ const StepHandler: FunctionComponent<{
     onActivate: (stepName: string) => void;
     onFinished: () => void | Promise<void>;
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
+    /** The page which follows this one, when it isn't the end of the design. */
+    nextPage?: "review" | "shared";
     onOpenExperience?: (experience: WorkflowExperience) => void;
     onUpdatingChange?: (updating: boolean) => void;
     /** Reports whether the step has nothing for the customer to choose, so it is hidden. */
@@ -244,6 +246,7 @@ const StepHandler: FunctionComponent<{
     onActivate,
     onFinished,
     onRequestQuote,
+    nextPage,
     onOpenExperience,
     onUpdatingChange,
     onHiddenChange,
@@ -280,7 +283,6 @@ const StepHandler: FunctionComponent<{
 
     const { addToCartLabel } = useThemeConfiguration();
     const { allowCart, allowQuote } = useCheckoutOptions();
-    const reviewPageEnabled = usePageEnabled("review");
     const renderStepComponent = () => {
         // The finish step has no handle.
         if (step.type === StepType.Finish) {
@@ -297,7 +299,8 @@ const StepHandler: FunctionComponent<{
                     }
                     onFinished={onFinished}
                     addToCartLabel={addToCartLabel}
-                    reviewNext={reviewPageEnabled}
+                    reviewNext={!!nextPage}
+                    reviewLabel={nextPage === "shared" ? "Continue" : undefined}
                     allowCart={allowCart}
                     allowQuote={allowQuote}
                     onRequestQuote={onRequestQuote}
@@ -406,7 +409,9 @@ const Customization: FunctionComponent<{
     onOpenExperience?: (experience: WorkflowExperience) => void;
     /** Called with true while a product step is adding or removing products, and false once done. */
     onUpdatingChange?: (updating: boolean) => void;
-}> = ({ workflowExperience, onNext, onRequestQuote, onOpenExperience, onUpdatingChange }) => {
+    /** The page which follows this one, when it isn't the end of the design. */
+    nextPage?: "review" | "shared";
+}> = ({ workflowExperience, onNext, onRequestQuote, onOpenExperience, onUpdatingChange, nextPage }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
@@ -419,7 +424,6 @@ const Customization: FunctionComponent<{
     const { stacked } = useLayoutMode();
     const keyboardViewportHeight = useKeyboardViewportHeight();
     const { addToCartLabel } = useThemeConfiguration();
-    const reviewPageEnabled = usePageEnabled("review");
     const sidebarWidthPercentage = useThemeConfiguration().sidebarWidthPercentage || DEFAULT_SIDEBAR_WIDTH_PERCENTAGE;
 
     const workflow = workflowExperience.getWorkflow();
@@ -565,6 +569,7 @@ const Customization: FunctionComponent<{
                                             onActivate={handleActivation}
                                             onFinished={handleFinish}
                                             onRequestQuote={handleQuote}
+                                            nextPage={nextPage}
                                             onOpenExperience={onOpenExperience}
                                             onUpdatingChange={onUpdatingChange}
                                             onHiddenChange={handleHiddenChange}
@@ -586,7 +591,11 @@ const Customization: FunctionComponent<{
                                     )}
                                 </ActionBarTotal>
                                 <Button onClick={scrollToFinish}>
-                                    {reviewPageEnabled ? "Review" : addToCartLabel || "Add to cart"}
+                                    {nextPage === "shared"
+                                        ? "Continue"
+                                        : nextPage === "review"
+                                          ? "Review"
+                                          : addToCartLabel || "Add to cart"}
                                 </Button>
                             </ActionBar>
                         </ActionBarClip>

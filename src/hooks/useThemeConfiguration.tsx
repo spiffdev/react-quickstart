@@ -56,6 +56,12 @@ export const usePageEnabled = (pageKey: string) => {
     return !!page && !page.disabled;
 };
 
+/**
+ * The keys of the pages in a group, in the order the partner has put them.
+ */
+export const useGroupPageKeys = (groupKey: string) =>
+    usePageSettings().groups.find((group) => group.key === groupKey)?.pageKeys ?? [];
+
 export const ThemeConfigurationProvider: FunctionComponent<{
     configuration: ThemeInstallConfigurationResource | undefined;
     children: ReactNode;

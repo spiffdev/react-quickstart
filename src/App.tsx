@@ -105,7 +105,9 @@ const App: FunctionComponent<{
                 });
             }
             const collectionId = getProductCollectionForNewBundle(context);
-            return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders });
+            // Passing the activation lets the bundle pick up the activation's Global Property Configuration.
+            const activationId = (c.activation as ActivationData | undefined)?.id;
+            return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders }, activationId);
         };
 
         loadBundle()

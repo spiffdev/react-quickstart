@@ -107,6 +107,8 @@ const FinishUI: FunctionComponent<{
     addToCartLabel?: string;
     /** When true the button leads to a review of the design, where the design is completed or a quote requested. */
     reviewNext?: boolean;
+    /** The button's label when it leads to another page. */
+    reviewLabel?: string;
     allowCart?: boolean;
     allowQuote?: boolean;
     /** Resolves false when the customer backs out of the quote, so they can carry on with their design. */
@@ -121,6 +123,7 @@ const FinishUI: FunctionComponent<{
     onFinished,
     addToCartLabel,
     reviewNext = false,
+    reviewLabel = "Review your design",
     allowCart = true,
     allowQuote = false,
     onRequestQuote,
@@ -285,7 +288,7 @@ const FinishUI: FunctionComponent<{
                     onClick={handleFinish}
                 >
                     {reviewNext
-                        ? "Review your design"
+                        ? reviewLabel
                         : finishing && !quoting
                           ? "Adding to cart..."
                           : addToCartLabel || "Complete Design"}
