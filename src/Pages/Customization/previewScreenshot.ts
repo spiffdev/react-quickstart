@@ -30,15 +30,24 @@ const TEXTURES_TIMEOUT_MS = 8000;
 /**
  * Waits for the design to have been drawn onto the model. Layouts are rasterised asynchronously after the model is
  * injected, and each result only reaches the model's texture on a frame of the preview's render loop.
+ *
+ * A layout's "last completed render" can't be trusted on its own: it is kept from the last time the experience was on
+ * screen (so it is already set although the model's textures are new and blank), and a render that has no canvas to
+ * draw to yet counts as completed. So a fresh render is asked for, and it's that one which is waited for.
  */
 const waitForTextures = async (workflowExperience: WorkflowExperience) => {
+    // Only layouts which are drawn to the model have a canvas. The rest never will, so they aren't waited for.
     const bridges = Array.from(
         workflowExperience.getWorkflowManager().getLayoutPreviewService()?.getAll().values() ?? [],
-    );
+    ).filter((bridge) => bridge.getStaticContext());
     const deadline = Date.now() + TEXTURES_TIMEOUT_MS;
+    const before = new Map(bridges.map((bridge) => [bridge, bridge.getLastCompletedStaticRender() ?? 0]));
+    bridges.forEach((bridge) => bridge.requestRerender());
     while (
         bridges.some(
-            (bridge) => bridge.getLastCompletedStaticRender() === undefined || bridge.getStaticContextDirty(),
+            (bridge) =>
+                (bridge.getLastCompletedStaticRender() ?? 0) <= (before.get(bridge) ?? 0) ||
+                bridge.getStaticContextDirty(),
         ) &&
         Date.now() < deadline
     ) {
