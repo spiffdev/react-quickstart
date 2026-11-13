@@ -922,10 +922,10 @@
   dependencies:
     tslib "^2.6.2"
 
-"@spiffcommerce/core@44.19.1":
-  version "44.19.1"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.19.1.tgz#0ccc606ccddb2530b5c7af43027f12f085675e9c"
-  integrity sha512-7uB0FJGuYVEaO7dtT09BqphFBBBsEkjfhaNFWfSTh1J6Hv+3JDzH4ehJHT8LMV9KJ4787Z/ptyU1qci3aChyBw==
+"@spiffcommerce/core@44.19.2":
+  version "44.19.2"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.19.2.tgz#4a3252d0dea322df18dd29b8207c200287d32232"
+  integrity sha512-j1W1FmvJ7Wgpqf0p1BwUcobhxxbdG3eP3opLEK1Qsy+ppVcoANzFyxwcq1osPes6nIRUPvZjgZoHVt5euxf7Vg==
   dependencies:
     "@adobe/css-tools" "^4.5.0"
     "@apollo/client" "^3.11.8"

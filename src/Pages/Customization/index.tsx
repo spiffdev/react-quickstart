@@ -233,6 +233,7 @@ const StepHandler: FunctionComponent<{
     onFinished: () => void | Promise<void>;
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
     onOpenExperience?: (experience: WorkflowExperience) => void;
+    onUpdatingChange?: (updating: boolean) => void;
     /** Reports whether the step has nothing for the customer to choose, so it is hidden. */
     onHiddenChange: (stepName: string, hidden: boolean) => void;
 }> = ({
@@ -244,6 +245,7 @@ const StepHandler: FunctionComponent<{
     onFinished,
     onRequestQuote,
     onOpenExperience,
+    onUpdatingChange,
     onHiddenChange,
 }) => {
     const [hidden, setHidden] = useState(false);
@@ -334,7 +336,14 @@ const StepHandler: FunctionComponent<{
             );
         }
         if (handle instanceof ProductStepHandle) {
-            return <ProductUI step={handle} onActivation={onActivation} onOpenExperience={onOpenExperience} />;
+            return (
+                <ProductUI
+                    step={handle}
+                    onActivation={onActivation}
+                    onOpenExperience={onOpenExperience}
+                    onUpdatingChange={onUpdatingChange}
+                />
+            );
         }
         if (handle instanceof ShapeStepHandle) return <ShapeUI step={handle} onActivation={onActivation} />;
         if (handle instanceof TextStepHandle) {
@@ -397,7 +406,9 @@ const Customization: FunctionComponent<{
     onSummaryChanged?: (summary: { exportedData: ExportedStepData[]; selectionCost: number }) => void;
     /** Opens another experience in the bundle, such as a product added by a product step. */
     onOpenExperience?: (experience: WorkflowExperience) => void;
-}> = ({ workflowExperience, onNext, onRequestQuote, onSummaryChanged, onOpenExperience }) => {
+    /** Called with true while a product step is adding or removing products, and false once done. */
+    onUpdatingChange?: (updating: boolean) => void;
+}> = ({ workflowExperience, onNext, onRequestQuote, onSummaryChanged, onOpenExperience, onUpdatingChange }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
@@ -561,6 +572,7 @@ const Customization: FunctionComponent<{
                                             onFinished={handleFinish}
                                             onRequestQuote={handleQuote}
                                             onOpenExperience={onOpenExperience}
+                                            onUpdatingChange={onUpdatingChange}
                                             onHiddenChange={handleHiddenChange}
                                         />
                                     ))}

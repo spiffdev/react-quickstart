@@ -42,7 +42,7 @@ const ExperienceSwitcher: FunctionComponent<{
                     $active={!!active && experienceId(active) === experienceId(experience)}
                     onClick={() => onSelect(experience)}
                 >
-                    {experience.getProduct()?.name || `Product ${index + 1}`}
+                    {experience.getTransaction().designName || experience.getProduct()?.name || `Product ${index + 1}`}
                 </Tab>
             ))}
         </Bar>

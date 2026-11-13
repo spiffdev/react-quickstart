@@ -1,5 +1,5 @@
-import { FunctionComponent, useCallback, useEffect, useMemo, useState } from "react";
-import { ProductStepHandle, Transaction, Variant, WorkflowExperience } from "@spiffcommerce/core";
+import { FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { nameTransaction, ProductStepHandle, Transaction, Variant, WorkflowExperience } from "@spiffcommerce/core";
 import styled from "styled-components";
 import useBundle from "../../../hooks/useBundle";
 import Typography from "../../../components/typography";
@@ -13,14 +13,14 @@ const Container = styled.div`
 `;
 
 const Hint = styled(Typography)<{ $error?: boolean }>`
-    margin: 0 0 12px;
+    margin: 12px 0 0;
     font-size: 14px;
     color: ${(props) => (props.$error ? "#c0392b" : "#666")};
 `;
 
 const Added = styled.ul`
     list-style: none;
-    margin: 0 0 16px;
+    margin: 16px 0 0;
     padding: 0;
     display: flex;
     flex-direction: column;
@@ -62,7 +62,9 @@ const ProductUI: FunctionComponent<{
     onActivation?: () => void;
     /** Opens one of the bundle's other experiences, so a chosen product can be personalised. */
     onOpenExperience?: (experience: WorkflowExperience) => void;
-}> = ({ step, onActivation, onOpenExperience }) => {
+    /** Called with true while products are being added or removed (including naming them), and false once done. */
+    onUpdatingChange?: (updating: boolean) => void;
+}> = ({ step, onActivation, onOpenExperience, onUpdatingChange }) => {
     const bundle = useBundle();
     const [variants, setVariants] = useState<Variant[]>([]);
     const [loading, setLoading] = useState(true);
@@ -70,6 +72,8 @@ const ProductUI: FunctionComponent<{
     const [error, setError] = useState<string | undefined>(undefined);
     // Bumped whenever the bundle's products change, so the chosen products are read again.
     const [revision, setRevision] = useState(0);
+    // Products are only shown once they're fully set up (named), so bundle events are ignored in the meantime.
+    const updating = useRef(false);
 
     useEffect(() => {
         step.getAvailableVariants()
@@ -79,7 +83,9 @@ const ProductUI: FunctionComponent<{
     }, [step]);
 
     useEffect(() => {
-        const refresh = () => setRevision((current) => current + 1);
+        const refresh = () => {
+            if (!updating.current) setRevision((current) => current + 1);
+        };
         bundle.addEventListener("workflow-experience-added", refresh);
         bundle.addEventListener("workflow-experience-removed", refresh);
         return () => {
@@ -100,6 +106,8 @@ const ProductUI: FunctionComponent<{
             if (busy) return;
             setBusy(true);
             setError(undefined);
+            updating.current = true;
+            onUpdatingChange?.(true);
             onActivation?.();
             try {
                 await action();
@@ -108,14 +116,37 @@ const ProductUI: FunctionComponent<{
                 setError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
             } finally {
                 // Changing the quantity of an existing product doesn't raise a bundle event.
+                updating.current = false;
                 setRevision((current) => current + 1);
                 setBusy(false);
+                onUpdatingChange?.(false);
             }
         },
-        [busy, onActivation],
+        [busy, onActivation, onUpdatingChange],
     );
 
-    const handleAdd = useCallback((variant: Variant) => run(() => step.addProduct(variant)), [run, step]);
+    // Each personalisable product is its own design, so repeats of a product are numbered to tell them apart.
+    const handleAdd = useCallback(
+        (variant: Variant) =>
+            run(async () => {
+                const before = new Set(step.getChildTransactions().map((transaction) => transaction.id));
+                await step.addProduct(variant);
+                const added = step.getChildTransactions().filter((transaction) => !before.has(transaction.id));
+                const sameProduct = step
+                    .getChildTransactions()
+                    .filter((transaction) => transaction.product?.id === added[0]?.product?.id);
+                if (added.length !== 1 || sameProduct.length < 2) return;
+                const name = `${added[0].product?.name ?? variant.getName()} (${sameProduct.length})`;
+                try {
+                    await nameTransaction(added[0].id, name);
+                    added[0].designName = name;
+                } catch (err) {
+                    // The product is still added; it just keeps the shared name.
+                    console.error("Error naming product:", err);
+                }
+            }),
+        [run, step],
+    );
     const handleRemove = useCallback(
         (transaction: Transaction) => run(() => step.removeProduct(transaction.id)),
         [run, step],
@@ -148,12 +179,28 @@ const ProductUI: FunctionComponent<{
 
     return (
         <Container data-test-step-type="product">
-            {requirement && <Hint variant="p">{requirement}</Hint>}
+            {requirement && (
+                <Hint variant="p" style={{ margin: "0 0 12px" }}>
+                    {requirement}
+                </Hint>
+            )}
+            <VariantGallery
+                variants={variants}
+                disabled={busy || atMax}
+                searchEnabled={step.isSearchBarEnabled()}
+                categoriesEnabled={step.isCategoryFilterEnabled()}
+                onSelect={handleAdd}
+            />
+            {error && (
+                <Hint variant="p" $error>
+                    {error}
+                </Hint>
+            )}
             {children.length > 0 && (
                 <Added>
                     {children.map((transaction) => (
                         <AddedItem key={transaction.id}>
-                            <AddedName>{transaction.product?.name || "Product"}</AddedName>
+                            <AddedName>{transaction.designName || transaction.product?.name || "Product"}</AddedName>
                             {(transaction.quantity || 1) > 1 && <Quantity>× {transaction.quantity}</Quantity>}
                             {!!transaction.product?.workflows?.length && onOpenExperience && (
                                 <SmallButton type="button" onClick={() => handleOpen(transaction)}>
@@ -167,18 +214,6 @@ const ProductUI: FunctionComponent<{
                     ))}
                 </Added>
             )}
-            {error && (
-                <Hint variant="p" $error>
-                    {error}
-                </Hint>
-            )}
-            <VariantGallery
-                variants={variants}
-                disabled={busy || atMax}
-                searchEnabled={step.isSearchBarEnabled()}
-                categoriesEnabled={step.isCategoryFilterEnabled()}
-                onSelect={handleAdd}
-            />
         </Container>
     );
 };

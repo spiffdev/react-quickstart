@@ -109,16 +109,24 @@ const PageHandler: FunctionComponent<{}> = () => {
     // The experience created by the current product and workflow selection, if any.
     const [selectionExperience, setSelectionExperience] = useState<WorkflowExperience | undefined>(undefined);
     // Product steps add and remove experiences from the bundle, which the experience switcher needs to reflect.
-    const [, setBundleRevision] = useState(0);
+    // While a product step is updating, new experiences are held back so a product only appears once it's fully set up.
+    const [bundleRevision, setBundleRevision] = useState(0);
+    const holdingExperiences = useRef(false);
+    const refreshExperiences = useCallback(() => {
+        if (!holdingExperiences.current) setBundleRevision((current) => current + 1);
+    }, []);
+    const handleProductsUpdating = useCallback((updating: boolean) => {
+        holdingExperiences.current = updating;
+        if (!updating) setBundleRevision((current) => current + 1);
+    }, []);
     useEffect(() => {
-        const refresh = () => setBundleRevision((current) => current + 1);
-        bundle.addEventListener("workflow-experience-added", refresh);
-        bundle.addEventListener("workflow-experience-removed", refresh);
+        bundle.addEventListener("workflow-experience-added", refreshExperiences);
+        bundle.addEventListener("workflow-experience-removed", refreshExperiences);
         return () => {
-            bundle.removeEventListener("workflow-experience-added", refresh);
-            bundle.removeEventListener("workflow-experience-removed", refresh);
+            bundle.removeEventListener("workflow-experience-added", refreshExperiences);
+            bundle.removeEventListener("workflow-experience-removed", refreshExperiences);
         };
-    }, [bundle]);
+    }, [bundle, refreshExperiences]);
     // The furthest page the customer can return to using the stepper.
     const [reachedIndex, setReachedIndex] = useState(0);
     // The details of the design on the personalise page, for the review page. Tagged with the experience they're for.
@@ -440,6 +448,9 @@ const PageHandler: FunctionComponent<{}> = () => {
     };
 
     // Reaching the personalise page for the first time is the start of the customer's design.
+    // Read again when the bundle changes (not on every render), so held-back experiences stay hidden meanwhile.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const switcherExperiences = useMemo(() => bundle.getWorkflowExperiences(), [bundle, bundleRevision, experience]);
     const onExperiencePage = page === "experience" && !!experience;
     useEffect(() => {
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
@@ -662,9 +673,9 @@ const PageHandler: FunctionComponent<{}> = () => {
                 )}
                 {page === "experience" && experience && (
                     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-                        {bundle.getWorkflowExperienceCount() > 1 && (
+                        {switcherExperiences.length > 1 && (
                             <ExperienceSwitcher
-                                experiences={bundle.getWorkflowExperiences()}
+                                experiences={switcherExperiences}
                                 active={experience}
                                 onSelect={setExperience}
                             />
@@ -677,6 +688,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                                 onRequestQuote={handleRequestQuote}
                                 onSummaryChanged={handleSummaryChanged}
                                 onOpenExperience={setExperience}
+                                onUpdatingChange={handleProductsUpdating}
                             />
                         </div>
                     </div>
