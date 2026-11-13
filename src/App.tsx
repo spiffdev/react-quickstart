@@ -105,7 +105,12 @@ const App: FunctionComponent<{
                 });
             }
             const collectionId = getProductCollectionForNewBundle(context);
-            return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders });
+            return client.getNewBundle(
+                collectionId || undefined,
+                undefined,
+                { test: enableTestOrders },
+                context.activation?.id,
+            );
         };
 
         loadBundle()
