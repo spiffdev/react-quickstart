@@ -5,7 +5,6 @@ import useBundle from "../hooks/useBundle";
 import ProductCollectionSelector from "./ProductCollectionSelector";
 import {
     CollectionProduct,
-    ExportedStepData,
     getProductCollections,
     ProductCollection,
     ProductWorkflow,
@@ -136,10 +135,6 @@ const PageHandler: FunctionComponent<{}> = () => {
     }, [bundle, refreshExperiences]);
     // The furthest page the customer can return to using the stepper, as a rank from `pageRank`.
     const [reachedRank, setReachedRank] = useState(0);
-    // The details of the design on the personalise page, for the review page. Tagged with the experience they're for.
-    const [summary, setSummary] = useState<
-        { experienceId: string; exportedData: ExportedStepData[]; selectionCost: number } | undefined
-    >(undefined);
     // Set once the design has been handed off, after which the earlier pages can't be returned to.
     const [completion, setCompletion] = useState<{ kind: "design" } | { kind: "quote"; quoteId: string } | undefined>(
         undefined,
@@ -166,7 +161,6 @@ const PageHandler: FunctionComponent<{}> = () => {
         const bundleCollection = bundle.getProductCollection();
         setErrorMessage(undefined);
         setCollection(bundleCollection);
-        setSummary(undefined);
         setCompletion(undefined);
         preparation.current = undefined;
 
@@ -520,12 +514,6 @@ const PageHandler: FunctionComponent<{}> = () => {
         await completeDesign();
     }, [reviewPageEnabled, completeDesign]);
 
-    const handleSummaryChanged = useCallback(
-        (changed: { exportedData: ExportedStepData[]; selectionCost: number }) =>
-            experience && setSummary({ experienceId: experience.getTransaction().id, ...changed }),
-        [experience],
-    );
-
     // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
     // This resolves with whether the quote was requested, which is false when the customer cancels.
     const handleRequestQuote = useCallback(
@@ -666,22 +654,15 @@ const PageHandler: FunctionComponent<{}> = () => {
                                 workflowExperience={experience}
                                 onNext={handleFinish}
                                 onRequestQuote={handleRequestQuote}
-                                onSummaryChanged={handleSummaryChanged}
                                 onOpenExperience={setExperience}
                                 onUpdatingChange={handleProductsUpdating}
                             />
                         </div>
                     </div>
                 )}
-                {page === "review" && experience && (
+                {page === "review" && switcherExperiences.length > 0 && (
                     <ReviewPage
-                        workflowExperience={experience}
-                        exportedData={
-                            summary?.experienceId === experience.getTransaction().id ? summary.exportedData : undefined
-                        }
-                        selectionCost={
-                            summary?.experienceId === experience.getTransaction().id ? summary.selectionCost : 0
-                        }
+                        experiences={switcherExperiences}
                         onConfirm={completeDesign}
                         confirmLabel={addToCartLabel}
                         allowCart={allowCart}

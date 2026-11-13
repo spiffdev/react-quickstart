@@ -402,13 +402,11 @@ const Customization: FunctionComponent<{
     workflowExperience: WorkflowExperience;
     onNext: () => void | Promise<void>;
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
-    /** Called whenever the details of the design change. */
-    onSummaryChanged?: (summary: { exportedData: ExportedStepData[]; selectionCost: number }) => void;
     /** Opens another experience in the bundle, such as a product added by a product step. */
     onOpenExperience?: (experience: WorkflowExperience) => void;
     /** Called with true while a product step is adding or removing products, and false once done. */
     onUpdatingChange?: (updating: boolean) => void;
-}> = ({ workflowExperience, onNext, onRequestQuote, onSummaryChanged, onOpenExperience, onUpdatingChange }) => {
+}> = ({ workflowExperience, onNext, onRequestQuote, onOpenExperience, onUpdatingChange }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
@@ -490,10 +488,6 @@ const Customization: FunctionComponent<{
             }
         }
     }, [mandatorySteps, traversableScenes, workflowExperience]);
-
-    useEffect(() => {
-        onSummaryChanged?.({ exportedData, selectionCost });
-    }, [exportedData, selectionCost, onSummaryChanged]);
 
     const handleFinish = useCallback(async () => {
         await handleFinishChecks();
