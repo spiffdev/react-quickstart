@@ -3,6 +3,7 @@ import styled from "styled-components";
 import useCurrency from "../../hooks/useCurrency";
 import useThemeConfiguration, { useCheckoutOptions, usePageEnabled } from "../../hooks/useThemeConfiguration";
 import { PricingProvider } from "../../hooks/usePricing";
+import { countProducts } from "./Steps/ProductUI";
 import { canDownloadPreview, downloadPreview } from "./downloadPreview";
 import {
     AnyStepData,
@@ -16,6 +17,7 @@ import {
     ModelStepHandle,
     ModuleStepHandle,
     PictureStepHandle,
+    ProductStepHandle,
     QuestionStepHandle,
     ShapeStepHandle,
     Step,
@@ -45,6 +47,7 @@ import {
     DigitalContentUI,
     FrameUI,
     FinishUI,
+    ProductUI,
 } from "./Steps";
 
 // Only these step types can be marked as mandatory, matching Beeline.
@@ -229,7 +232,50 @@ const StepHandler: FunctionComponent<{
     onActivate: (stepName: string) => void;
     onFinished: () => void | Promise<void>;
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
-}> = ({ step, workflowExperience, selectionCost, exportedData, onActivate, onFinished, onRequestQuote }) => {
+    onOpenExperience?: (experience: WorkflowExperience) => void;
+    /** Reports whether the step has nothing for the customer to choose, so it is hidden. */
+    onHiddenChange: (stepName: string, hidden: boolean) => void;
+}> = ({
+    step,
+    workflowExperience,
+    selectionCost,
+    exportedData,
+    onActivate,
+    onFinished,
+    onRequestQuote,
+    onOpenExperience,
+    onHiddenChange,
+}) => {
+    const [hidden, setHidden] = useState(false);
+    // A step offering a single variant, which is already selected, gives the customer nothing to choose.
+    // Only steps that are nothing but a choice of variant qualify (a text step still needs its text box).
+    useEffect(() => {
+        const handle = workflowExperience.getStepById(step.stepName);
+        if (!(
+            handle instanceof MaterialStepHandle ||
+            handle instanceof ModelStepHandle ||
+            handle instanceof PictureStepHandle ||
+            handle instanceof QuestionStepHandle
+        )) {
+            return;
+        }
+        let cancelled = false;
+        handle
+            .getAllVariants()
+            .then((variants) => {
+                if (cancelled) return;
+                const only = variants.length === 1 ? variants[0] : undefined;
+                setHidden(!!only && handle.getCurrentVariant()?.getId() === only.getId());
+            })
+            .catch((error) => console.error("Error checking step variants:", error));
+        return () => {
+            cancelled = true;
+        };
+    }, [step.stepName, workflowExperience]);
+    useEffect(() => {
+        onHiddenChange(step.stepName, hidden);
+    }, [hidden, onHiddenChange, step.stepName]);
+
     const { addToCartLabel } = useThemeConfiguration();
     const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
@@ -287,6 +333,9 @@ const StepHandler: FunctionComponent<{
                 />
             );
         }
+        if (handle instanceof ProductStepHandle) {
+            return <ProductUI step={handle} onActivation={onActivation} onOpenExperience={onOpenExperience} />;
+        }
         if (handle instanceof ShapeStepHandle) return <ShapeUI step={handle} onActivation={onActivation} />;
         if (handle instanceof TextStepHandle) {
             return (
@@ -325,6 +374,8 @@ const StepHandler: FunctionComponent<{
 
     const isFinishStep = step.type === StepType.Finish;
 
+    if (hidden) return null;
+
     return (
         <div>
             {!isFinishStep && (
@@ -344,11 +395,14 @@ const Customization: FunctionComponent<{
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
     /** Called whenever the details of the design change. */
     onSummaryChanged?: (summary: { exportedData: ExportedStepData[]; selectionCost: number }) => void;
-}> = ({ workflowExperience, onNext, onRequestQuote, onSummaryChanged }) => {
+    /** Opens another experience in the bundle, such as a product added by a product step. */
+    onOpenExperience?: (experience: WorkflowExperience) => void;
+}> = ({ workflowExperience, onNext, onRequestQuote, onSummaryChanged, onOpenExperience }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
     const [mandatorySteps, setMandatorySteps] = useState<MandatorySteps>({});
+    const [hiddenSteps, setHiddenSteps] = useState<ReadonlySet<string>>(new Set());
     const activeStepName = useRef<string | undefined>(undefined);
     const formatPrice = useCurrency();
     const [finishInView, setFinishInView] = useState(false);
@@ -378,6 +432,16 @@ const Customization: FunctionComponent<{
         });
     }, [workflowExperience]);
 
+    const handleHiddenChange = useCallback((stepName: string, hidden: boolean) => {
+        setHiddenSteps((current) => {
+            if (current.has(stepName) === hidden) return current;
+            const next = new Set(current);
+            if (hidden) next.add(stepName);
+            else next.delete(stepName);
+            return next;
+        });
+    }, []);
+
     // When the customer first interacts with a different step, play that step's camera and model animations.
     const handleActivation = useCallback(
         (stepName: string) => {
@@ -401,6 +465,12 @@ const Customization: FunctionComponent<{
                 if (step.mandatory && STEP_TYPES_WITH_MANDATORY_SUPPORT.includes(step.type)) {
                     if (!mandatorySteps[step.stepName]) {
                         throw new Error(`"${step.stepTitle}" is required before you can continue.`);
+                    }
+                }
+                if (step.type === StepType.Product) {
+                    const handle = workflowExperience.getStepById(step.stepName);
+                    if (handle instanceof ProductStepHandle && countProducts(handle) < handle.getMin()) {
+                        throw new Error(`"${step.stepTitle}" needs at least ${handle.getMin()} to be chosen.`);
                     }
                 }
                 if (validationErrors.steps.has(step.stepName)) {
@@ -467,8 +537,18 @@ const Customization: FunctionComponent<{
                         )}
                         {traversableScenes.map((scene) => {
                             const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
+                            // A scene whose steps are all hidden has nothing to show, title included.
+                            const emptyScene =
+                                !isFinishScene &&
+                                scene.renderableSteps.every(
+                                    (step) => step.type !== StepType.Introduction && hiddenSteps.has(step.stepName),
+                                );
                             return (
-                                <Card key={scene.name} data-finish-scene={isFinishScene ? "" : undefined}>
+                                <Card
+                                    key={scene.name}
+                                    data-finish-scene={isFinishScene ? "" : undefined}
+                                    style={emptyScene ? { display: "none" } : undefined}
+                                >
                                     {!isFinishScene && <SceneTitle variant="h2">{scene.title}</SceneTitle>}
                                     {scene.renderableSteps.map((step) => (
                                         <StepHandler
@@ -480,6 +560,8 @@ const Customization: FunctionComponent<{
                                             onActivate={handleActivation}
                                             onFinished={handleFinish}
                                             onRequestQuote={handleQuote}
+                                            onOpenExperience={onOpenExperience}
+                                            onHiddenChange={handleHiddenChange}
                                         />
                                     ))}
                                 </Card>

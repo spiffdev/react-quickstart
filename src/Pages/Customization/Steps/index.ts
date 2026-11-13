@@ -10,3 +10,4 @@ export { default as TextUI } from "./TextUI";
 export { default as DigitalContentUI } from "./DigitalContentUI";
 export { default as FrameUI } from "./FrameUI";
 export { default as FinishUI } from "./FinishUI";
+export { default as ProductUI } from "./ProductUI";

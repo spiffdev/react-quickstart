@@ -2,6 +2,13 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-13 — Product steps, and hiding single-variant steps
+
+- New **product step** (`Steps/ProductUI.tsx`): a gallery of the step's products (with the step's search and category settings). Choosing one adds a child transaction to the bundle (or raises the quantity of a non-personalisable product). Added products are listed above the gallery with a Remove button and, for personalisable products, a Personalise button that opens that product's experience (use the experience switcher to come back). The step's maximum disables the gallery once reached, and the minimum is checked when finishing or requesting a quote.
+- `PageHandler.tsx` now listens for experiences being added to or removed from the bundle, so the experience switcher stays current. `Customization` has a new `onOpenExperience` prop.
+- Not handled yet: the step's pricing mode and locked add-ons (`getLockedAddOns()`). Child product prices aren't included in the total shown.
+- Steps that are only a choice of variant (material, model, picture, question) are hidden when they have a single variant and it is already selected, as in Beeline. A scene whose steps are all hidden is hidden too. Text, shape, illustration and frame steps are never hidden, as they have more to them than the variant choice. To change this, edit the check in `StepHandler` in `Customization/index.tsx`.
+
 ## 2026-11-11 — Responsive layout for phones and tablets
 
 - New `src/layout.ts`: the single source of truth for responsive layout. Orientation decides the layout mode (**stacked**: preview above the steps, in portrait or under 700px wide; **split**: preview beside the steps, in landscape from 700px) and width decides the size tier (compact under 600, medium 600–1023, expanded from 1024). A **short** modifier (height 500px or less) covers phones in landscape. Exports `MEDIA` (the media query strings) and the sidebar width bounds.

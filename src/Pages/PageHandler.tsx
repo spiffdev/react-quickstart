@@ -108,6 +108,17 @@ const PageHandler: FunctionComponent<{}> = () => {
     const [experience, setExperience] = useState<WorkflowExperience | undefined>(undefined);
     // The experience created by the current product and workflow selection, if any.
     const [selectionExperience, setSelectionExperience] = useState<WorkflowExperience | undefined>(undefined);
+    // Product steps add and remove experiences from the bundle, which the experience switcher needs to reflect.
+    const [, setBundleRevision] = useState(0);
+    useEffect(() => {
+        const refresh = () => setBundleRevision((current) => current + 1);
+        bundle.addEventListener("workflow-experience-added", refresh);
+        bundle.addEventListener("workflow-experience-removed", refresh);
+        return () => {
+            bundle.removeEventListener("workflow-experience-added", refresh);
+            bundle.removeEventListener("workflow-experience-removed", refresh);
+        };
+    }, [bundle]);
     // The furthest page the customer can return to using the stepper.
     const [reachedIndex, setReachedIndex] = useState(0);
     // The details of the design on the personalise page, for the review page. Tagged with the experience they're for.
@@ -665,6 +676,7 @@ const PageHandler: FunctionComponent<{}> = () => {
                                 onNext={handleFinish}
                                 onRequestQuote={handleRequestQuote}
                                 onSummaryChanged={handleSummaryChanged}
+                                onOpenExperience={setExperience}
                             />
                         </div>
                     </div>
