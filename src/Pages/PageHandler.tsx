@@ -86,7 +86,10 @@ const THANK_YOU_STEP: PageStep = { page: "thankyou", label: "Thank you" };
 const PAGE_ORDER: PageType[] = ["collection", "product", "workflow", "experience", "review", "thankyou"];
 const pageRank = (page: PageType) => PAGE_ORDER.indexOf(page);
 
-const PageHandler: FunctionComponent<{}> = () => {
+const PageHandler: FunctionComponent<{
+    /** The product to personalise when it has already been chosen (single product mode only). */
+    collectionProduct?: CollectionProduct;
+}> = ({ collectionProduct }) => {
     const client = useClient();
     const bundle = useBundle();
     const activation = useActivation();
@@ -97,6 +100,11 @@ const PageHandler: FunctionComponent<{}> = () => {
     // In single product mode the customer works on one design at a time: they choose a product (and a workflow, if it
     // has several) and that replaces the previous choice. Otherwise they build a cart of any number of designs.
     const singleMode = !!activation.singleProductMode;
+    // A product which has already been chosen skips the product page, and the design page too if it has one workflow.
+    const presetProduct = singleMode ? collectionProduct : undefined;
+    const presetWorkflows = useMemo(() => presetProduct?.getAllWorkflows() ?? [], [presetProduct]);
+    // If starting the preset product's only design fails, the design page is shown so the customer can try again.
+    const [presetStartFailed, setPresetStartFailed] = useState(false);
     // With a single collection there's nothing to choose, so it's selected for the customer. If that fails the customer
     // is shown the collection page instead, so they can try again.
     const [autoSelectFailed, setAutoSelectFailed] = useState(false);
@@ -108,14 +116,21 @@ const PageHandler: FunctionComponent<{}> = () => {
     // The thank you page doesn't depend on the review page, so each is added independently.
     const steps = useMemo(
         () => [
-            ...(autoSelectCollection ? [] : [COLLECTION_STEP]),
-            PRODUCT_STEP,
-            ...(singleMode ? [WORKFLOW_STEP] : []),
+            ...(autoSelectCollection || presetProduct ? [] : [COLLECTION_STEP]),
+            ...(presetProduct ? [] : [PRODUCT_STEP]),
+            ...(singleMode && !(presetProduct && presetWorkflows.length === 1) ? [WORKFLOW_STEP] : []),
             EXPERIENCE_STEP,
             ...(reviewPageEnabled ? [REVIEW_STEP] : []),
             ...(thankYouPageEnabled ? [THANK_YOU_STEP] : []),
         ],
-        [autoSelectCollection, singleMode, reviewPageEnabled, thankYouPageEnabled],
+        [
+            autoSelectCollection,
+            presetProduct,
+            presetWorkflows.length,
+            singleMode,
+            reviewPageEnabled,
+            thankYouPageEnabled,
+        ],
     );
     const stepIndex = useCallback((target: PageType) => steps.findIndex((step) => step.page === target), [steps]);
     const [page, setPage] = useState<PageType>("collection");
@@ -177,9 +192,10 @@ const PageHandler: FunctionComponent<{}> = () => {
         createdExperiences.current.clear();
         setErrorMessage(undefined);
         setCollection(bundleCollection);
-        setProduct(undefined);
+        setProduct(presetProduct);
         setWorkflow(undefined);
         setSelectionExperience(undefined);
+        setPresetStartFailed(false);
         setCompletion(undefined);
         preparation.current = undefined;
 
@@ -191,10 +207,16 @@ const PageHandler: FunctionComponent<{}> = () => {
             setReachedRank(pageRank("experience"));
         } else {
             setExperience(undefined);
-            setPage(bundleCollection ? "product" : "collection");
-            setReachedRank(bundleCollection ? pageRank("product") : pageRank("collection"));
+            if (presetProduct) {
+                // There is no product to choose, only (perhaps) which of its designs to start.
+                setPage("workflow");
+                setReachedRank(pageRank("workflow"));
+            } else {
+                setPage(bundleCollection ? "product" : "collection");
+                setReachedRank(bundleCollection ? pageRank("product") : pageRank("collection"));
+            }
         }
-    }, [bundle]);
+    }, [bundle, presetProduct]);
 
     // Selects the only collection on the customer's behalf.
     useEffect(() => {
@@ -422,6 +444,35 @@ const PageHandler: FunctionComponent<{}> = () => {
             }, "We couldn't remove that product. Please try again."),
         [attempt, bundle, refreshExperiences],
     );
+
+    // A preset product with a single design has nothing left to choose, so its design is started straight away.
+    const startingPreset =
+        !!presetProduct &&
+        presetWorkflows.length === 1 &&
+        !presetStartFailed &&
+        !selectionExperience &&
+        page === "workflow" &&
+        !experience;
+    const presetStarted = useRef<typeof bundle | undefined>(undefined);
+    useEffect(() => {
+        // Once only per bundle (effects can run twice in development), unless starting it failed.
+        if (!startingPreset || !presetProduct || presetStarted.current === bundle) return;
+        presetStarted.current = bundle;
+        let started = true;
+        void attempt(async () => {
+            try {
+                await startExperience(presetProduct, presetWorkflows[0]);
+            } catch (error) {
+                started = false;
+                throw error;
+            }
+        }, "We couldn't start your design. Please try again.").then(() => {
+            if (!started) {
+                presetStarted.current = undefined;
+                setPresetStartFailed(true);
+            }
+        });
+    }, [attempt, bundle, presetProduct, presetWorkflows, startExperience, startingPreset]);
 
     const refreshOwner = useCallback(async () => {
         const stakeholders = await bundle.getAllStakeholders();
@@ -773,7 +824,8 @@ const PageHandler: FunctionComponent<{}> = () => {
                         onProductSelected={handleProductSelected}
                     />
                 )}
-                {page === "workflow" && product && (
+                {page === "workflow" && startingPreset && <LoadingOverlay />}
+                {page === "workflow" && product && !startingPreset && (
                     <WorkflowSelector
                         product={product}
                         selectedWorkflowId={workflow?.getId()}

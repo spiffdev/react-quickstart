@@ -14,8 +14,11 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import {
     ActivationData,
+    CollectionProduct,
     getActivation,
     getIntegration,
+    getIntegrationProducts,
+    setApplicationKey,
     getOverrideThemeConfiguration,
     spiffCoreConfiguration,
 } from "@spiffcommerce/core";
@@ -85,13 +88,41 @@ const loadDevConfiguration = async (themeBridge: any) => {
             bundleId,
         };
     } else if (activationId) {
-        activation = await getActivation(activationId);
+        // The server decides which of a product's integrations is the current one from the application key, so it has to
+        // be known before anything is fetched. The client does this later, which is too late for the activation.
+        if (baseOptions.applicationKey) setApplicationKey(baseOptions.applicationKey);
+        // In production the integration product comes from the e-commerce product page that launched the theme. For
+        // local development it can be supplied here. It's needed up front, as the activation only includes the
+        // products asked for.
+        const integrationProductId = import.meta.env.VITE_INTEGRATION_PRODUCT_ID;
+        let productId: string | undefined;
+        if (integrationProductId) {
+            productId = (await getIntegrationProducts([integrationProductId]))[0]?.product?.id;
+            if (!productId) {
+                throw new Error(`Failed to find integration product ${integrationProductId}`);
+            }
+        }
+        activation = await getActivation(activationId, productId ? [productId] : undefined);
         if (!activation) {
             throw new Error(`Failed to find activation ${activationId}`);
         }
         if (activation.singleProductMode) {
+            // As the editor does: the integration product preselects its product from the activation's collections.
+            const activationCollections = activation.activationProductCollections ?? [];
+            const findProduct = (apc: (typeof activationCollections)[number]) =>
+                [apc.productCollection.productCollectionProducts]
+                    .flat()
+                    .find((p) => !!productId && p?.productId === productId);
+            const matchedCollection = productId ? activationCollections.find((apc) => !!findProduct(apc)) : undefined;
+            const matchedProduct = matchedCollection ? findProduct(matchedCollection) : undefined;
+            if (integrationProductId && !matchedProduct) {
+                throw new Error(
+                    `Integration product ${integrationProductId} is not in a collection of Activation "${activation.name}" (${activation.id}).`,
+                );
+            }
+
             const productCollectionId =
-                activation.activationProductCollections?.[0]?.productCollection.id ||
+                (matchedCollection ?? activationCollections[0])?.productCollection.id ||
                 import.meta.env.VITE_PRODUCT_COLLECTION_ID;
 
             if (!productCollectionId) {
@@ -104,6 +135,7 @@ const loadDevConfiguration = async (themeBridge: any) => {
                 type: "new",
                 productCollectionId,
                 singleProductMode: activation.singleProductMode,
+                ...(matchedProduct && { collectionProduct: new CollectionProduct(matchedProduct) }),
             } as ThemeContextBundleOptionsNew;
         } else {
             bundleOptions = {

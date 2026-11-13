@@ -122,6 +122,13 @@ const App: FunctionComponent<{
         };
     }, [client, context, enableTestOrders, loadAttempt]);
 
+    // In single product mode the product may already be chosen, such as by the e-commerce product page.
+    const bundleOptions = (context as ThemeContextBundle).bundleOptions;
+    const presetProduct =
+        context.type === "bundle" && bundleOptions.type === "new" && bundleOptions.singleProductMode
+            ? bundleOptions.collectionProduct
+            : undefined;
+
     let content: ReactNode;
     if (loadFailed) {
         content = (
@@ -138,7 +145,7 @@ const App: FunctionComponent<{
                 <ActivationProvider activation={context.activation}>
                     <BundleProvider bundle={bundle}>
                         <CurrencyProvider currencyContext={currencyContext}>
-                            <PageHandler />
+                            <PageHandler collectionProduct={presetProduct} />
                         </CurrencyProvider>
                     </BundleProvider>
                 </ActivationProvider>
