@@ -9,6 +9,7 @@ Every notable change to this theme, newest first.
 - The **product page has a cart on the side** (below the products on narrow screens). A product's Select button adds a design to the bundle; when the product has more than one workflow the button opens a dropdown of workflow names (`components/DropdownButton.tsx`). Products can be added repeatedly, and each cart line can be removed. Continue opens the personalise page, where the existing experience switcher moves between the designs.
 - Each cart line has a **quantity control** (− / typed value / +, minimum 1, applied on blur or Enter via `setQuantity`). Line prices and the total are multiplied by quantity.
 - Cart prices follow each workflow's `showPricing` flag, and the total is only shown when every line's price is. Products added by a product step are not listed in the cart.
+- The experience switcher lists top-level designs only; products added by a product step appear as smaller chips in a row beneath, and only while their parent or one of its siblings is selected. The parent's tab gets a thicker outline while one of its children is selected.
 - Changing collection with a non-empty cart asks for confirmation, then removes every design in the bundle.
 - Not handled yet: workflow prices in the dropdown (core's `ProductWorkflow` has no price or `showPricing` before an experience exists), per-product minimum order quantities, a combined review of all designs, and a polished multi-experience customisation page.
 
