@@ -57,17 +57,17 @@ const ThankYouPage: FunctionComponent<{
     const [attempt, setAttempt] = useState(0);
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         setState("preparing");
         onPrepare()
             .then((prepared) => {
-                if (cancelled) return;
+                if (canceled) return;
                 setHandOff(prepared);
                 setState("ready");
             })
-            .catch(() => !cancelled && setState("failed"));
+            .catch(() => !canceled && setState("failed"));
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [onPrepare, attempt]);
 

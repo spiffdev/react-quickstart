@@ -130,16 +130,16 @@ const OptionProperty: FunctionComponent<{ handle: OptionGlobalPropertyHandle }> 
     );
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         handle
             .getAvailableVariants()
-            .then((available) => !cancelled && setVariants(available))
+            .then((available) => !canceled && setVariants(available))
             .catch((error) => {
                 console.error("Error loading shared options:", error);
-                if (!cancelled) setVariants([]);
+                if (!canceled) setVariants([]);
             });
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [handle]);
 
@@ -202,13 +202,13 @@ const FileUploadProperty: FunctionComponent<{ handle: FileUploadGlobalPropertyHa
     const extensions = DEFAULT_EXTENSIONS;
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         handle
             .getImage()
-            .then((asset) => !cancelled && setImage(asset))
+            .then((asset) => !canceled && setImage(asset))
             .catch((loadError) => console.error("Error loading the shared image:", loadError));
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [handle, hasImage]);
 

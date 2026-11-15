@@ -294,26 +294,26 @@ const ReviewItem: FunctionComponent<{
     const [previewFailed, setPreviewFailed] = useState(false);
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         setPreviewUrl(undefined);
         setPreviewFailed(false);
         enqueuePreview(async () => {
             // The customer may have left by the time it's this item's turn.
-            if (cancelled) return undefined;
+            if (canceled) return undefined;
             return withScreenshotPreview(experience, () => createDesignPreviewImage(experience, PREVIEW_RESOLUTION));
         })
             .then((url) => {
-                if (cancelled) return;
+                if (canceled) return;
                 // An empty image counts as a failure, so the skeleton doesn't stay up for good.
                 if (url) setPreviewUrl(url);
                 else setPreviewFailed(true);
             })
             .catch((e) => {
                 console.error("Error creating the review preview:", e);
-                if (!cancelled) setPreviewFailed(true);
+                if (!canceled) setPreviewFailed(true);
             });
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [experience]);
 
@@ -407,7 +407,7 @@ const ReviewPage: FunctionComponent<{
     }, [experiences]);
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         setDetails(undefined);
         Promise.all(
             experiences.map(async (experience): Promise<[string, ItemDetailsData]> => {
@@ -418,9 +418,9 @@ const ReviewPage: FunctionComponent<{
                     return [experienceId(experience), []];
                 }
             }),
-        ).then((entries) => !cancelled && setDetails(new Map(entries)));
+        ).then((entries) => !canceled && setDetails(new Map(entries)));
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [experiences]);
 

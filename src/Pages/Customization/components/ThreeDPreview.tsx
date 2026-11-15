@@ -57,7 +57,7 @@ const ThreeDPreview: FunctionComponent<{
 
         const service = getPreviewService();
         const manager = workflowExperience.getWorkflowManager();
-        let cancelled = false;
+        let canceled = false;
 
         const load = async () => {
             service.updatePreviewOptions({
@@ -71,7 +71,7 @@ const ThreeDPreview: FunctionComponent<{
             ]);
             // Sync the render buffer to the canvas' final box before revealing the scene.
             service.fireResizeEvent();
-            if (!cancelled) {
+            if (!canceled) {
                 setReady(true);
             }
         };
@@ -81,7 +81,7 @@ const ThreeDPreview: FunctionComponent<{
         }, LOAD_DEBOUNCE_MS);
 
         return () => {
-            cancelled = true;
+            canceled = true;
             window.clearTimeout(timer);
             service.unregisterView(canvas);
             manager.ejectFromPreviewService();

@@ -265,17 +265,17 @@ const StepHandler: FunctionComponent<{
         )) {
             return;
         }
-        let cancelled = false;
+        let canceled = false;
         handle
             .getAllVariants()
             .then((variants) => {
-                if (cancelled) return;
+                if (canceled) return;
                 const only = variants.length === 1 ? variants[0] : undefined;
                 setHidden(!!only && handle.getCurrentVariant()?.getId() === only.getId());
             })
             .catch((error) => console.error("Error checking step variants:", error));
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [step.stepName, workflowExperience]);
     useEffect(() => {

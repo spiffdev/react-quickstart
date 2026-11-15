@@ -504,9 +504,9 @@ const ImageCropper: FunctionComponent<{
                                 <feColorMatrix
                                     type="matrix"
                                     values={`${saturation} ${saturation} ${saturation} 0 0 ${saturation} ${saturation} ${saturation} 0 0 ${saturation} ${saturation} ${saturation} 0 0 0 0 0 1 0`}
-                                    result="greyscale"
+                                    result="grayscale"
                                 />
-                                <feComponentTransfer in="greyscale">
+                                <feComponentTransfer in="grayscale">
                                     <feFuncR type="discrete" tableValues={thresholdTableValues} />
                                     <feFuncG type="discrete" tableValues={thresholdTableValues} />
                                     <feFuncB type="discrete" tableValues={thresholdTableValues} />

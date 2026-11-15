@@ -19,7 +19,7 @@ import WorkflowSelector from "./WorkflowSelector";
 import Customization from "./Customization";
 import { createDesignPreviewImage, withScreenshotPreview } from "./Customization/previewScreenshot";
 import ReviewPage from "./Review";
-import SharedPersonalisation from "./SharedPersonalisation";
+import SharedPersonalization from "./SharedPersonalization";
 import ThankYouPage from "./ThankYou";
 import ErrorBanner from "../components/ErrorBanner";
 import ExperienceSwitcher from "./components/ExperienceSwitcher";
@@ -113,12 +113,12 @@ const PageHandler: FunctionComponent<{
     const thankYouPageEnabled = usePageEnabled("thank-you");
     // The shared page only exists when the partner has switched it on and there are shared properties to show.
     const sharedPageEnabled = usePageEnabled("shared-personalise");
-    const personaliseOrder = useGroupPageKeys("personalisation");
+    const personalizeOrder = useGroupPageKeys("personalisation");
     // Only the activation's own configuration counts, not one inherited from a product collection.
     const sharedPageShown = sharedPageEnabled && !!activation.globalPropertyConfiguration;
     const sharedFirst =
         sharedPageShown &&
-        orderIndex(personaliseOrder, "shared-personalise") < orderIndex(personaliseOrder, "personalise");
+        orderIndex(personalizeOrder, "shared-personalise") < orderIndex(personalizeOrder, "personalise");
     const pageRank = useCallback((page: PageType) => pageRankIn(page, sharedFirst), [sharedFirst]);
     // The page where the customer starts personalising.
     const firstPersonalisePage: PageType = sharedFirst ? "shared" : "experience";
@@ -257,26 +257,26 @@ const PageHandler: FunctionComponent<{
     // Selects the only collection on the customer's behalf.
     useEffect(() => {
         if (!autoSelectCollection || !onlyCollectionId || bundle.getProductCollection()) return;
-        let cancelled = false;
+        let canceled = false;
         (async () => {
             try {
                 const [only] = (await getProductCollections([onlyCollectionId])) ?? [];
                 if (!only) throw new Error("The collection could not be found.");
                 // Assigning is safe to repeat, so a second attempt (e.g. a re-run of this effect) does no harm.
                 await bundle.assignProductCollection(only.getId());
-                if (cancelled) return;
+                if (canceled) return;
                 setCollection(only);
                 setPage((current) => (current === "collection" ? "product" : current));
                 setReachedRank((reached) => Math.max(reached, pageRank("product")));
             } catch (error) {
                 console.error("Error selecting the collection:", error);
-                if (cancelled) return;
+                if (canceled) return;
                 setAutoSelectFailed(true);
                 setErrorMessage("We couldn't load the products. Please select a collection to try again.");
             }
         })();
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [autoSelectCollection, bundle, onlyCollectionId, pageRank]);
 
@@ -938,7 +938,7 @@ const PageHandler: FunctionComponent<{
                     </div>
                 )}
                 {page === "shared" && experience && (
-                    <SharedPersonalisation
+                    <SharedPersonalization
                         key={experience.getTransaction().id}
                         experience={experience}
                         onNext={handleSharedFinish}

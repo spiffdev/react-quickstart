@@ -50,11 +50,11 @@ const ModuleUI: FunctionComponent<{
     const [text, setText] = useState(() => step.getText());
     const [helperText, setHelperText] = useState(() => remainingText(step));
     const [error, setError] = useState(false);
-    const [initialised, setInitialised] = useState(false);
+    const [initialized, setInitialized] = useState(false);
 
     useEffect(() => {
-        workflowManager.addInitCallback((stepInitialised) => {
-            setInitialised(stepInitialised[step.getId()] || false);
+        workflowManager.addInitCallback((stepInitialized) => {
+            setInitialized(stepInitialized[step.getId()] || false);
         });
     }, [step, workflowManager]);
 
@@ -83,7 +83,7 @@ const ModuleUI: FunctionComponent<{
                 onChange={handleTextChange}
                 onFocus={onActivation}
                 placeholder="Enter your text here..."
-                disabled={!initialised}
+                disabled={!initialized}
                 $error={error}
             />
             {helperText && (

@@ -94,7 +94,7 @@ const App: FunctionComponent<{
     );
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         setLoadFailed(false);
 
         const loadBundle = async () => {
@@ -112,15 +112,15 @@ const App: FunctionComponent<{
 
         loadBundle()
             .then((loaded) => {
-                if (!cancelled) setBundle(loaded);
+                if (!canceled) setBundle(loaded);
             })
             .catch((error) => {
                 console.error("Error loading the bundle:", error);
-                if (!cancelled) setLoadFailed(true);
+                if (!canceled) setLoadFailed(true);
             });
 
         return () => {
-            cancelled = true;
+            canceled = true;
         };
     }, [client, context, enableTestOrders, loadAttempt]);
 

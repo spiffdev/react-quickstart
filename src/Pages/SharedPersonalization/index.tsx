@@ -108,7 +108,7 @@ const ErrorText = styled(Typography)`
  * Options shared by every product in the design, from the Global Property Configuration. A change here is applied to
  * every step which shares the property, in every product.
  */
-const SharedPersonalisation: FunctionComponent<{
+const SharedPersonalization: FunctionComponent<{
     /** The experience to show in the preview. */
     experience: WorkflowExperience;
     /** Moves on from this page. Rejects with a customer-readable message when that fails. */
@@ -128,14 +128,14 @@ const SharedPersonalisation: FunctionComponent<{
     const [error, setError] = useState("");
 
     useEffect(() => {
-        let cancelled = false;
+        let canceled = false;
         const load = () =>
             bundle
                 .getGlobalProperties()
-                .then((loaded) => !cancelled && setHandles(loaded.filter((handle) => !handle.isSilent())))
+                .then((loaded) => !canceled && setHandles(loaded.filter((handle) => !handle.isSilent())))
                 .catch((loadError) => {
                     console.error("Error loading the shared properties:", loadError);
-                    if (!cancelled) setHandles([]);
+                    if (!canceled) setHandles([]);
                 });
         const refreshMandatory = () => setRevision((current) => current + 1);
         void load();
@@ -143,7 +143,7 @@ const SharedPersonalisation: FunctionComponent<{
         bundle.addEventListener("conditional-global-properties-changed", load);
         bundle.addEventListener("global-properties-mandatory-changed", refreshMandatory);
         return () => {
-            cancelled = true;
+            canceled = true;
             bundle.removeEventListener("conditional-global-properties-changed", load);
             bundle.removeEventListener("global-properties-mandatory-changed", refreshMandatory);
         };
@@ -227,4 +227,4 @@ const SharedPersonalisation: FunctionComponent<{
     );
 };
 
-export default SharedPersonalisation;
+export default SharedPersonalization;
