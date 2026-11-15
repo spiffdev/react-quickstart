@@ -1,6 +1,6 @@
 import { FunctionComponent, useCallback, useEffect, useMemo, useState } from "react";
 import { MEDIA } from "../../layout";
-import styled, { keyframes } from "styled-components";
+import styled from "styled-components";
 import { FileText, ShoppingCart } from "lucide-react";
 import { ExportedStepData, WorkflowExperience } from "@spiffcommerce/core";
 import Button from "../../components/button";
@@ -39,51 +39,44 @@ const ItemCard = styled.article`
     }
 `;
 
-const PreviewImage = styled.img`
+// Holds the preview's place (it is square) from the start, so the layout doesn't move when the image arrives.
+const PreviewFrame = styled.div`
+    position: relative;
     flex: none;
     width: 160px;
     height: 160px;
-    object-fit: contain;
     align-self: flex-start;
     border: 1px solid #e0e0e0;
     border-radius: 8px;
     background-color: #fff;
-
-    @media ${MEDIA.compact} {
-        width: 100%;
-        height: auto;
-        max-height: 280px;
-    }
-`;
-
-const shimmer = keyframes`
-    from {
-        background-position: 100% 0;
-    }
-    to {
-        background-position: -100% 0;
-    }
-`;
-
-// Holds the image's place (the preview is square) while it's being rendered.
-const PreviewSkeleton = styled.div`
-    flex: none;
-    width: 160px;
-    height: 160px;
-    align-self: flex-start;
-    border-radius: 8px;
-    background: linear-gradient(90deg, #eeeeee 25%, #f7f7f7 50%, #eeeeee 75%) 100% 0 / 200% 100%;
-    animation: ${shimmer} 1.4s linear infinite;
-
-    @media (prefers-reduced-motion: reduce) {
-        animation: none;
-    }
+    overflow: hidden;
 
     @media ${MEDIA.compact} {
         width: 100%;
         height: auto;
         aspect-ratio: 1;
         max-height: 280px;
+    }
+`;
+
+const PreviewImage = styled.img`
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+`;
+
+// Covers the frame while the preview is made and loaded, then fades out to reveal the image.
+const PreviewOverlay = styled.div<{ $visible: boolean }>`
+    position: absolute;
+    inset: 0;
+    background-color: #d4d4d4;
+    opacity: ${(props) => (props.$visible ? 1 : 0)};
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+
+    @media (prefers-reduced-motion: reduce) {
+        transition: none;
     }
 `;
 
@@ -292,11 +285,14 @@ const ReviewItem: FunctionComponent<{
     const [previewUrl, setPreviewUrl] = useState<string | undefined>(undefined);
     // The image may fail to render, in which case the item is shown without it.
     const [previewFailed, setPreviewFailed] = useState(false);
+    // The image has been fetched and drawn, as opposed to merely having been made.
+    const [previewLoaded, setPreviewLoaded] = useState(false);
 
     useEffect(() => {
         let canceled = false;
         setPreviewUrl(undefined);
         setPreviewFailed(false);
+        setPreviewLoaded(false);
         enqueuePreview(async () => {
             // The customer may have left by the time it's this item's turn.
             if (canceled) return undefined;
@@ -321,12 +317,24 @@ const ReviewItem: FunctionComponent<{
     const own = pricingShown(experience) ? formatPrice : undefined;
     return (
         <ItemCard>
-            {previewUrl ? (
-                <PreviewImage src={previewUrl} alt={`Preview of ${nameOf(experience)}`} />
-            ) : (
-                !previewFailed && (
-                    <PreviewSkeleton role="status" aria-label={`Loading preview of ${nameOf(experience)}`} />
-                )
+            {!previewFailed && (
+                <PreviewFrame>
+                    {previewUrl && (
+                        <PreviewImage
+                            src={previewUrl}
+                            alt={`Preview of ${nameOf(experience)}`}
+                            onLoad={() => setPreviewLoaded(true)}
+                            // An image which can't be shown shouldn't leave the overlay up for good.
+                            onError={() => setPreviewFailed(true)}
+                        />
+                    )}
+                    <PreviewOverlay
+                        $visible={!previewLoaded}
+                        role={previewLoaded ? undefined : "status"}
+                        aria-label={previewLoaded ? undefined : `Loading preview of ${nameOf(experience)}`}
+                        aria-hidden={previewLoaded || undefined}
+                    />
+                </PreviewFrame>
             )}
             <ItemDetails>
                 <ItemHeader>
