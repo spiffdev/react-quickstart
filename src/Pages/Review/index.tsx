@@ -7,6 +7,7 @@ import Button from "../../components/button";
 import Typography from "../../components/typography";
 import { createDesignPreviewImage, withScreenshotPreview } from "../Customization/previewScreenshot";
 import useCurrency from "../../hooks/useCurrency";
+import TermsAgreement from "../Customization/components/TermsAgreement";
 
 const PREVIEW_RESOLUTION = 512;
 
@@ -397,6 +398,21 @@ const ReviewPage: FunctionComponent<{
     const [confirming, setConfirming] = useState(false);
     const [quoting, setQuoting] = useState(false);
     const [error, setError] = useState("");
+    const [agreed, setAgreed] = useState(false);
+
+    // Each design's workflow can have its own terms. They are agreed to together, once each has been read.
+    const terms = useMemo(
+        () =>
+            Array.from(
+                new Set(
+                    experiences
+                        .map((experience) => experience.getWorkflow()?.finalizeStepConfig?.termsMarkdown)
+                        .filter((markdown): markdown is string => !!markdown),
+                ),
+            ).join("\n\n---\n\n"),
+        [experiences],
+    );
+    const needsAgreement = !!terms && !agreed;
 
     // A product whose parent is missing has nowhere to sit, so it gets a row of its own.
     const { items, childrenOf } = useMemo(() => {
@@ -489,10 +505,13 @@ const ReviewPage: FunctionComponent<{
                         <Typography variant="span">{currencyFormatter(total)}</Typography>
                     </Totals>
                 )}
+                {terms && (
+                    <TermsAgreement id="confirm-order" markdown={terms} agreed={agreed} onAgreedChange={setAgreed} />
+                )}
                 {allowCart && (
                     <Button
                         fullWidth
-                        disabled={confirming || !ready}
+                        disabled={confirming || !ready || needsAgreement}
                         icon={confirming && !quoting ? undefined : <ShoppingCart size={18} aria-hidden="true" />}
                         onClick={handleConfirm}
                     >
@@ -502,7 +521,7 @@ const ReviewPage: FunctionComponent<{
                 {allowQuote && (
                     <QuoteButton
                         fullWidth
-                        disabled={confirming || !ready}
+                        disabled={confirming || !ready || needsAgreement}
                         icon={<FileText size={18} aria-hidden="true" />}
                         onClick={handleQuote}
                     >

@@ -1,7 +1,7 @@
 import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import useCurrency from "../../hooks/useCurrency";
-import useThemeConfiguration, { useCheckoutOptions } from "../../hooks/useThemeConfiguration";
+import useThemeConfiguration, { useCheckoutOptions, usePageEnabled } from "../../hooks/useThemeConfiguration";
 import { PricingProvider } from "../../hooks/usePricing";
 import { countProducts } from "./Steps/ProductUI";
 import { canDownloadPreview, downloadPreview } from "./downloadPreview";
@@ -145,8 +145,8 @@ const Scroll = styled.div`
 const actionBarLayouts = `${MEDIA.stacked}, ${MEDIA.short}`;
 
 // Collapses out of the way (rather than just fading) so the steps can use the room.
-const ActionBarShell = styled.div<{ $hidden: boolean }>`
-    display: none;
+const ActionBarShell = styled.div<{ $hidden: boolean; $always: boolean }>`
+    display: ${(props) => (props.$always ? "grid" : "none")};
     flex: none;
     grid-template-rows: ${(props) => (props.$hidden ? "0fr" : "1fr")};
     visibility: ${(props) => (props.$hidden ? "hidden" : "visible")};
@@ -183,6 +183,13 @@ const ActionBarTotal = styled.div`
     flex-direction: column;
     min-width: 0;
     font-weight: 600;
+`;
+
+const ActionBarError = styled(Typography)`
+    margin: 0;
+    padding: 8px 16px 0;
+    font-size: 13px;
+    color: #d32f2f;
 `;
 
 const SceneTitle = styled(Typography)`
@@ -442,6 +449,10 @@ const Customization: FunctionComponent<{
     const { stacked } = useLayoutMode();
     const keyboardViewportHeight = useKeyboardViewportHeight();
     const { addToCartLabel } = useThemeConfiguration();
+    // With a review page, the design is finished there (terms included), so this page only needs a way to move on.
+    const finishOnReviewPage = usePageEnabled("review");
+    const [moving, setMoving] = useState(false);
+    const [moveError, setMoveError] = useState("");
     const sidebarWidthPercentage = useThemeConfiguration().sidebarWidthPercentage || DEFAULT_SIDEBAR_WIDTH_PERCENTAGE;
 
     const workflow = workflowExperience.getWorkflow();
@@ -537,6 +548,18 @@ const Customization: FunctionComponent<{
         return () => observer.disconnect();
     }, [traversableScenes]);
 
+    const handleMoveOn = useCallback(async () => {
+        setMoveError("");
+        setMoving(true);
+        try {
+            await handleFinish();
+        } catch (error) {
+            console.error("Error moving on from the design:", error);
+            setMoveError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+            setMoving(false);
+        }
+    }, [handleFinish]);
+
     // The action bar can't complete the design itself (there are terms to accept), so it takes the customer to the finish step.
     const scrollToFinish = useCallback(() => {
         scrollRef.current?.querySelector("[data-finish-scene]")?.scrollIntoView({ behavior: "smooth", block: "end" });
@@ -556,7 +579,7 @@ const Customization: FunctionComponent<{
                 </PreviewPane>
                 <Sidebar $widthPercentage={sidebarWidthPercentage}>
                     <Scroll ref={scrollRef}>
-                        {showPricing && formatPrice && totalPrice > 0 && (
+                        {!finishOnReviewPage && showPricing && formatPrice && totalPrice > 0 && (
                             <TotalBar>
                                 <Typography variant="span">Total</Typography>
                                 <Typography variant="span">{formatPrice(totalPrice)}</Typography>
@@ -564,6 +587,7 @@ const Customization: FunctionComponent<{
                         )}
                         {traversableScenes.map((scene) => {
                             const isFinishScene = scene.renderableSteps.some((step) => step.type === StepType.Finish);
+                            if (isFinishScene && finishOnReviewPage) return null;
                             // A scene whose steps are all hidden has nothing to show, title included.
                             const emptyScene =
                                 !isFinishScene &&
@@ -597,8 +621,9 @@ const Customization: FunctionComponent<{
                             );
                         })}
                     </Scroll>
-                    <ActionBarShell $hidden={finishInView}>
+                    <ActionBarShell $hidden={finishInView && !finishOnReviewPage} $always={finishOnReviewPage}>
                         <ActionBarClip>
+                            {moveError && <ActionBarError role="alert">{moveError}</ActionBarError>}
                             <ActionBar>
                                 <ActionBarTotal>
                                     {showPricing && formatPrice && totalPrice > 0 && (
@@ -608,7 +633,7 @@ const Customization: FunctionComponent<{
                                         </>
                                     )}
                                 </ActionBarTotal>
-                                <Button onClick={scrollToFinish}>
+                                <Button disabled={moving} onClick={finishOnReviewPage ? handleMoveOn : scrollToFinish}>
                                     {nextPage === "shared"
                                         ? "Continue"
                                         : nextPage === "review"

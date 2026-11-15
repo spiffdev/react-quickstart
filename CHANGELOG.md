@@ -18,6 +18,12 @@ Every notable change to this theme, newest first.
 - Removals and quantity changes go through the same queue, so they can't interleave with adds. The cart's controls are disabled only while one of those is in progress, and its Continue button waits until nothing is left to add.
 - Failures are still reported by the page's error banner. A failed add doesn't stop the ones queued behind it.
 
+## 2026-11-16 — Finishing moves to the review page
+
+- When the review page is on, the Personalise page no longer shows the finish step (order summary, download preview, terms and buttons). Instead its action bar is shown on every layout, not just narrow ones, with the total and a "Review" button ("Continue" when the shared page comes next) which runs the same checks (updates pending, mandatory steps, validation) and shows any problem above it. The total bar at the top is dropped then, as the action bar carries the total.
+- The **terms and conditions are on the review page** in that case: one "I agree to the terms and conditions" checkbox (new shared `Customization/components/TermsAgreement.tsx`, also used by the finish step), made from the terms of every workflow in the cart (identical terms are shown once). Adding to the cart and requesting a quote are disabled until it's ticked.
+- Without a review page nothing changes: the finish step, with its terms, is shown as before.
+
 ## 2026-11-13 — Fix bundles not being created with Activation
 
 - Fixed a small bug where new Bundles were not being provided the active Activation ID.

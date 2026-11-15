@@ -5,7 +5,7 @@ import { ClipboardCheck, Download, FileText, ShoppingCart } from "lucide-react";
 import Button from "../../../components/button";
 import useCurrency from "../../../hooks/useCurrency";
 import Typography from "../../../components/typography";
-import TermsScreen from "../components/TermsScreen";
+import TermsAgreement from "../components/TermsAgreement";
 
 const Container = styled.div`
     padding: 16px;
@@ -50,34 +50,6 @@ const ErrorText = styled(Typography)`
 const SummaryValue = styled.div`
     display: flex;
     gap: 12px;
-`;
-
-const CheckboxContainer = styled.div`
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin: 16px 0;
-`;
-
-const Checkbox = styled.input`
-    width: 18px;
-    height: 18px;
-    cursor: pointer;
-`;
-
-const Label = styled.label`
-    font-size: 14px;
-    cursor: pointer;
-`;
-
-const TermsLink = styled(Typography)`
-    color: var(--theme-primary-color);
-    text-decoration: underline;
-    cursor: pointer;
-
-    &:hover {
-        color: var(--theme-primary-color-hover);
-    }
 `;
 
 const ButtonGroup = styled.div`
@@ -141,7 +113,6 @@ const FinishUI: FunctionComponent<{
     );
 
     const [isConfirmed, setIsConfirmed] = useState(false);
-    const [showTerms, setShowTerms] = useState(false);
     const [finishing, setFinishing] = useState(false);
     const [downloading, setDownloading] = useState(false);
     const [finishError, setFinishError] = useState("");
@@ -188,12 +159,6 @@ const FinishUI: FunctionComponent<{
             setDownloading(false);
         }
     }, [onDownloadPreview]);
-
-    const handleAgree = useCallback(() => {
-        setIsConfirmed(true);
-        setShowTerms(false);
-        handleFinish();
-    }, [handleFinish]);
 
     return (
         <Container data-test-step-type="finish">
@@ -245,34 +210,13 @@ const FinishUI: FunctionComponent<{
                 </ButtonGroup>
             )}
             {termsMarkdown && (
-                <>
-                    <CheckboxContainer>
-                        <Checkbox
-                            type="checkbox"
-                            id="confirm-design"
-                            checked={isConfirmed}
-                            onChange={(e) => setIsConfirmed(e.target.checked)}
-                        />
-                        <Label htmlFor="confirm-design">
-                            I agree to the{" "}
-                            <TermsLink
-                                variant="span"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    setShowTerms(true);
-                                }}
-                            >
-                                terms and conditions
-                            </TermsLink>
-                        </Label>
-                    </CheckboxContainer>
-                    <TermsScreen
-                        visible={showTerms}
-                        source={termsMarkdown}
-                        onAgree={handleAgree}
-                        onBack={() => setShowTerms(false)}
-                    />
-                </>
+                <TermsAgreement
+                    id="confirm-design"
+                    markdown={termsMarkdown}
+                    agreed={isConfirmed}
+                    onAgreedChange={setIsConfirmed}
+                    onAgree={handleFinish}
+                />
             )}
             {(allowCart || reviewNext) && (
                 <Button
