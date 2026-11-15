@@ -199,9 +199,9 @@ export const pageSettings: ThemeConfigurationPageSettings = {
         },
         {
             // The two personalise pages can be shown in either order. Both always come before the review page.
-            key: "personalisation",
+            key: "personalization",
             title: "Personalisation",
-            pageKeys: ["shared-personalise", "personalise"],
+            pageKeys: ["shared-personalize", "personalize"],
             reorderable: true,
         },
         {
@@ -261,7 +261,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             `,
         },
         {
-            key: "personalise",
+            key: "personalize",
             title: "Personalise",
             subtitle: "How the design editor is laid out and what it offers customers.",
             icon: "sliders",
@@ -286,7 +286,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             ],
         },
         {
-            key: "shared-personalise",
+            key: "shared-personalize",
             title: "Shared Personalise",
             subtitle:
                 "Options shared by every product in the design, such as one image used by all of them. Only shown when the activation has a Global Property Configuration.",

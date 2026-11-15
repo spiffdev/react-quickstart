@@ -57,7 +57,7 @@ const GlobalPropertyOverride: FunctionComponent<{
     const bundle = useBundle();
     const activation = useActivation();
     // Overriding means something once the customer is given the shared page to set the values on.
-    const sharedPageShown = usePageEnabled("shared-personalise") && !!activation.globalPropertyConfiguration;
+    const sharedPageShown = usePageEnabled("shared-personalize") && !!activation.globalPropertyConfiguration;
     const step = workflowExperience.getStepById(stepName);
     const configuration = bundle.getGlobalPropertyConfiguration();
 

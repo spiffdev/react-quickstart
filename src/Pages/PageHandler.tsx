@@ -112,19 +112,19 @@ const PageHandler: FunctionComponent<{
     const reviewPageEnabled = usePageEnabled("review");
     const thankYouPageEnabled = usePageEnabled("thank-you");
     // The shared page only exists when the partner has switched it on and there are shared properties to show.
-    const sharedPageEnabled = usePageEnabled("shared-personalise");
-    const personalizeOrder = useGroupPageKeys("personalisation");
+    const sharedPageEnabled = usePageEnabled("shared-personalize");
+    const personalizeOrder = useGroupPageKeys("personalization");
     // Only the activation's own configuration counts, not one inherited from a product collection.
     const sharedPageShown = sharedPageEnabled && !!activation.globalPropertyConfiguration;
     const sharedFirst =
         sharedPageShown &&
-        orderIndex(personalizeOrder, "shared-personalise") < orderIndex(personalizeOrder, "personalise");
+        orderIndex(personalizeOrder, "shared-personalize") < orderIndex(personalizeOrder, "personalize");
     const pageRank = useCallback((page: PageType) => pageRankIn(page, sharedFirst), [sharedFirst]);
     // The page where the customer starts personalising.
-    const firstPersonalisePage: PageType = sharedFirst ? "shared" : "experience";
+    const firstPersonalizePage: PageType = sharedFirst ? "shared" : "experience";
     // Read by the effect which starts a bundle off, which mustn't run again just because these change.
-    const startingPoint = useRef({ firstPersonalisePage, pageRank });
-    startingPoint.current = { firstPersonalisePage, pageRank };
+    const startingPoint = useRef({ firstPersonalizePage, pageRank });
+    startingPoint.current = { firstPersonalizePage, pageRank };
     // In single product mode the customer works on one design at a time: they choose a product (and a workflow, if it
     // has several) and that replaces the previous choice. Otherwise they build a cart of any number of designs.
     const singleMode = !!activation.singleProductMode;
@@ -235,8 +235,8 @@ const PageHandler: FunctionComponent<{
         const experiences = bundle.getWorkflowExperiences();
         if (experiences.length > 0) {
             setExperience(experiences[0]);
-            setPage(startingPoint.current.firstPersonalisePage);
-            setReachedRank(startingPoint.current.pageRank(startingPoint.current.firstPersonalisePage));
+            setPage(startingPoint.current.firstPersonalizePage);
+            setReachedRank(startingPoint.current.pageRank(startingPoint.current.firstPersonalizePage));
         } else {
             setExperience(undefined);
             if (presetProduct) {
@@ -393,13 +393,13 @@ const PageHandler: FunctionComponent<{
             setWorkflow(selectedWorkflow);
             setSelectionExperience(created);
             setExperience(created);
-            setReachedRank(pageRank(firstPersonalisePage));
-            setPage(firstPersonalisePage);
+            setReachedRank(pageRank(firstPersonalizePage));
+            setPage(firstPersonalizePage);
             if (leftoverWarning) {
                 setErrorMessage(leftoverWarning);
             }
         },
-        [bundle, client, firstPersonalisePage, pageRank, removeSelectionExperience],
+        [bundle, client, firstPersonalizePage, pageRank, removeSelectionExperience],
     );
 
     const handleProductSelected = useCallback(
@@ -416,7 +416,7 @@ const PageHandler: FunctionComponent<{
                         setPage("workflow");
                     } else if (selectionExperience) {
                         setExperience(selectionExperience);
-                        setPage(firstPersonalisePage);
+                        setPage(firstPersonalizePage);
                     } else {
                         await startExperience(selected, workflows[0]);
                     }
@@ -439,7 +439,7 @@ const PageHandler: FunctionComponent<{
         [
             attempt,
             confirmReplace,
-            firstPersonalisePage,
+            firstPersonalizePage,
             pageRank,
             product,
             removeSelectionExperience,
@@ -455,7 +455,7 @@ const PageHandler: FunctionComponent<{
 
                 if (selectionExperience && workflow?.getId() === selected.getId()) {
                     setExperience(selectionExperience);
-                    setPage(firstPersonalisePage);
+                    setPage(firstPersonalizePage);
                     return;
                 }
 
@@ -463,7 +463,7 @@ const PageHandler: FunctionComponent<{
 
                 await startExperience(product, selected);
             }, "We couldn't start that design. Please try again."),
-        [attempt, confirmReplace, firstPersonalisePage, product, selectionExperience, startExperience, workflow],
+        [attempt, confirmReplace, firstPersonalizePage, product, selectionExperience, startExperience, workflow],
     );
 
     // Adds a design of the product to the cart. The customer stays on the product page to add more.
@@ -663,9 +663,9 @@ const PageHandler: FunctionComponent<{
         const toOpen = experienceToOpen();
         if (!toOpen) return;
         setExperience(toOpen);
-        setReachedRank((reached) => Math.max(reached, pageRank(firstPersonalisePage)));
-        setPage(firstPersonalisePage);
-    }, [experienceToOpen, firstPersonalisePage, pageRank]);
+        setReachedRank((reached) => Math.max(reached, pageRank(firstPersonalizePage)));
+        setPage(firstPersonalizePage);
+    }, [experienceToOpen, firstPersonalizePage, pageRank]);
     const onExperiencePage = (page === "experience" || page === "shared") && !!experience;
     useEffect(() => {
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
@@ -763,7 +763,7 @@ const PageHandler: FunctionComponent<{
     // What the customer is heading to when they leave a personalise page.
     const nextAfter = (from: "experience" | "shared") => steps[steps.findIndex((step) => step.page === from) + 1]?.page;
     // The same, when it is another page of the design rather than the end of it.
-    const personaliseSuccessor = (from: "experience" | "shared") => {
+    const personalizeSuccessor = (from: "experience" | "shared") => {
         const next = nextAfter(from);
         return next === "review" || next === "shared" ? next : undefined;
     };
@@ -929,7 +929,7 @@ const PageHandler: FunctionComponent<{
                                 key={experience.getTransaction().id}
                                 workflowExperience={experience}
                                 onNext={handleFinish}
-                                nextPage={personaliseSuccessor("experience")}
+                                nextPage={personalizeSuccessor("experience")}
                                 onRequestQuote={handleRequestQuote}
                                 onOpenExperience={setExperience}
                                 onUpdatingChange={handleProductsUpdating}
