@@ -6,8 +6,11 @@ const LoadingSpinner: FunctionComponent<{
     thickness?: number;
 }> = ({ size = 40, color = "#000", thickness = 4 }) => {
     return (
-        <div
+        // A span, so the spinner can sit inside text and buttons.
+        <span
             style={{
+                display: "inline-block",
+                flex: "none",
                 width: `${size}px`,
                 height: `${size}px`,
                 border: `${thickness}px solid rgba(0, 0, 0, 0.1)`,
@@ -24,7 +27,7 @@ const LoadingSpinner: FunctionComponent<{
                     }
                 `}
             </style>
-        </div>
+        </span>
     );
 };
 

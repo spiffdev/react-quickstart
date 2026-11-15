@@ -5,6 +5,7 @@ import Button from "../../components/button";
 import DropdownButton, { type DropdownItem } from "../../components/DropdownButton";
 import Card from "../../components/card";
 import Typography from "../../components/typography";
+import LoadingSpinner from "./LoadingSpinner";
 
 const TileCard = styled(Card)<{ $selected?: boolean }>`
     width: 250px;
@@ -31,6 +32,12 @@ const TileImage = styled.img`
     height: 100%;
 `;
 
+const Pending = styled(Typography)`
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+`;
+
 const SelectorTile: FunctionComponent<{
     imageUrl?: string;
     title: string;
@@ -42,8 +49,18 @@ const SelectorTile: FunctionComponent<{
      */
     choices?: DropdownItem[];
     onChoose?: (id: string) => void;
-}> = ({ imageUrl, title, selected, onClick, choices, onChoose }) => {
-    const label = <Typography>{selected ? "Selected" : "Select"}</Typography>;
+    /** How many requests from this tile are waiting or in progress. The button stays usable, so more can be queued. */
+    pending?: number;
+}> = ({ imageUrl, title, selected, onClick, choices, onChoose, pending = 0 }) => {
+    const label =
+        pending > 0 ? (
+            <Pending variant="span" role="status">
+                <LoadingSpinner size={14} thickness={2} color="var(--theme-primary-contrast-color)" />
+                {pending > 1 ? `Adding (${pending})...` : "Adding..."}
+            </Pending>
+        ) : (
+            <Typography>{selected ? "Selected" : "Select"}</Typography>
+        );
     return (
         <TileCard $selected={selected}>
             <ImageContainer>{imageUrl ? <TileImage src={imageUrl} /> : undefined}</ImageContainer>

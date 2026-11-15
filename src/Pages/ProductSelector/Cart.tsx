@@ -254,7 +254,9 @@ const Cart: FunctionComponent<{
     onContinue: () => void;
     /** Disables the controls while the cart is being changed. */
     busy?: boolean;
-}> = ({ experiences, onRemove, onQuantityChange, onContinue, busy }) => {
+    /** False while something is still being added, as the cart would be incomplete. */
+    canContinue?: boolean;
+}> = ({ experiences, onRemove, onQuantityChange, onContinue, busy, canContinue = true }) => {
     const formatPrice = useCurrency();
     // A workflow decides for itself whether its price is shown. An unset (null) flag counts as enabled.
     const priceShown = (experience: WorkflowExperience) => experience.getWorkflow()?.showPricing !== false;
@@ -312,7 +314,7 @@ const Cart: FunctionComponent<{
                         <Typography variant="span">{formatPrice(total)}</Typography>
                     </Total>
                 )}
-                <Button fullWidth disabled={busy || experiences.length === 0} onClick={onContinue}>
+                <Button fullWidth disabled={busy || !canContinue || experiences.length === 0} onClick={onContinue}>
                     Continue
                 </Button>
             </Footer>

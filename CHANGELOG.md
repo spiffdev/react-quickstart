@@ -12,6 +12,12 @@ Every notable change to this theme, newest first.
 - The shared **file upload property** (`SharedPersonalization/FileUploadProperty.tsx`) matches the frame step's image handling where the handle allows it: remove or restore the background and "Optimize image" (vectorise) when the integration has the Advanced Image Manipulation addon, and colour editing with `SVGColorSelector` when the property has its colour picker on (PMS values when its PMS picker is on). Not available, as the handle has no API for them: removing an image, merging colours, and switching back from an optimised image. Optimising restarts from the original image, so it is only offered while the background is not removed. The property has no file type setting, so the default list of types is used.
 - New bundles are created with the activation's id (`getNewBundle(..., activationId)`), which is how the bundle gets that configuration. A product collection's own configuration is ignored by this page's visibility check.
 
+## 2026-11-16 — Adding to the cart no longer blocks the products page
+
+- Adding a product no longer covers the page with a loading overlay. Each click is **queued** (`ProductSelector/index.tsx`) and done one at a time in the order asked for, as each one changes the bundle. The tile which was clicked shows a spinner and "Adding..." (with a count, "Adding (2)...", when the same product has been clicked more than once); its button stays usable so more can be queued. The product appears in the cart as soon as its own add finishes.
+- Removals and quantity changes go through the same queue, so they can't interleave with adds. The cart's controls are disabled only while one of those is in progress, and its Continue button waits until nothing is left to add.
+- Failures are still reported by the page's error banner. A failed add doesn't stop the ones queued behind it.
+
 ## 2026-11-13 — Fix bundles not being created with Activation
 
 - Fixed a small bug where new Bundles were not being provided the active Activation ID.
