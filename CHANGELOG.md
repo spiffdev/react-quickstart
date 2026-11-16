@@ -2,6 +2,18 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-16 — Conversion configuration on every transaction
+
+- When the theme has a conversion configuration, `PageHandler` assigns its id to the recipient of every transaction in the bundle (including products added by a product step, and designs from a reloaded bundle) through `WorkflowManager.updateRecipient`, leaving the rest of the recipient as it is. Transactions which already have it are skipped, each is only updated once (a failure is retried the next time the cart changes), and the id is still also kept in the bundle's metadata as before.
+
+## 2026-11-16 — Templating fields in text
+
+- Text steps and the shared text property now work with templating fields as the corporate theme does, through one component (`Customization/components/TemplateTextField.tsx`, using core 44.21's `parseTextTemplateForWorkflow`):
+  - Under the text box is a row of pill buttons, one per field from `getTemplatingKeys()` (hover for the field and its current value). A button inserts `{{key}}` where the cursor is as if it had been typed, so undo works, or on the end of the text when the box isn't being edited.
+  - When the box isn't being edited and the text has fields in it, it's shown as the design will have it: each field becomes a chip with its value, green when it has one and red (showing the field as written) when it would be blank. Clicking or tabbing into it goes back to editing.
+  - A field which isn't finished (such as an unclosed `{{`) gives the box an error border and a message. The text's own problems (blocked words, limits) still take precedence.
+  - The shared property fills fields in from the first design, as core does, and only offers the buttons when `isTemplatingEnabled()` is true. The earlier debug logging of the keys was removed.
+
 ## 2026-11-16 — Shared (global) personalisation
 
 - New optional **Shared Personalise page** (`Pages/SharedPersonalisation`) for the Global Property Configuration: options shared by every product in the design, rendered from `bundle.getGlobalProperties()`. Text, file upload (local and mobile, following the same theme settings as the frame step), option and color option properties are supported. Silent properties are not shown, mandatory ones (marked `*`) block continuing until fulfilled, and properties with conditions appear and disappear as the customer answers (`conditional-global-properties-changed`).
@@ -10,6 +22,7 @@ Every notable change to this theme, newest first.
 - When the shared page is last and there's no review page, it completes the design itself (add to cart, or request a quote).
 - **Overriding shared properties for one product**: on the Personalise page, a step which uses shared properties (while the shared page is shown) is replaced by a notice saying it's set on the shared page, with a "Customise for this product" button (`Customization/components/GlobalPropertyOverride.tsx`). It calls `setOverrideGlobalPropertyConfiguration(type, true)` for each kind of shared property the step uses (a text step can use both text and colour) and reveals the step's normal controls. A "Use shared" button in the step's top right turns the overrides off and re-applies the shared values to this product with `applyGlobalState([experience])`. A frame step keeps its position and scale controls (`ImageCropper`) available while the image is shared, as those aren't shared; its image controls (upload, remove, optimise, colours) appear once it's overridden (`FrameUI`'s `imageShared` prop).
 - The shared **file upload property** (`SharedPersonalization/FileUploadProperty.tsx`) matches the frame step's image handling where the handle allows it: remove or restore the background and "Optimize image" (vectorise) when the integration has the Advanced Image Manipulation addon, and colour editing with `SVGColorSelector` when the property has its colour picker on (PMS values when its PMS picker is on). Not available, as the handle has no API for them: removing an image, merging colours, and switching back from an optimised image. Optimising restarts from the original image, so it is only offered while the background is not removed. The property has no file type setting, so the default list of types is used.
+- The shared **text property** now behaves like a text step: it finds the text steps which use it (not those overriding it) and applies the text to them as it's typed, so it's checked by them. Their verdicts are shown as the step shows them (blocked words, unsupported characters, no new lines, text doesn't fit, character limit; otherwise the fewest characters remaining across them). Unacceptable text isn't kept, so the saved value is always acceptable. It's a multi-line box when any of those steps supports new lines. Templating is covered by the entry below.
 - New bundles are created with the activation's id (`getNewBundle(..., activationId)`), which is how the bundle gets that configuration. A product collection's own configuration is ignored by this page's visibility check.
 
 ## 2026-11-16 — Adding to the cart no longer blocks the products page

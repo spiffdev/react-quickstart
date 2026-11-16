@@ -100,6 +100,27 @@ const pageRankIn = (page: PageType, sharedFirst: boolean) =>
 // A page which isn't in the partner's order comes last.
 const orderIndex = (keys: string[], key: string) => (keys.includes(key) ? keys.indexOf(key) : Infinity);
 
+// The recipient's details, in the order `updateRecipient` takes them (from first name to the fifth custom field), when
+// only its conversion configuration is being set.
+const NO_RECIPIENT_CHANGES = Array.from({ length: 16 }, () => undefined) as unknown as [
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+];
+
 const PageHandler: FunctionComponent<{
     /** The product to personalise when it has already been chosen (single product mode only). */
     collectionProduct?: CollectionProduct;
@@ -640,6 +661,29 @@ const PageHandler: FunctionComponent<{
     // Read again when the bundle changes (not on every render), so held-back experiences stay hidden meanwhile.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     const switcherExperiences = useMemo(() => bundle.getWorkflowExperiences(), [bundle, bundleRevision, experience]);
+    // Every transaction is given the theme's conversion configuration, as each one has a recipient from its creation.
+    // The ones already done are remembered so a transaction is only updated once.
+    const conversionAssigned = useRef(new Set<string>());
+    useEffect(() => {
+        const configurationId = conversionConfiguration?.id;
+        if (!configurationId) return;
+        for (const candidate of switcherExperiences) {
+            const transaction = candidate.getTransaction();
+            const key = `${transaction.id}:${configurationId}`;
+            if (transaction.recipient?.conversionConfigurationId === configurationId) continue;
+            if (conversionAssigned.current.has(key)) continue;
+            conversionAssigned.current.add(key);
+            // Everything else about the recipient is left as it is.
+            candidate
+                .getWorkflowManager()
+                .updateRecipient(...NO_RECIPIENT_CHANGES, configurationId)
+                .catch((error) => {
+                    console.error("Error assigning the conversion configuration:", error);
+                    // So a later change to the cart tries again.
+                    conversionAssigned.current.delete(key);
+                });
+        }
+    }, [conversionConfiguration?.id, switcherExperiences]);
     // Products added by a product step belong to the design they were added to, so they aren't in the cart themselves.
     const cartExperiences = useMemo(
         () => switcherExperiences.filter((candidate) => !candidate.getTransaction().parentTransaction),

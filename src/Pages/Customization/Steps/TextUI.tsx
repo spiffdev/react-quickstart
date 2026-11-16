@@ -1,50 +1,15 @@
-import { ChangeEvent, FunctionComponent, useCallback, useEffect, useState } from "react";
+import { FunctionComponent, useCallback, useEffect, useState } from "react";
 import { ColorOption, TextChangeResult, TextStepHandle, Variant, WorkflowManager } from "@spiffcommerce/core";
-import styled, { css } from "styled-components";
+import styled from "styled-components";
 import Typography from "../../../components/typography";
 import { swatchBackground } from "../components/customColor";
+import TemplateTextField from "../components/TemplateTextField";
 import VariantGallery from "../components/VariantGallery";
 
 const Container = styled.div`
     padding: 16px;
     box-sizing: border-box;
     width: 100%;
-`;
-
-const fieldStyles = css<{ $error?: boolean }>`
-    width: 100%;
-    padding: 12px;
-    border: 1px solid ${(props) => (props.$error ? "#d32f2f" : "#ccc")};
-    border-radius: 4px;
-    font-size: 16px;
-    font-family: inherit;
-    box-sizing: border-box;
-
-    &:focus {
-        outline: none;
-        border-color: ${(props) => (props.$error ? "#d32f2f" : "var(--theme-primary-color)")};
-    }
-
-    &:disabled {
-        background-color: #f5f5f5;
-        cursor: not-allowed;
-    }
-`;
-
-const TextField = styled.input<{ $error?: boolean }>`
-    ${fieldStyles}
-`;
-
-const TextArea = styled.textarea<{ $error?: boolean }>`
-    ${fieldStyles}
-    min-height: 80px;
-    resize: vertical;
-`;
-
-const HelperText = styled(Typography)<{ $error?: boolean }>`
-    margin-top: 4px;
-    font-size: 12px;
-    color: ${(props) => (props.$error ? "#d32f2f" : "#666")};
 `;
 
 const EditAllLabel = styled.label`
@@ -112,7 +77,7 @@ const StrokeTitle = styled(Typography)`
 const fillValue = (color: ColorOption) => color.fill ?? color.variant?.color ?? color.stroke;
 const strokeValue = (color: ColorOption) => color.stroke ?? color.variant?.color ?? color.fill;
 
-const errorMessage = (result: TextChangeResult) => {
+export const errorMessage = (result: TextChangeResult) => {
     const errors = result.errorData;
     if (!errors) return undefined;
     if (errors.blockedProfanity) return "Text contains blocked words";
@@ -123,7 +88,7 @@ const errorMessage = (result: TextChangeResult) => {
     return undefined;
 };
 
-const remainingText = (remaining: number | undefined) =>
+export const remainingText = (remaining: number | undefined) =>
     remaining !== undefined ? `${remaining} characters remaining` : "";
 
 const TextUI: FunctionComponent<{
@@ -170,15 +135,15 @@ const TextUI: FunctionComponent<{
         setHelperText(message ?? remainingText(result.helperData.charactersRemaining));
     }, []);
 
-    const handleTextChange = useCallback(
-        (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-            const value = event.target.value;
+    const changeText = useCallback(
+        (value: string) => {
             setText(value);
             onActivation?.();
             applyResult(step.setText(value));
         },
         [applyResult, onActivation, step],
     );
+    const templatingKeys = step.getTemplatingKeys();
 
     const handleFocus = useCallback(() => {
         onActivation?.();
@@ -262,23 +227,20 @@ const TextUI: FunctionComponent<{
     const showImageFills = imageFills.length > 1;
     const showFillColors = !showImageFills && !!step.hasColorPicker() && fillColors.length > 0;
     const showStrokeColors = strokeColors.length > 0;
-    const fieldProps = {
-        value: text,
-        onChange: handleTextChange,
-        onFocus: handleFocus,
-        placeholder: "Enter text...",
-        disabled: variantPending,
-        $error: error,
-    };
-
     return (
         <Container data-test-step-type="text">
-            {step.newLinesSupported() ? <TextArea {...fieldProps} /> : <TextField type="text" {...fieldProps} />}
-            {helperText && (
-                <HelperText variant="span" $error={error}>
-                    {helperText}
-                </HelperText>
-            )}
+            <TemplateTextField
+                value={text}
+                onChange={changeText}
+                multiline={step.newLinesSupported()}
+                keys={templatingKeys}
+                workflowManager={workflowManager}
+                placeholder="Enter text..."
+                disabled={variantPending}
+                error={error}
+                helperText={helperText}
+                onFieldFocus={handleFocus}
+            />
             {step.isReplaceable() && (
                 <EditAllLabel>
                     <input

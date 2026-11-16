@@ -922,10 +922,10 @@
   dependencies:
     tslib "^2.6.2"
 
-"@spiffcommerce/core@44.19.3":
-  version "44.19.3"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.19.3.tgz#d5b0ad16b4f7cf86cb30e24f08a3454bc5f9436c"
-  integrity sha512-nz7xQacT5F3j6jw7cMhSAHswgMKqQa6eKwsPBQQz1+ntVO/Fs/3Jb2rA80w33SGogbtb+E5X7X1DycVrdJG3gQ==
+"@spiffcommerce/core@44.21.0":
+  version "44.21.0"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.21.0.tgz#2ee92d615221318c25b6b7f3f60803a21a46882e"
+  integrity sha512-RHbVhDPyyEISE3z6kjFzOU2dr/PvUD1ucGWLqw0Ei+GItRjGNj0IMwm8OhLvBlKW25jDUR4/FjFkG+zHV7ne+A==
   dependencies:
     "@adobe/css-tools" "^4.5.0"
     "@apollo/client" "^3.11.8"
@@ -978,10 +978,10 @@
     svg-path-bbox "^1.2.4"
     unicode-default-word-boundary "^13.0.0"
 
-"@spiffcommerce/preview-3d@6.0.0":
-  version "6.0.0"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/preview-3d/-/preview-3d-6.0.0.tgz#3f8947f88f236b2f4c9864927b064f25738b421b"
-  integrity sha512-WvrcuwMNU/8LImM1V0w+fsU4+g+7Q43sfnJBrFTk7ITwSZNrHGhnzSGKsArmwU07MV858A3CxqVxlrnXpNUhUg==
+"@spiffcommerce/preview-3d@6.0.1":
+  version "6.0.1"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/preview-3d/-/preview-3d-6.0.1.tgz#5be4414ef0873363d5d87e3e7dd09b9dee179dca"
+  integrity sha512-9jlHA5jzYWIIDZC7/GXj0Nklk/NJGS8REzYdi9ZGMkCCE4OTevd6XPllJDfI1BQtim5Q2wD1C/eQAFyMbjNDWA==
   dependencies:
     "@babylonjs/core" "8.53.0"
     "@babylonjs/loaders" "8.53.0"
