@@ -9,6 +9,7 @@ import useBundle from "../../hooks/useBundle";
 import useThemeConfiguration from "../../hooks/useThemeConfiguration";
 import { MEDIA, SIDEBAR_MAX_WIDTH, SIDEBAR_MIN_WIDTH } from "../../layout";
 import ThreeDPreview from "../Customization/components/ThreeDPreview";
+import ExperienceSwitcher from "../components/ExperienceSwitcher";
 import LoadingOverlay from "../components/LoadingOverlay";
 import { PropertyControl } from "./properties";
 
@@ -111,6 +112,10 @@ const ErrorText = styled(Typography)`
 const SharedPersonalization: FunctionComponent<{
     /** The experience to show in the preview. */
     experience: WorkflowExperience;
+    /** Every design, so the one in the preview can be changed. */
+    experiences: WorkflowExperience[];
+    groupChildren?: boolean;
+    onSelectExperience: (experience: WorkflowExperience) => void;
     /** Moves on from this page. Rejects with a customer-readable message when that fails. */
     onNext: () => void | Promise<void>;
     /** What the button which moves on is called. Without one there's no such button (e.g. only quotes are allowed). */
@@ -118,7 +123,16 @@ const SharedPersonalization: FunctionComponent<{
     /** When this page is the last before the design is completed, the customer may ask for a quote instead. */
     allowQuote?: boolean;
     onRequestQuote?: () => void | boolean | Promise<void | boolean>;
-}> = ({ experience, onNext, nextLabel, allowQuote = false, onRequestQuote }) => {
+}> = ({
+    experience,
+    experiences,
+    groupChildren,
+    onSelectExperience,
+    onNext,
+    nextLabel,
+    allowQuote = false,
+    onRequestQuote,
+}) => {
     const bundle = useBundle();
     const sidebarWidthPercentage = useThemeConfiguration().sidebarWidthPercentage || DEFAULT_SIDEBAR_WIDTH_PERCENTAGE;
     const [handles, setHandles] = useState<GlobalPropertyHandle[] | undefined>(undefined);
@@ -176,54 +190,69 @@ const SharedPersonalization: FunctionComponent<{
     );
 
     return (
-        <Layout>
-            <PreviewPane>
-                <ThreeDPreview workflowExperience={experience} />
-            </PreviewPane>
-            <Sidebar $widthPercentage={sidebarWidthPercentage}>
-                <Scroll>
-                    {!handles ? (
-                        <LoadingOverlay />
-                    ) : (
-                        <Card>
-                            <Heading variant="h2">Shared options</Heading>
-                            {handles.map((handle) => (
-                                <Property key={handle.getName()}>
-                                    <PropertyTitle variant="h3">
-                                        {handle.getTitle()}
-                                        {handle.isMandatory() && <Required aria-label="required">*</Required>}
-                                    </PropertyTitle>
-                                    {handle.getDescription() && <Description>{handle.getDescription()}</Description>}
-                                    <PropertyControl handle={handle} />
-                                </Property>
-                            ))}
-                        </Card>
-                    )}
-                </Scroll>
-                <Footer>
-                    {nextLabel && (
-                        <Button
-                            fullWidth
-                            disabled={!handles || incomplete || working}
-                            onClick={() => run(checked(onNext))}
-                        >
-                            {nextLabel}
-                        </Button>
-                    )}
-                    {allowQuote && onRequestQuote && (
-                        <Button
-                            fullWidth
-                            disabled={!handles || incomplete || working}
-                            icon={<FileText size={18} aria-hidden="true" />}
-                            onClick={() => run(checked(onRequestQuote))}
-                        >
-                            Request a Quote
-                        </Button>
-                    )}
-                    {error && <ErrorText role="alert">{error}</ErrorText>}
-                </Footer>
-            </Sidebar>
-        </Layout>
+        <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
+            {experiences.length > 1 && (
+                // Changes which design the preview shows. The options are shared, so nothing else depends on it.
+                <ExperienceSwitcher
+                    experiences={experiences}
+                    active={experience}
+                    groupChildren={groupChildren}
+                    onSelect={onSelectExperience}
+                />
+            )}
+            <div style={{ flex: "1 1 0", minHeight: 0 }}>
+                <Layout>
+                    <PreviewPane>
+                        <ThreeDPreview key={experience.getTransaction().id} workflowExperience={experience} />
+                    </PreviewPane>
+                    <Sidebar $widthPercentage={sidebarWidthPercentage}>
+                        <Scroll>
+                            {!handles ? (
+                                <LoadingOverlay />
+                            ) : (
+                                <Card>
+                                    <Heading variant="h2">Shared options</Heading>
+                                    {handles.map((handle) => (
+                                        <Property key={handle.getName()}>
+                                            <PropertyTitle variant="h3">
+                                                {handle.getTitle()}
+                                                {handle.isMandatory() && <Required aria-label="required">*</Required>}
+                                            </PropertyTitle>
+                                            {handle.getDescription() && (
+                                                <Description>{handle.getDescription()}</Description>
+                                            )}
+                                            <PropertyControl handle={handle} />
+                                        </Property>
+                                    ))}
+                                </Card>
+                            )}
+                        </Scroll>
+                        <Footer>
+                            {nextLabel && (
+                                <Button
+                                    fullWidth
+                                    disabled={!handles || incomplete || working}
+                                    onClick={() => run(checked(onNext))}
+                                >
+                                    {nextLabel}
+                                </Button>
+                            )}
+                            {allowQuote && onRequestQuote && (
+                                <Button
+                                    fullWidth
+                                    disabled={!handles || incomplete || working}
+                                    icon={<FileText size={18} aria-hidden="true" />}
+                                    onClick={() => run(checked(onRequestQuote))}
+                                >
+                                    Request a Quote
+                                </Button>
+                            )}
+                            {error && <ErrorText role="alert">{error}</ErrorText>}
+                        </Footer>
+                    </Sidebar>
+                </Layout>
+            </div>
+        </div>
     );
 };
 

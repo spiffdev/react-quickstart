@@ -9,6 +9,7 @@ import LoadingOverlay from "../components/LoadingOverlay";
 
 // The products on one side and the cart on the other, which moves below the products when there's no room beside them.
 const Layout = styled.div`
+    position: relative;
     display: flex;
     height: 100%;
 

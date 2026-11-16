@@ -703,6 +703,19 @@ const PageHandler: FunctionComponent<{
         () => switcherExperiences.find((candidate) => candidate === experience) ?? cartExperiences[0],
         [cartExperiences, experience, switcherExperiences],
     );
+    // The design after the one being personalised, in the order the switcher lists them. Products added to a design
+    // are part of it, so when they're grouped under it they're skipped and the next design is the next one in the cart.
+    const nextExperience = useMemo(() => {
+        if (!experience) return undefined;
+        const list = singleMode ? switcherExperiences : cartExperiences;
+        const parentId = experience.getTransaction().parentTransaction?.id;
+        const current =
+            !singleMode && parentId
+                ? (list.find((candidate) => candidate.getTransaction().id === parentId) ?? experience)
+                : experience;
+        const index = list.indexOf(current);
+        return index >= 0 ? list[index + 1] : undefined;
+    }, [cartExperiences, experience, singleMode, switcherExperiences]);
     const handleContinue = useCallback(() => {
         const toOpen = experienceToOpen();
         if (!toOpen) return;
@@ -973,6 +986,7 @@ const PageHandler: FunctionComponent<{
                                 key={experience.getTransaction().id}
                                 workflowExperience={experience}
                                 onNext={handleFinish}
+                                onNextProduct={nextExperience ? () => setExperience(nextExperience) : undefined}
                                 nextPage={personalizeSuccessor("experience")}
                                 onRequestQuote={handleRequestQuote}
                                 onOpenExperience={setExperience}
@@ -983,8 +997,10 @@ const PageHandler: FunctionComponent<{
                 )}
                 {page === "shared" && experience && (
                     <SharedPersonalization
-                        key={experience.getTransaction().id}
                         experience={experience}
+                        experiences={switcherExperiences}
+                        groupChildren={!singleMode}
+                        onSelectExperience={setExperience}
                         onNext={handleSharedFinish}
                         nextLabel={
                             nextAfter("shared") === "experience"

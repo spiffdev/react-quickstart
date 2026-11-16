@@ -1,13 +1,15 @@
 import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
 import { WorkflowExperience } from "@spiffcommerce/core";
-import { Minus, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Minus, Plus, Trash2 } from "lucide-react";
 import styled from "styled-components";
 import { MEDIA } from "../../layout";
 import Button from "../../components/button";
 import Typography from "../../components/typography";
 import useCurrency from "../../hooks/useCurrency";
 
-const Panel = styled.aside`
+// Beside the products, the cart lists everything. When stacked below them it shows only the latest design, and can be
+// expanded to cover the whole products area.
+const Panel = styled.aside<{ $expanded: boolean }>`
     flex: 0 0 320px;
     display: flex;
     flex-direction: column;
@@ -18,26 +20,90 @@ const Panel = styled.aside`
 
     @media ${MEDIA.stacked} {
         flex: 0 1 auto;
-        max-height: 45%;
         border-left: none;
         border-top: 1px solid #e0e0e0;
+        ${(props) =>
+            props.$expanded &&
+            `
+            position: absolute;
+            inset: 0;
+            z-index: 2;
+            border-top: none;
+        `}
+    }
+`;
+
+const HeadingRow = styled.div`
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 16px 16px 8px;
+
+    @media ${MEDIA.stacked} {
+        padding: 10px 16px 4px;
     }
 `;
 
 const Heading = styled(Typography)`
     margin: 0;
-    padding: 16px 16px 8px;
     font-size: 18px;
     font-weight: 600;
 `;
 
-const Lines = styled.ul`
+// Only needed when stacked, where the rest of the cart is out of sight.
+const Count = styled.span`
+    display: none;
+    margin-left: 6px;
+    font-weight: 400;
+    color: #666;
+
+    @media ${MEDIA.stacked} {
+        display: inline;
+    }
+`;
+
+const ExpandButton = styled.button`
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 6px;
+    color: var(--theme-primary-color);
+    background: none;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+
+    &:focus-visible {
+        outline: 2px solid var(--theme-primary-color);
+    }
+
+    @media ${MEDIA.stacked} {
+        display: inline-flex;
+    }
+`;
+
+const Lines = styled.ul<{ $expanded: boolean }>`
     flex: 1 1 0;
     min-height: 0;
     margin: 0;
     padding: 0 16px;
     overflow-y: auto;
     list-style: none;
+
+    /* Stacked: only the design added last, until the cart is expanded. */
+    @media ${MEDIA.stacked} {
+        ${(props) =>
+            !props.$expanded &&
+            `
+            flex: none;
+            overflow: visible;
+
+            & > li:not(:last-child) {
+                display: none;
+            }
+        `}
+    }
 `;
 
 const Line = styled.li`
@@ -81,8 +147,11 @@ const Stepper = styled.div`
     border-radius: 5px;
 `;
 
+// Touch screens give every button a minimum size, so the icon has to be centred in it.
 const StepperButton = styled.button`
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 6px;
     color: inherit;
     background: none;
@@ -198,6 +267,8 @@ const QuantityControl: FunctionComponent<{
 const RemoveButton = styled.button`
     flex: none;
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
     padding: 6px;
     color: #666;
     background: none;
@@ -258,6 +329,10 @@ const Cart: FunctionComponent<{
     canContinue?: boolean;
 }> = ({ experiences, onRemove, onQuantityChange, onContinue, busy, canContinue = true }) => {
     const formatPrice = useCurrency();
+    const [expanded, setExpanded] = useState(false);
+    // With one design there's nothing more to show, so the cart can't stay expanded after others are removed.
+    const canExpand = experiences.length > 1;
+    const isExpanded = expanded && canExpand;
     // A workflow decides for itself whether its price is shown. An unset (null) flag counts as enabled.
     const priceShown = (experience: WorkflowExperience) => experience.getWorkflow()?.showPricing !== false;
     // A total which left out the prices that are hidden would be misleading, so it's only shown when every price is.
@@ -268,12 +343,31 @@ const Cart: FunctionComponent<{
     );
 
     return (
-        <Panel aria-label="Your cart">
-            <Heading variant="h2">Your cart</Heading>
+        <Panel aria-label="Your cart" $expanded={isExpanded}>
+            <HeadingRow>
+                <Heading variant="h2">
+                    Your cart
+                    {experiences.length > 0 && <Count>({experiences.length})</Count>}
+                </Heading>
+                {canExpand && (
+                    <ExpandButton
+                        type="button"
+                        aria-label={isExpanded ? "Collapse cart" : "Expand cart"}
+                        aria-expanded={isExpanded}
+                        onClick={() => setExpanded((current) => !current)}
+                    >
+                        {isExpanded ? (
+                            <ChevronDown size={22} aria-hidden="true" />
+                        ) : (
+                            <ChevronUp size={22} aria-hidden="true" />
+                        )}
+                    </ExpandButton>
+                )}
+            </HeadingRow>
             {experiences.length === 0 ? (
                 <Empty>Nothing here yet. Choose a product to get started.</Empty>
             ) : (
-                <Lines>
+                <Lines $expanded={isExpanded}>
                     {experiences.map((experience) => {
                         const name = experience.getTransaction().designName || experience.getProduct()?.name;
                         const image = imageOf(experience);

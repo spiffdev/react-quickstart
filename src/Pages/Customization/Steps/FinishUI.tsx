@@ -1,7 +1,7 @@
 import { FunctionComponent, useCallback, useState } from "react";
 import { ExportedStepData } from "@spiffcommerce/core";
 import styled from "styled-components";
-import { ClipboardCheck, Download, FileText, ShoppingCart } from "lucide-react";
+import { ArrowRight, ClipboardCheck, Download, FileText, ShoppingCart } from "lucide-react";
 import Button from "../../../components/button";
 import useCurrency from "../../../hooks/useCurrency";
 import Typography from "../../../components/typography";
@@ -81,6 +81,8 @@ const FinishUI: FunctionComponent<{
     reviewNext?: boolean;
     /** The button's label when it leads to another page. */
     reviewLabel?: string;
+    /** Moves to the next design in the bundle, when there is one. Offered alongside the way on from this one. */
+    onNextProduct?: () => void | Promise<void>;
     allowCart?: boolean;
     allowQuote?: boolean;
     /** Resolves false when the customer backs out of the quote, so they can carry on with their design. */
@@ -96,6 +98,7 @@ const FinishUI: FunctionComponent<{
     addToCartLabel,
     reviewNext = false,
     reviewLabel = "Review your design",
+    onNextProduct,
     allowCart = true,
     allowQuote = false,
     onRequestQuote,
@@ -130,6 +133,19 @@ const FinishUI: FunctionComponent<{
     }, [onFinished]);
 
     const [quoting, setQuoting] = useState(false);
+    const [movingToNext, setMovingToNext] = useState(false);
+
+    const handleNextProduct = useCallback(async () => {
+        setFinishError("");
+        setMovingToNext(true);
+        try {
+            await onNextProduct?.();
+        } catch (error) {
+            console.error("Error moving to the next product:", error);
+            setFinishError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
+            setMovingToNext(false);
+        }
+    }, [onNextProduct]);
 
     // Confirming the quote's details happens in a dialog opened by `onRequestQuote`.
     const handleQuote = useCallback(async () => {
@@ -218,10 +234,22 @@ const FinishUI: FunctionComponent<{
                     onAgree={handleFinish}
                 />
             )}
+            {onNextProduct && (
+                <ButtonGroup>
+                    <Button
+                        fullWidth
+                        disabled={finishing || movingToNext}
+                        icon={<ArrowRight size={18} aria-hidden="true" />}
+                        onClick={handleNextProduct}
+                    >
+                        Next product
+                    </Button>
+                </ButtonGroup>
+            )}
             {(allowCart || reviewNext) && (
                 <Button
                     fullWidth
-                    disabled={(!!termsMarkdown && !isConfirmed) || finishing}
+                    disabled={(!!termsMarkdown && !isConfirmed) || finishing || movingToNext}
                     icon={
                         finishing && !quoting ? undefined : reviewNext ? (
                             <ClipboardCheck size={18} aria-hidden="true" />

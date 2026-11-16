@@ -26,6 +26,7 @@ import {
     WorkflowExperience,
     WorkflowScene,
 } from "@spiffcommerce/core";
+import { ArrowRight } from "lucide-react";
 import Card from "../../components/card";
 import Typography from "../../components/typography";
 import Button from "../../components/button";
@@ -178,6 +179,11 @@ const ActionBar = styled.div`
     border-top: 1px solid #e0e0e0;
 `;
 
+const ActionBarButtons = styled.div`
+    display: flex;
+    gap: 8px;
+`;
+
 const ActionBarTotal = styled.div`
     display: flex;
     flex-direction: column;
@@ -242,6 +248,8 @@ const StepHandler: FunctionComponent<{
     onRequestQuote: () => void | boolean | Promise<void | boolean>;
     /** The page which follows this one, when it isn't the end of the design. */
     nextPage?: "review" | "shared";
+    /** Moves to the next design in the bundle, when there is one. */
+    onNextProduct?: () => void | Promise<void>;
     onOpenExperience?: (experience: WorkflowExperience) => void;
     onUpdatingChange?: (updating: boolean) => void;
     /** Reports whether the step has nothing for the customer to choose, so it is hidden. */
@@ -255,6 +263,7 @@ const StepHandler: FunctionComponent<{
     onFinished,
     onRequestQuote,
     nextPage,
+    onNextProduct,
     onOpenExperience,
     onUpdatingChange,
     onHiddenChange,
@@ -310,6 +319,7 @@ const StepHandler: FunctionComponent<{
                     addToCartLabel={addToCartLabel}
                     reviewNext={!!nextPage}
                     reviewLabel={nextPage === "shared" ? "Continue" : undefined}
+                    onNextProduct={onNextProduct}
                     allowCart={allowCart}
                     allowQuote={allowQuote}
                     onRequestQuote={onRequestQuote}
@@ -436,7 +446,9 @@ const Customization: FunctionComponent<{
     onUpdatingChange?: (updating: boolean) => void;
     /** The page which follows this one, when it isn't the end of the design. */
     nextPage?: "review" | "shared";
-}> = ({ workflowExperience, onNext, onRequestQuote, onOpenExperience, onUpdatingChange, nextPage }) => {
+    /** Moves to the next design in the bundle. Given when there is one, in which case finishing this design leads there. */
+    onNextProduct?: () => void;
+}> = ({ workflowExperience, onNext, onRequestQuote, onOpenExperience, onUpdatingChange, nextPage, onNextProduct }) => {
     const [selectionCost, setSelectionCost] = useState(0);
     const [exportedData, setExportedData] = useState<ExportedStepData[]>([]);
     const [traversableScenes, setTraversableScenes] = useState<WorkflowScene[]>([]);
@@ -527,6 +539,12 @@ const Customization: FunctionComponent<{
         await onNext();
     }, [handleFinishChecks, onNext]);
 
+    // Each design is checked as it's left, as otherwise only the last one would be.
+    const handleNextProduct = useCallback(async () => {
+        await handleFinishChecks();
+        onNextProduct?.();
+    }, [handleFinishChecks, onNextProduct]);
+
     // A quote needs the same checks as adding to the cart.
     const handleQuote = useCallback(async () => {
         await handleFinishChecks();
@@ -548,17 +566,18 @@ const Customization: FunctionComponent<{
         return () => observer.disconnect();
     }, [traversableScenes]);
 
-    const handleMoveOn = useCallback(async () => {
+    // Used by the action bar when there's no finish step to do it: it shows what's wrong when the checks fail.
+    const moveOn = useCallback(async (action: () => Promise<void>) => {
         setMoveError("");
         setMoving(true);
         try {
-            await handleFinish();
+            await action();
         } catch (error) {
             console.error("Error moving on from the design:", error);
             setMoveError(error instanceof Error ? error.message : "Something went wrong. Please try again.");
             setMoving(false);
         }
-    }, [handleFinish]);
+    }, []);
 
     // The action bar can't complete the design itself (there are terms to accept), so it takes the customer to the finish step.
     const scrollToFinish = useCallback(() => {
@@ -612,6 +631,7 @@ const Customization: FunctionComponent<{
                                             onFinished={handleFinish}
                                             onRequestQuote={handleQuote}
                                             nextPage={nextPage}
+                                            onNextProduct={onNextProduct && handleNextProduct}
                                             onOpenExperience={onOpenExperience}
                                             onUpdatingChange={onUpdatingChange}
                                             onHiddenChange={handleHiddenChange}
@@ -633,13 +653,27 @@ const Customization: FunctionComponent<{
                                         </>
                                     )}
                                 </ActionBarTotal>
-                                <Button disabled={moving} onClick={finishOnReviewPage ? handleMoveOn : scrollToFinish}>
-                                    {nextPage === "shared"
-                                        ? "Continue"
-                                        : nextPage === "review"
-                                          ? "Review"
-                                          : addToCartLabel || "Add to cart"}
-                                </Button>
+                                <ActionBarButtons>
+                                    {finishOnReviewPage && onNextProduct && (
+                                        <Button
+                                            disabled={moving}
+                                            icon={<ArrowRight size={18} aria-hidden="true" />}
+                                            onClick={() => moveOn(handleNextProduct)}
+                                        >
+                                            Next product
+                                        </Button>
+                                    )}
+                                    <Button
+                                        disabled={moving}
+                                        onClick={finishOnReviewPage ? () => moveOn(handleFinish) : scrollToFinish}
+                                    >
+                                        {nextPage === "shared"
+                                            ? "Continue"
+                                            : nextPage === "review"
+                                              ? "Review"
+                                              : addToCartLabel || "Add to cart"}
+                                    </Button>
+                                </ActionBarButtons>
                             </ActionBar>
                         </ActionBarClip>
                     </ActionBarShell>

@@ -2,6 +2,15 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-16 — Moving between designs
+
+- The **shared personalise page** has the experience switcher (when the bundle has more than one design), which only changes the design shown in the 3D preview; the options on the page are shared, so nothing else depends on it.
+- On the **personalise page**, when another design follows the current one, a **"Next product"** button (with an arrow) is offered in addition to the usual way on, which is still there (add to cart / quote, "Review your design" or "Continue", as before). In the finish step it sits above that button; with the review page on, the action bar shows both. The same checks as before (updates pending, mandatory steps, validation) run as each design is left. "Next" follows the switcher's order; when building a cart, products added to a design by a product step belong to it and are skipped over.
+
+## 2026-11-16 — Cart on narrow screens
+
+- When the cart sits below the products (stacked layout, i.e. phones and portrait), it now shows only the **design added last**, with the heading's count ("Your cart (3)"), the total and Continue, so it no longer fills the bottom of the screen with a scroll area. With more than one design, an expand icon button covers the whole products area (below the stepper and banners) with the full cart, and the same button collapses it again. Removing designs down to one collapses it. Beside the products the cart is unchanged. (`ProductSelector/Cart.tsx`; the products area is now `position: relative` for the overlay.)
+
 ## 2026-11-16 — Conversion configuration on every transaction
 
 - When the theme has a conversion configuration, `PageHandler` assigns its id to the recipient of every transaction in the bundle (including products added by a product step, and designs from a reloaded bundle) through `WorkflowManager.updateRecipient`, leaving the rest of the recipient as it is. Transactions which already have it are skipped, each is only updated once (a failure is retried the next time the cart changes), and the id is still also kept in the bundle's metadata as before.
