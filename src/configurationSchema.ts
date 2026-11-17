@@ -7,6 +7,20 @@ import {
     ThemeConfigurationSchema,
 } from "@spiffcommerce/theme-bridge";
 
+/*
+ * A note on how this configuration is shaped.
+ *
+ * Earlier themes put much of their configuration in nested objects (a "startPage" object holding the start page's
+ * fields, and so on). That is no longer the standard approach. Keep the configuration in flat structures: one field
+ * per setting, at the top level, with the page it appears on decided by `pageSettings` below. A field's place in
+ * the configuration editor is then only a matter of which page lists it, so pages can be reorganised, split or merged
+ * without moving any stored data, and a partner's existing values are never lost by doing so.
+ *
+ * Object fields and custom schema types are all still supported. Use them only when they really make sense, such as
+ * a list of repeated entries or a value which is meaningless without its siblings, and not simply to group fields
+ * which belong to the same page.
+ */
+
 export interface ThemeConfiguration {
     /**
      * A custom font used for all text. Falls back to the platform's font.
