@@ -2,6 +2,17 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-17 — Corporate portal: menu, sign-out and order details
+
+- **Menu:** the account dialog now opens on a menu (Draft orders, Previous orders, Saved branding, Sign out) in place of tabs, with a "← Menu" link back from each page.
+- **Sign out** also replaces the bundle with a new empty one (`startNewBundle`, shared with the first load in `App`), so the next person at the screen doesn't see the last customer's design. Their drafts are still saved against their account.
+- **Order details:** three new settings, **Corporate Portal: Order Name / Purchase Order / Dispatch Date**, each *Not asked* (the default), *Asked, optional* or *Asked, required*. They're recorded on the bundle's own `name`, `purchaseOrder` and `dispatchDate` fields (not its metadata), and only those which have changed are sent.
+  - Whichever are switched on are asked in an **Order details** button on the stepper bar, at any time, and when **duplicating** a previous order (before the copy is made).
+  - Required ones must be filled in before a design can be completed or a quote requested; the dialog opens for them if they aren't.
+  - The dispatch date is saved as the corporate theme does: the chosen day at the current local time, as an ISO instant, and read back as a local day.
+  - The dispatch date can't be in the past, and is kept within the product collection's dispatch dates when it has them.
+- New: `utils/orderDetails.ts`, `hooks/useOrderDetails.ts`, `components/OrderDetailsForm.tsx`, `components/OrderDetailsDialog.tsx`.
+
 ## 2026-11-17 — Corporate portal: saved branding and guest email
 
 - **Saved branding:** with the portal on and an activation that has shared options (a Global Property Configuration), the account dialog gains a **Saved branding** tab. It lists the signed-in customer's templates for that configuration, and **Apply** puts one on the bundle (recording its name in the bundle's `template` metadata) and shows the shared page afresh. The tab can also save the current shared options as a new template, and remove one.

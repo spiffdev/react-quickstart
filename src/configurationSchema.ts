@@ -69,6 +69,15 @@ export interface ThemeConfiguration {
      */
     portalEnforceLogin?: boolean;
     /**
+     * With the corporate portal, whether customers are asked to name their order: "off" (the default), "optional" or
+     * "required". Also asked when duplicating a previous order.
+     */
+    portalOrderName?: OrderDetailMode;
+    /** As `portalOrderName`, for the order's purchase order number. */
+    portalPurchaseOrder?: OrderDetailMode;
+    /** As `portalOrderName`, for the order's dispatch date. */
+    portalDispatchDate?: OrderDetailMode;
+    /**
      * The details asked of the customer when they request a quote. Only an email is asked for when unset.
      * Ignored when the corporate portal is enabled.
      */
@@ -86,6 +95,9 @@ export interface ThemeConfiguration {
      */
     thankYouCloseLabel?: string;
 }
+
+/** Whether an order detail is asked of the customer. */
+export type OrderDetailMode = "off" | "optional" | "required";
 
 export const configurationSchema: ThemeConfigurationSchema = {
     fields: [
@@ -195,6 +207,45 @@ export const configurationSchema: ThemeConfigurationSchema = {
             defaultValue: "false",
             description:
                 "When the email prompt is shown, customers are asked to sign in with a code instead of only entering their email. They can still continue as a guest.",
+        },
+        {
+            type: FieldType.Select,
+            key: "portalOrderName",
+            title: "Corporate Portal: Order Name",
+            defaultValue: "off",
+            description:
+                "Whether customers can name their order. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
+            options: [
+                { key: "off", value: "Not asked" },
+                { key: "optional", value: "Asked, optional" },
+                { key: "required", value: "Asked, required" },
+            ],
+        },
+        {
+            type: FieldType.Select,
+            key: "portalPurchaseOrder",
+            title: "Corporate Portal: Purchase Order",
+            defaultValue: "off",
+            description:
+                "Whether customers can enter a purchase order number. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
+            options: [
+                { key: "off", value: "Not asked" },
+                { key: "optional", value: "Asked, optional" },
+                { key: "required", value: "Asked, required" },
+            ],
+        },
+        {
+            type: FieldType.Select,
+            key: "portalDispatchDate",
+            title: "Corporate Portal: Dispatch Date",
+            defaultValue: "off",
+            description:
+                "Whether customers can choose a dispatch date, within the product collection's dispatch dates when it has them. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
+            options: [
+                { key: "off", value: "Not asked" },
+                { key: "optional", value: "Asked, optional" },
+                { key: "required", value: "Asked, required" },
+            ],
         },
         {
             type: FieldType.ConversionConfiguration,
@@ -324,6 +375,9 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                         "enableCorporatePortal",
                         "portalPromptEmail",
                         "portalEnforceLogin",
+                        "portalOrderName",
+                        "portalPurchaseOrder",
+                        "portalDispatchDate",
                         "conversionConfiguration",
                     ],
                 },

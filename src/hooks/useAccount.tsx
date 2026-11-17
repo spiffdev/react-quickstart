@@ -9,7 +9,9 @@ import {
     useMemo,
     useState,
 } from "react";
-import useBundle, { useSetBundle } from "./useBundle";
+import useBundle, { useSetBundle, useStartNewBundle } from "./useBundle";
+import useOrderDetailFields from "./useOrderDetails";
+import { applyOrderDetails, type OrderDetails } from "../utils/orderDetails";
 import useClient from "./useClient";
 import useThemeConfiguration from "./useThemeConfiguration";
 
@@ -21,11 +23,15 @@ interface AccountContextType {
     sendVerificationCode: (emailAddress: string) => Promise<void>;
     /** Resolves true when the code was accepted, in which case the current bundle now belongs to the customer. */
     submitVerificationCode: (emailAddress: string, code: string) => Promise<boolean>;
+    /** Signs out, and replaces the bundle with a new one so the next customer doesn't see this one's design. */
     signOut: () => Promise<void>;
     /** Re-opens one of the customer's draft bundles in place of the current one. */
     openDraft: (bundleId: string) => Promise<void>;
-    /** Copies one of the customer's previous bundles, designs included, and works on the copy. */
-    duplicateBundle: (bundleId: string) => Promise<void>;
+    /**
+     * Copies one of the customer's previous bundles, designs included, and works on the copy. The order details,
+     * which are only the ones the partner has switched on, are recorded on the copy.
+     */
+    duplicateBundle: (bundleId: string, details?: OrderDetails) => Promise<void>;
 }
 
 const AccountContext = createContext<AccountContextType>({
@@ -47,6 +53,8 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
     const client = useClient();
     const bundle = useBundle();
     const setBundle = useSetBundle();
+    const startNewBundle = useStartNewBundle();
+    const orderDetailFields = useOrderDetailFields();
     const { enableCorporatePortal, enableTestOrders } = useThemeConfiguration();
     const enabled = !!enableCorporatePortal;
     const [customer, setCustomer] = useState<Customer | undefined>(undefined);
@@ -125,7 +133,8 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
     const signOut = useCallback(async () => {
         await client.logOut();
         setCustomer(undefined);
-    }, [client]);
+        await startNewBundle();
+    }, [client, startNewBundle]);
 
     const bundleOptions = useMemo(() => ({ test: enableTestOrders || undefined }), [enableTestOrders]);
 
@@ -137,11 +146,13 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
     );
 
     const duplicateBundle = useCallback(
-        async (bundleId: string) => {
+        async (bundleId: string, details?: OrderDetails) => {
             const duplicate = await client.duplicateBundle(bundleId, false, true, bundleOptions);
-            setBundle(await duplicate());
+            const copy = await duplicate();
+            if (details) await applyOrderDetails(copy, orderDetailFields, details);
+            setBundle(copy);
         },
-        [bundleOptions, client, setBundle],
+        [bundleOptions, client, orderDetailFields, setBundle],
     );
 
     const value = useMemo(

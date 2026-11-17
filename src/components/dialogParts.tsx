@@ -70,22 +70,33 @@ export const TextButton = styled.button`
     }
 `;
 
-export const Tabs = styled.div`
+export const MenuItem = styled.button`
     display: flex;
-    gap: 16px;
-    margin: 16px 0 8px;
-    border-bottom: 1px solid #e0e0e0;
-`;
-
-export const Tab = styled.button<{ $active: boolean }>`
-    padding: 8px 0;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    margin-top: 8px;
+    padding: 12px 16px;
     font: inherit;
-    font-weight: ${(props) => (props.$active ? 600 : 400)};
-    color: ${(props) => (props.$active ? "var(--theme-primary-color)" : "inherit")};
-    background: none;
-    border: none;
-    border-bottom: 2px solid ${(props) => (props.$active ? "var(--theme-primary-color)" : "transparent")};
+    text-align: left;
+    background: #f7f7f7;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
     cursor: pointer;
+
+    & > span {
+        font-size: 13px;
+        color: #616161;
+    }
+
+    &:hover:not(:disabled) {
+        border-color: var(--theme-primary-color);
+    }
+
+    &:disabled {
+        cursor: default;
+        opacity: 0.6;
+    }
 `;
 
 export const Row = styled.li`

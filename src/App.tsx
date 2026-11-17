@@ -1,4 +1,4 @@
-import { FunctionComponent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FunctionComponent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
     SpiffThemeLoader,
     ThemeContext,
@@ -94,6 +94,16 @@ const App: FunctionComponent<{
         [context.configuration],
     );
 
+    const createNewBundle = useCallback(() => {
+        const collectionId = getProductCollectionForNewBundle(context);
+        // Passing the activation lets the bundle pick up the activation's Global Property Configuration.
+        const activationId = ((context as ThemeContextBundle).activation as ActivationData | undefined)?.id;
+        return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders }, activationId);
+    }, [client, context, enableTestOrders]);
+
+    // Starts over, such as when the customer signs out and the next customer shouldn't see their design.
+    const startNewBundle = useCallback(async () => setBundle(await createNewBundle()), [createNewBundle]);
+
     useEffect(() => {
         let canceled = false;
         setLoadFailed(false);
@@ -105,10 +115,7 @@ const App: FunctionComponent<{
                     test: enableTestOrders || undefined,
                 });
             }
-            const collectionId = getProductCollectionForNewBundle(context);
-            // Passing the activation lets the bundle pick up the activation's Global Property Configuration.
-            const activationId = (c.activation as ActivationData | undefined)?.id;
-            return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders }, activationId);
+            return createNewBundle();
         };
 
         loadBundle()
@@ -123,7 +130,7 @@ const App: FunctionComponent<{
         return () => {
             canceled = true;
         };
-    }, [client, context, enableTestOrders, loadAttempt]);
+    }, [client, context, createNewBundle, enableTestOrders, loadAttempt]);
 
     // In single product mode the product may already be chosen, such as by the e-commerce product page.
     const bundleOptions = (context as ThemeContextBundle).bundleOptions;
@@ -146,7 +153,7 @@ const App: FunctionComponent<{
         content = (
             <ClientProvider client={client}>
                 <ActivationProvider activation={context.activation}>
-                    <BundleProvider bundle={bundle} setBundle={setBundle}>
+                    <BundleProvider bundle={bundle} setBundle={setBundle} startNewBundle={startNewBundle}>
                         <AccountProvider>
                             <CurrencyProvider currencyContext={currencyContext}>
                                 <PageHandler collectionProduct={presetProduct} />

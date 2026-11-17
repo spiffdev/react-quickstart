@@ -5,20 +5,10 @@ import ErrorBanner from "./ErrorBanner";
 import useAccount from "../hooks/useAccount";
 import useBundle from "../hooks/useBundle";
 import useClient from "../hooks/useClient";
-import {
-    Backdrop,
-    Dialog,
-    Header,
-    Input,
-    List,
-    Muted,
-    Row,
-    RowText,
-    Tab,
-    Tabs,
-    TextButton,
-    Title,
-} from "./dialogParts";
+import useOrderDetailFields from "../hooks/useOrderDetails";
+import { EMPTY_ORDER_DETAILS } from "../utils/orderDetails";
+import OrderDetailsForm from "./OrderDetailsForm";
+import { Backdrop, Dialog, Header, Input, List, Muted, Row, RowText, MenuItem, TextButton, Title } from "./dialogParts";
 
 const PAGE_SIZE = 10;
 
@@ -342,9 +332,11 @@ const TemplateList: FunctionComponent<{ onApplied: () => void }> = ({ onApplied 
     );
 };
 
+type AccountPage = "menu" | "drafts" | "orders" | "templates";
+
 /**
- * The corporate portal. Customers sign in with a code sent to their email, then can pick a draft up where they left
- * it, or duplicate one of their previous orders.
+ * The corporate portal. Customers sign in with a code sent to their email, then from the menu can pick a draft up where
+ * they left it, duplicate one of their previous orders, or apply their saved branding.
  */
 const AccountDialog: FunctionComponent<{
     onClose: () => void;
@@ -353,67 +345,144 @@ const AccountDialog: FunctionComponent<{
 }> = ({ onClose, onTemplateApplied }) => {
     const { customer, signOut, openDraft, duplicateBundle } = useAccount();
     const bundle = useBundle();
+    const orderDetailFields = useOrderDetailFields();
     // Branding is the shared options, which only some activations have.
     const templatesAvailable = !!bundle.getGlobalPropertyConfiguration();
-    const [tab, setTab] = useState<"drafts" | "orders" | "templates">("drafts");
+    const [page, setPage] = useState<AccountPage>("menu");
+    // The previous order being duplicated, while the customer is asked for the new order's details.
+    const [reorder, setReorder] = useState<BundleRaw | undefined>(undefined);
+    const [signOutError, setSignOutError] = useState<string | undefined>(undefined);
+    const [signingOut, setSigningOut] = useState(false);
+
+    const handleSignOut = async () => {
+        setSigningOut(true);
+        setSignOutError(undefined);
+        try {
+            await signOut();
+            setPage("menu");
+        } catch (caught) {
+            console.error("Error signing out:", caught);
+            setSignOutError("We couldn't sign you out. Please try again.");
+        } finally {
+            setSigningOut(false);
+        }
+    };
+
+    const back = () => (reorder ? setReorder(undefined) : setPage("menu"));
+
+    const renderSignedIn = () => {
+        if (reorder) {
+            return (
+                <>
+                    <Muted>Tell us about the new order. Your previous order is copied, designs included.</Muted>
+                    <OrderDetailsForm
+                        fields={orderDetailFields}
+                        initialValues={EMPTY_ORDER_DETAILS}
+                        collection={reorder.productCollection}
+                        submitLabel="Duplicate"
+                        submittingLabel="Duplicating..."
+                        onSubmit={async (details) => {
+                            await duplicateBundle(reorder.id!, details);
+                            onClose();
+                        }}
+                    />
+                </>
+            );
+        }
+        switch (page) {
+            case "drafts":
+                return (
+                    <BundleList
+                        ordered={false}
+                        emptyMessage="You have no drafts yet."
+                        actionLabel="Continue"
+                        busyLabel="Opening..."
+                        onAction={async (item) => {
+                            await openDraft(item.id!);
+                            onClose();
+                        }}
+                    />
+                );
+            case "orders":
+                return (
+                    <BundleList
+                        ordered
+                        emptyMessage="You have no previous orders yet."
+                        actionLabel="Duplicate"
+                        busyLabel="Duplicating..."
+                        onAction={async (item) => {
+                            // Order details the partner asks for are given before the copy is made.
+                            if (orderDetailFields.length > 0) {
+                                setReorder(item);
+                                return;
+                            }
+                            await duplicateBundle(item.id!);
+                            onClose();
+                        }}
+                    />
+                );
+            case "templates":
+                return <TemplateList onApplied={onTemplateApplied} />;
+            default:
+                return (
+                    <>
+                        {signOutError && (
+                            <ErrorBanner message={signOutError} onDismiss={() => setSignOutError(undefined)} />
+                        )}
+                        <MenuItem type="button" onClick={() => setPage("drafts")}>
+                            <strong>Draft orders</strong>
+                            <span>Pick up an order where you left it.</span>
+                        </MenuItem>
+                        <MenuItem type="button" onClick={() => setPage("orders")}>
+                            <strong>Previous orders</strong>
+                            <span>Start a new order from one you've already placed.</span>
+                        </MenuItem>
+                        {templatesAvailable && (
+                            <MenuItem type="button" onClick={() => setPage("templates")}>
+                                <strong>Saved branding</strong>
+                                <span>Apply, save or remove your saved branding.</span>
+                            </MenuItem>
+                        )}
+                        <MenuItem type="button" disabled={signingOut} onClick={() => void handleSignOut()}>
+                            <strong>{signingOut ? "Signing out..." : "Sign out"}</strong>
+                            <span>
+                                Signed in as {customer?.emailAddress}. Your current design is cleared from this screen.
+                            </span>
+                        </MenuItem>
+                    </>
+                );
+        }
+    };
+
+    const heading = reorder
+        ? "Duplicate order"
+        : page === "drafts"
+          ? "Draft orders"
+          : page === "orders"
+            ? "Previous orders"
+            : page === "templates"
+              ? "Saved branding"
+              : "My account";
 
     return (
         <Backdrop>
             <Dialog role="dialog" aria-modal="true" aria-labelledby="account-title">
                 <Header>
-                    <Title id="account-title">{customer ? "My account" : "Sign in"}</Title>
+                    <Title id="account-title">{customer ? heading : "Sign in"}</Title>
                     <TextButton type="button" onClick={onClose}>
                         Close
                     </TextButton>
                 </Header>
                 {customer ? (
                     <>
-                        <Muted>
-                            Signed in as {customer.emailAddress}.{" "}
-                            <TextButton type="button" onClick={() => void signOut()}>
-                                Sign out
-                            </TextButton>
-                        </Muted>
-                        <Tabs role="tablist">
-                            <Tab role="tab" $active={tab === "drafts"} onClick={() => setTab("drafts")}>
-                                Drafts
-                            </Tab>
-                            <Tab role="tab" $active={tab === "orders"} onClick={() => setTab("orders")}>
-                                Previous orders
-                            </Tab>
-                            {templatesAvailable && (
-                                <Tab role="tab" $active={tab === "templates"} onClick={() => setTab("templates")}>
-                                    Saved branding
-                                </Tab>
-                            )}
-                        </Tabs>
-                        {tab === "drafts" ? (
-                            <BundleList
-                                key="drafts"
-                                ordered={false}
-                                emptyMessage="You have no drafts yet."
-                                actionLabel="Continue"
-                                busyLabel="Opening..."
-                                onAction={async (item) => {
-                                    await openDraft(item.id!);
-                                    onClose();
-                                }}
-                            />
-                        ) : tab === "templates" ? (
-                            <TemplateList key="templates" onApplied={onTemplateApplied} />
-                        ) : (
-                            <BundleList
-                                key="orders"
-                                ordered
-                                emptyMessage="You have no previous orders yet."
-                                actionLabel="Duplicate"
-                                busyLabel="Duplicating..."
-                                onAction={async (item) => {
-                                    await duplicateBundle(item.id!);
-                                    onClose();
-                                }}
-                            />
+                        {(page !== "menu" || reorder) && (
+                            <Muted>
+                                <TextButton type="button" onClick={back}>
+                                    ← {reorder ? "Previous orders" : "Menu"}
+                                </TextButton>
+                            </Muted>
                         )}
+                        {renderSignedIn()}
                     </>
                 ) : (
                     <SignIn />

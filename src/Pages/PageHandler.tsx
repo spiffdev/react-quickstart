@@ -1,6 +1,6 @@
 import { FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { CircleUserRound, UserRound } from "lucide-react";
+import { CircleUserRound, ClipboardList, UserRound } from "lucide-react";
 import useBundle from "../hooks/useBundle";
 import ProductCollectionSelector from "./ProductCollectionSelector";
 import {
@@ -37,6 +37,9 @@ import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm
 import ConversionDialog from "../components/ConversionDialog";
 import AccountDialog from "../components/AccountDialog";
 import GuestEmailDialog from "../components/GuestEmailDialog";
+import OrderDetailsDialog from "../components/OrderDetailsDialog";
+import useOrderDetailFields from "../hooks/useOrderDetails";
+import { missingOrderDetails, readOrderDetails } from "../utils/orderDetails";
 import useAccount from "../hooks/useAccount";
 
 // A text button for the stepper bar, so it reads as a link rather than a call to action.
@@ -143,6 +146,11 @@ const PageHandler: FunctionComponent<{
     const { enabled: portalEnabled, customer } = useAccount();
     const conversionConfiguration = portalEnabled ? undefined : themeConversionConfiguration;
     const [accountOpen, setAccountOpen] = useState(false);
+    // The order details dialog, and what is waiting on it.
+    const orderDetailFields = useOrderDetailFields();
+    const [pendingOrderDetails, setPendingOrderDetails] = useState<{ resolve: (saved: boolean) => void } | undefined>(
+        undefined,
+    );
     // Applying a saved branding template changes the shared options, so the shared page is shown afresh.
     const [templateRevision, setTemplateRevision] = useState(0);
     // Whether the guest email prompt is showing, and the bundles it has already been shown for.
@@ -802,9 +810,18 @@ const PageHandler: FunctionComponent<{
         return { leave: () => spiffThemeLoader.addToEcommerceCart(result) };
     }, [bundle, takeScreenshot]);
 
+    // The design can't be completed (or a quote requested) until the order details the partner requires are filled in.
+    // They're asked for if they aren't, and this throws a customer-readable message if the customer doesn't give them.
+    const ensureOrderDetails = useCallback(async () => {
+        if (missingOrderDetails(orderDetailFields, readOrderDetails(bundle)).length === 0) return;
+        const saved = await new Promise<boolean>((resolve) => setPendingOrderDetails({ resolve }));
+        if (!saved) throw new Error("Please fill in the order details to continue.");
+    }, [bundle, orderDetailFields]);
+
     // Completes the design. With a thank you page that page prepares the hand-off and the customer's exit performs
     // it, otherwise it all happens now. Throws a customer-readable message on failure.
     const completeDesign = useCallback(async () => {
+        await ensureOrderDetails();
         try {
             await requestConversionIfRequired(ConversionLocation.OnEnd);
             if (thankYouPageEnabled) {
@@ -819,7 +836,7 @@ const PageHandler: FunctionComponent<{
             // The finish step shows this message under its button.
             throw new Error("We couldn't add your design to the cart. Please try again.");
         }
-    }, [finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
+    }, [ensureOrderDetails, finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
 
     // Prepares the hand-off for the thank you page. Only ever runs once per visit, however often it's asked for.
     const prepareHandOff = useCallback((): Promise<PreparedHandOff> => {
@@ -905,13 +922,14 @@ const PageHandler: FunctionComponent<{
             return false;
         }
         try {
+            await ensureOrderDetails();
             await confirmQuote({});
             return true;
         } catch (error) {
             setErrorMessage(error instanceof Error ? error.message : "We couldn't request your quote.");
             return false;
         }
-    }, [confirmQuote, customer, existingDetails, portalEnabled]);
+    }, [confirmQuote, customer, ensureOrderDetails, existingDetails, portalEnabled]);
 
     const saveConversionDetails = useCallback(
         async (details: QuoteDetails) => {
@@ -969,10 +987,21 @@ const PageHandler: FunctionComponent<{
                 }}
                 actions={
                     portalEnabled ? (
-                        <DetailsButton disabled={accountOpen} onClick={() => setAccountOpen(true)}>
-                            {customer ? customer.emailAddress : "Sign in"}
-                            <CircleUserRound size={16} aria-hidden="true" />
-                        </DetailsButton>
+                        <>
+                            {orderDetailFields.length > 0 && (
+                                <DetailsButton
+                                    disabled={!!pendingOrderDetails}
+                                    onClick={() => setPendingOrderDetails({ resolve: () => {} })}
+                                >
+                                    Order details
+                                    <ClipboardList size={16} aria-hidden="true" />
+                                </DetailsButton>
+                            )}
+                            <DetailsButton disabled={accountOpen} onClick={() => setAccountOpen(true)}>
+                                {customer ? customer.emailAddress : "Sign in"}
+                                <CircleUserRound size={16} aria-hidden="true" />
+                            </DetailsButton>
+                        </>
                     ) : manualConversionAvailable ? (
                         <DetailsButton
                             disabled={!!pendingConversion}
@@ -1094,6 +1123,14 @@ const PageHandler: FunctionComponent<{
                     />
                 )}
             </div>
+            {pendingOrderDetails && (
+                <OrderDetailsDialog
+                    onClose={(saved) => {
+                        pendingOrderDetails.resolve(saved);
+                        setPendingOrderDetails(undefined);
+                    }}
+                />
+            )}
             {accountOpen && (
                 <AccountDialog
                     onClose={() => setAccountOpen(false)}

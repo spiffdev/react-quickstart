@@ -61,9 +61,11 @@ const Actions = styled.div`
     display: flex;
     flex: none;
     align-items: center;
+    gap: 16px;
     padding: 0 16px;
 
     @media ${MEDIA.compact} {
+        gap: 12px;
         padding: 0 12px;
     }
 `;
