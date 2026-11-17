@@ -55,7 +55,22 @@ export interface ThemeConfiguration {
      */
     allowCartRequests?: boolean;
     /**
+     * Turns on the corporate portal: customers sign in with an email code, their bundle is attached to them, and they
+     * can re-open their drafts or duplicate their previous orders. Completely replaces the conversion configuration.
+     */
+    enableCorporatePortal?: boolean;
+    /**
+     * With the corporate portal, asks customers who haven't signed in for their email address when they start
+     * personalising. They can always continue as a guest instead.
+     */
+    portalPromptEmail?: boolean;
+    /**
+     * With the corporate portal's email prompt, customers sign in with a code rather than only giving their email.
+     */
+    portalEnforceLogin?: boolean;
+    /**
      * The details asked of the customer when they request a quote. Only an email is asked for when unset.
+     * Ignored when the corporate portal is enabled.
      */
     conversionConfiguration?: ConversionConfiguration;
     /**
@@ -158,10 +173,35 @@ export const configurationSchema: ThemeConfigurationSchema = {
                 "When true, the customer will be allowed to add items to their cart and proceed to checkout immediately.",
         },
         {
+            type: FieldType.Boolean,
+            key: "enableCorporatePortal",
+            title: "Enable Corporate Portal",
+            defaultValue: "false",
+            description:
+                "When true, customers sign in with an email code and can continue their drafts or duplicate previous orders. This completely replaces the conversion configuration.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalPromptEmail",
+            title: "Corporate Portal: Ask for Email",
+            defaultValue: "false",
+            description:
+                "When the corporate portal is enabled, asks customers who haven't signed in for their email address when they start personalising. They can continue as a guest.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalEnforceLogin",
+            title: "Corporate Portal: Enforce Sign-in",
+            defaultValue: "false",
+            description:
+                "When the email prompt is shown, customers are asked to sign in with a code instead of only entering their email. They can still continue as a guest.",
+        },
+        {
             type: FieldType.ConversionConfiguration,
             key: "conversionConfiguration",
             title: "Conversion Configuration",
-            description: "The details asked of the customer when they request a quote.",
+            description:
+                "The details asked of the customer when they request a quote. Ignored when the corporate portal is enabled.",
         },
         {
             type: FieldType.Text,
@@ -277,7 +317,15 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                 },
                 {
                     title: "Checkout",
-                    fields: ["addToCartLabel", "allowCartRequests", "allowQuoteRequests", "conversionConfiguration"],
+                    fields: [
+                        "addToCartLabel",
+                        "allowCartRequests",
+                        "allowQuoteRequests",
+                        "enableCorporatePortal",
+                        "portalPromptEmail",
+                        "portalEnforceLogin",
+                        "conversionConfiguration",
+                    ],
                 },
                 {
                     title: "Testing",

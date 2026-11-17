@@ -1,6 +1,6 @@
 import { FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { UserRound } from "lucide-react";
+import { CircleUserRound, UserRound } from "lucide-react";
 import useBundle from "../hooks/useBundle";
 import ProductCollectionSelector from "./ProductCollectionSelector";
 import {
@@ -35,6 +35,9 @@ import useThemeConfiguration, {
 } from "../hooks/useThemeConfiguration";
 import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
 import ConversionDialog from "../components/ConversionDialog";
+import AccountDialog from "../components/AccountDialog";
+import GuestEmailDialog from "../components/GuestEmailDialog";
+import useAccount from "../hooks/useAccount";
 
 // A text button for the stepper bar, so it reads as a link rather than a call to action.
 const DetailsButton = styled.button`
@@ -128,7 +131,23 @@ const PageHandler: FunctionComponent<{
     const client = useClient();
     const bundle = useBundle();
     const activation = useActivation();
-    const { conversionConfiguration, thankYouMessage, thankYouCloseLabel, addToCartLabel } = useThemeConfiguration();
+    const {
+        conversionConfiguration: themeConversionConfiguration,
+        thankYouMessage,
+        thankYouCloseLabel,
+        addToCartLabel,
+        portalPromptEmail,
+        portalEnforceLogin,
+    } = useThemeConfiguration();
+    // The corporate portal completely replaces the conversion configuration, which is treated as if it was never set.
+    const { enabled: portalEnabled, customer } = useAccount();
+    const conversionConfiguration = portalEnabled ? undefined : themeConversionConfiguration;
+    const [accountOpen, setAccountOpen] = useState(false);
+    // Applying a saved branding template changes the shared options, so the shared page is shown afresh.
+    const [templateRevision, setTemplateRevision] = useState(0);
+    // Whether the guest email prompt is showing, and the bundles it has already been shown for.
+    const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+    const guestPromptedBundles = useRef(new WeakSet<object>());
     const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
     const thankYouPageEnabled = usePageEnabled("thank-you");
@@ -728,6 +747,27 @@ const PageHandler: FunctionComponent<{
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
     }, [onExperiencePage, requestConversionIfRequired]);
 
+    // With the corporate portal, a customer who hasn't signed in can be asked for their email as they start.
+    // Each bundle is only asked once, and never when it already has an owner.
+    useEffect(() => {
+        if (!onExperiencePage || !portalEnabled || !portalPromptEmail || customer) return;
+        if (guestPromptedBundles.current.has(bundle)) return;
+        guestPromptedBundles.current.add(bundle);
+        bundle
+            .getAllStakeholders()
+            .then((stakeholders) => {
+                if (!stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) {
+                    setGuestPromptOpen(true);
+                }
+            })
+            .catch((error) => console.error("Error checking the customer's details:", error));
+    }, [bundle, customer, onExperiencePage, portalEnabled, portalPromptEmail]);
+    // Signing in answers the prompt, as does the bundle being swapped for another.
+    useEffect(() => {
+        if (customer) setGuestPromptOpen(false);
+    }, [customer]);
+    useEffect(() => setGuestPromptOpen(false), [bundle]);
+
     // A preview image is only needed for the first experience. It comes from the 3D scene when the workflow is set up
     // for that, which `finishBundle` makes sure is loaded.
     const takeScreenshot = useCallback(
@@ -825,20 +865,11 @@ const PageHandler: FunctionComponent<{
         return next === "review" || next === "shared" ? next : undefined;
     };
 
-    // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
-    // This resolves with whether the quote was requested, which is false when the customer cancels.
-    const handleRequestQuote = useCallback(
-        () =>
-            new Promise<boolean>((resolve) =>
-                setPendingConversion({ resolve, quote: true, initialValues: existingDetails() }),
-            ),
-        [existingDetails],
-    );
-
     const confirmQuote = useCallback(
         async (details: QuoteDetails) => {
             try {
-                await saveDetails(details);
+                // With the corporate portal the customer is already attached to the bundle by signing in.
+                if (!portalEnabled) await saveDetails(details);
                 const quoteId = await bundle.generateQuoteId();
                 if (thankYouPageEnabled) {
                     // The thank you page takes over from here. Quotes aren't handed off yet.
@@ -856,8 +887,31 @@ const PageHandler: FunctionComponent<{
                 throw new Error("We couldn't request your quote. Please try again.");
             }
         },
-        [bundle, saveDetails, thankYouPageEnabled],
+        [bundle, portalEnabled, saveDetails, thankYouPageEnabled],
     );
+
+    // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
+    // This resolves with whether the quote was requested, which is false when the customer cancels.
+    // With the corporate portal the customer's details are those of their account, so they sign in instead.
+    const handleRequestQuote = useCallback(async () => {
+        if (!portalEnabled) {
+            return new Promise<boolean>((resolve) =>
+                setPendingConversion({ resolve, quote: true, initialValues: existingDetails() }),
+            );
+        }
+        if (!customer) {
+            setAccountOpen(true);
+            setErrorMessage("Please sign in to request a quote.");
+            return false;
+        }
+        try {
+            await confirmQuote({});
+            return true;
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "We couldn't request your quote.");
+            return false;
+        }
+    }, [confirmQuote, customer, existingDetails, portalEnabled]);
 
     const saveConversionDetails = useCallback(
         async (details: QuoteDetails) => {
@@ -914,7 +968,12 @@ const PageHandler: FunctionComponent<{
                     setPage(target);
                 }}
                 actions={
-                    manualConversionAvailable ? (
+                    portalEnabled ? (
+                        <DetailsButton disabled={accountOpen} onClick={() => setAccountOpen(true)}>
+                            {customer ? customer.emailAddress : "Sign in"}
+                            <CircleUserRound size={16} aria-hidden="true" />
+                        </DetailsButton>
+                    ) : manualConversionAvailable ? (
                         <DetailsButton
                             disabled={!!pendingConversion}
                             onClick={() =>
@@ -997,6 +1056,7 @@ const PageHandler: FunctionComponent<{
                 )}
                 {page === "shared" && experience && (
                     <SharedPersonalization
+                        key={templateRevision}
                         experience={experience}
                         experiences={switcherExperiences}
                         groupChildren={!singleMode}
@@ -1034,6 +1094,22 @@ const PageHandler: FunctionComponent<{
                     />
                 )}
             </div>
+            {accountOpen && (
+                <AccountDialog
+                    onClose={() => setAccountOpen(false)}
+                    onTemplateApplied={() => setTemplateRevision((revision) => revision + 1)}
+                />
+            )}
+            {guestPromptOpen && !accountOpen && (
+                <GuestEmailDialog
+                    enforceLogin={!!portalEnforceLogin}
+                    onEmailProvided={async (email) => {
+                        await bundle.addStakeholder({ emailAddress: email }, StakeholderType.Owner);
+                        setGuestPromptOpen(false);
+                    }}
+                    onContinueAsGuest={() => setGuestPromptOpen(false)}
+                />
+            )}
             {pendingConversion && (
                 <ConversionDialog
                     // A quote can be cancelled, but it can't go ahead without the customer's details.

@@ -18,6 +18,7 @@ import { ThemeProvider } from "./hooks/useTheme";
 import { ThemeConfigurationProvider } from "./hooks/useThemeConfiguration";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
+import { AccountProvider } from "./hooks/useAccount";
 import type { ThemeConfiguration } from "./configurationSchema";
 import { ClientProvider } from "./hooks/useClient";
 import LoadingOverlay from "./Pages/components/LoadingOverlay";
@@ -145,10 +146,12 @@ const App: FunctionComponent<{
         content = (
             <ClientProvider client={client}>
                 <ActivationProvider activation={context.activation}>
-                    <BundleProvider bundle={bundle}>
-                        <CurrencyProvider currencyContext={currencyContext}>
-                            <PageHandler collectionProduct={presetProduct} />
-                        </CurrencyProvider>
+                    <BundleProvider bundle={bundle} setBundle={setBundle}>
+                        <AccountProvider>
+                            <CurrencyProvider currencyContext={currencyContext}>
+                                <PageHandler collectionProduct={presetProduct} />
+                            </CurrencyProvider>
+                        </AccountProvider>
                     </BundleProvider>
                 </ActivationProvider>
             </ClientProvider>

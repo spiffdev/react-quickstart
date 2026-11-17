@@ -2,6 +2,21 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-17 — Corporate portal: saved branding and guest email
+
+- **Saved branding:** with the portal on and an activation that has shared options (a Global Property Configuration), the account dialog gains a **Saved branding** tab. It lists the signed-in customer's templates for that configuration, and **Apply** puts one on the bundle (recording its name in the bundle's `template` metadata) and shows the shared page afresh. The tab can also save the current shared options as a new template, and remove one.
+- **Guest email prompt:** new **Corporate Portal: Ask for Email** setting. When on, a customer who isn't signed in is asked for their email as they first reach the personalise page (once per bundle, never when the bundle already has an owner). The email becomes the bundle's owner. **Continue as guest** closes it. With **Corporate Portal: Enforce Sign-in** the prompt is the sign-in form (email and code) instead.
+- New: `components/GuestEmailDialog.tsx`, `components/dialogParts.tsx` (the dialogs' shared styling).
+
+## 2026-11-17 — Corporate portal
+
+- New **Enable Corporate Portal** setting (Personalise > Checkout), modelled on the corporate theme's portal. When it's on it **completely replaces the conversion configuration**: the details dialog, its start/end/manual locations, the "Your details" button, the recipient's conversion configuration id and the details saved to the bundle's metadata are all skipped.
+- **Sign-in:** the stepper bar's button opens an account dialog where the customer enters their email and the code sent to it (`generateVerificationCode` / `verifyCode`). A session from a previous visit is restored (and dropped if the customer belongs to another partner). Signing in attaches the current bundle to the customer as its owner, unless it already has one.
+- **Re-open drafts:** the **Drafts** tab lists the customer's unordered bundles which have designs in them, and **Continue** loads one in place of the current bundle, picking up at the personalise page.
+- **Duplicate orders:** the **Previous orders** tab lists their ordered bundles, and **Duplicate** copies one (designs included) and works on the copy.
+- Requesting a quote uses the signed-in customer instead of asking for details, and asks them to sign in first if they haven't.
+- New: `hooks/useAccount.tsx`, `components/AccountDialog.tsx`; `BundleProvider` now also takes `setBundle`, so `App` can swap the bundle.
+
 ## 2026-11-16 — Moving between designs
 
 - The **shared personalise page** has the experience switcher (when the bundle has more than one design), which only changes the design shown in the 3D preview; the options on the page are shared, so nothing else depends on it.
