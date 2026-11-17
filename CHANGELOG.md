@@ -2,6 +2,15 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-17 — Welcome page, saved assets, default template, timeout and start over
+
+- **Welcome page:** a new optional page (Welcome, off until switched on) in a group of its own, so it can't be moved: it's always first. Title, description, background image and every button's text are settings. It starts a new order, and with the corporate portal also offers **saved branding**, **duplicate a previous order** and **continue a draft / sign in**, which open the account dialog on that page (the customer signs in first if they haven't). Applying branding from it carries straight on to the order. A bundle that already has designs (a draft, a duplicate) skips it, and it comes back whenever the bundle is replaced (sign-out, timeout, start over).
+- **Saved assets:** new **Saved assets** page in the account menu listing the customer's asset configurations (thumbnail, name, colour channels) with remove, as in the corporate theme. Assets a signed-in customer creates (e.g. uploading in a frame step) will be linked to them automatically, so they'll appear here with nothing more to do.
+- **Default template:** a signed-in customer with a default template has it applied to their new bundle (its shared options, and its name in the bundle's `template` metadata). Bundles with designs or branding already are left alone. The corporate theme starts the new bundle as a copy; here the bundle already exists, so its options are set instead.
+- **Inactivity timeout:** new **Corporate Portal: Inactivity Timeout (seconds)** setting. After that long without a click, touch, key press or movement, the customer is signed out and the bundle replaced (or, with nothing to clear, the welcome page is shown again).
+- **Start over:** the thank you page has a **Start a new order** button (**Show Start Over Button** / **Start Over Button Text** settings). It does whatever of the hand-off is left (adding the design to the e-commerce cart; nothing for test orders and quotes, which are already done) and then starts a new bundle.
+- **Collection badges:** saved branding shows the collections it's available in when the activation's collections use different shared options, and is disabled with a reason if it was made for a different configuration than the current bundle's. Applying it now shows "Applied ✓".
+
 ## 2026-11-17 — Corporate portal: menu, sign-out and order details
 
 - **Menu:** the account dialog now opens on a menu (Draft orders, Previous orders, Saved branding, Sign out) in place of tabs, with a "← Menu" link back from each page.

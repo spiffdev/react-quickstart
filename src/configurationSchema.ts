@@ -94,6 +94,31 @@ export interface ThemeConfiguration {
      * The text of the button that closes the experience from the thank you page.
      */
     thankYouCloseLabel?: string;
+    /** Whether the thank you page has a button which hands the design off and starts a new order. On by default. */
+    thankYouShowStartOver?: boolean;
+    /** The text of the thank you page's start over button. */
+    thankYouStartOverLabel?: string;
+    /**
+     * With the corporate portal, the seconds without any activity after which the experience starts over: the
+     * customer is signed out and their design is cleared. Never when unset or zero.
+     */
+    portalInactivitySeconds?: number;
+    /** An image shown behind the welcome page. */
+    welcomeBackgroundImage?: AssetResource;
+    /** The welcome page's heading. */
+    welcomeTitle?: string;
+    /** The text under the welcome page's heading. */
+    welcomeDescription?: string;
+    /** The text of the button that starts a new order. */
+    welcomeStartLabel?: string;
+    /** The text of the button that applies saved branding (corporate portal only). */
+    welcomeBrandingLabel?: string;
+    /** The text of the button that duplicates a previous order (corporate portal only). */
+    welcomeDuplicateLabel?: string;
+    /** The text of the button that re-opens a draft (corporate portal only). */
+    welcomeContinueLabel?: string;
+    /** The text of the button that signs in (corporate portal only). */
+    welcomeSignInLabel?: string;
 }
 
 /** Whether an order detail is asked of the customer. */
@@ -248,6 +273,86 @@ export const configurationSchema: ThemeConfigurationSchema = {
             ],
         },
         {
+            type: FieldType.Number,
+            key: "portalInactivitySeconds",
+            title: "Corporate Portal: Inactivity Timeout (seconds)",
+            description:
+                "When set, the experience starts over after this many seconds without any activity: the customer is signed out and their design is cleared. Leave empty to never time out. Useful for shared screens.",
+        },
+        {
+            type: FieldType.Asset,
+            assetType: AssetType.Image,
+            key: "welcomeBackgroundImage",
+            title: "Welcome Page Background",
+            description: "An image shown behind the welcome page.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeTitle",
+            title: "Welcome Page Title",
+            defaultValue: "Welcome",
+            description: "The heading on the welcome page.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeDescription",
+            title: "Welcome Page Description",
+            defaultValue: "Start a new order, or pick up where you left off.",
+            description: "The text under the heading on the welcome page.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeStartLabel",
+            title: "Start Button Text",
+            defaultValue: "Start a new order",
+            description: "The text of the button that starts a new order.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeBrandingLabel",
+            title: "Saved Branding Button Text",
+            defaultValue: "Use saved branding",
+            description:
+                "The text of the button that applies the customer's saved branding. Only shown with the corporate portal.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeDuplicateLabel",
+            title: "Duplicate Button Text",
+            defaultValue: "Duplicate a previous order",
+            description:
+                "The text of the button that starts from a previous order. Only shown with the corporate portal.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeContinueLabel",
+            title: "Continue Draft Button Text",
+            defaultValue: "Continue a draft",
+            description:
+                "The text of the button that re-opens a draft, when the customer is signed in. Only shown with the corporate portal.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeSignInLabel",
+            title: "Sign In Button Text",
+            defaultValue: "Sign in",
+            description: "The text of the button that signs the customer in. Only shown with the corporate portal.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "thankYouShowStartOver",
+            title: "Show Start Over Button",
+            defaultValue: "true",
+            description: "When true, the thank you page has a button that hands the design off and starts a new order.",
+        },
+        {
+            type: FieldType.Text,
+            key: "thankYouStartOverLabel",
+            title: "Start Over Button Text",
+            defaultValue: "Start a new order",
+            description: "The text of the thank you page's button that starts a new order.",
+        },
+        {
             type: FieldType.ConversionConfiguration,
             key: "conversionConfiguration",
             title: "Conversion Configuration",
@@ -286,6 +391,13 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             key: "appearance",
             title: "Appearance",
             pageKeys: ["styling"],
+            reorderable: false,
+        },
+        {
+            // The welcome page is always first, so it's in a group of its own which can't be reordered.
+            key: "welcome",
+            title: "Welcome",
+            pageKeys: ["welcome"],
             reorderable: false,
         },
         {
@@ -352,6 +464,32 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             `,
         },
         {
+            key: "welcome",
+            title: "Welcome",
+            subtitle:
+                "An optional landing page shown before anything else. With the corporate portal it also offers saved branding, previous orders and drafts.",
+            icon: "play",
+            // Whether the page is shown is set by the page's toggle, and the page is off until it is switched on.
+            toggleable: true,
+            disabled: true,
+            sections: [
+                {
+                    title: "Content",
+                    fields: ["welcomeTitle", "welcomeDescription", "welcomeBackgroundImage"],
+                },
+                {
+                    title: "Buttons",
+                    fields: [
+                        "welcomeStartLabel",
+                        "welcomeBrandingLabel",
+                        "welcomeDuplicateLabel",
+                        "welcomeContinueLabel",
+                        "welcomeSignInLabel",
+                    ],
+                },
+            ],
+        },
+        {
             key: "personalize",
             title: "Personalise",
             subtitle: "How the design editor is laid out and what it offers customers.",
@@ -378,6 +516,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                         "portalOrderName",
                         "portalPurchaseOrder",
                         "portalDispatchDate",
+                        "portalInactivitySeconds",
                         "conversionConfiguration",
                     ],
                 },
@@ -419,7 +558,12 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             sections: [
                 {
                     title: "Thank You Page",
-                    fields: ["thankYouMessage", "thankYouCloseLabel"],
+                    fields: [
+                        "thankYouMessage",
+                        "thankYouCloseLabel",
+                        "thankYouShowStartOver",
+                        "thankYouStartOverLabel",
+                    ],
                 },
             ],
         },

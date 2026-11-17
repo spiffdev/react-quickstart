@@ -129,3 +129,27 @@ export const List = styled.ul`
     padding: 0;
     list-style: none;
 `;
+
+export const Chips = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+`;
+
+export const Chip = styled.span`
+    padding: 2px 8px;
+    font-size: 12px;
+    color: #424242;
+    background: #eeeeee;
+    border-radius: 10px;
+`;
+
+export const Thumbnail = styled.img`
+    flex: none;
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 6px;
+    background: #f0f0f0;
+`;

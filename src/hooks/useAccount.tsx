@@ -1,4 +1,4 @@
-import { StakeholderType, type Customer } from "@spiffcommerce/core";
+import { getGlobalPropertyStateForBundle, StakeholderType, type Customer } from "@spiffcommerce/core";
 import {
     createContext,
     FunctionComponent,
@@ -7,6 +7,7 @@ import {
     useContext,
     useEffect,
     useMemo,
+    useRef,
     useState,
 } from "react";
 import useBundle, { useSetBundle, useStartNewBundle } from "./useBundle";
@@ -25,6 +26,8 @@ interface AccountContextType {
     submitVerificationCode: (emailAddress: string, code: string) => Promise<boolean>;
     /** Signs out, and replaces the bundle with a new one so the next customer doesn't see this one's design. */
     signOut: () => Promise<void>;
+    /** Starts over for the next customer: signs out if anyone is, and replaces the bundle with a new one. */
+    resetSession: () => Promise<void>;
     /** Re-opens one of the customer's draft bundles in place of the current one. */
     openDraft: (bundleId: string) => Promise<void>;
     /**
@@ -40,6 +43,7 @@ const AccountContext = createContext<AccountContextType>({
     sendVerificationCode: async () => {},
     submitVerificationCode: async () => false,
     signOut: async () => {},
+    resetSession: async () => {},
     openDraft: async () => {},
     duplicateBundle: async () => {},
 });
@@ -110,6 +114,30 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
         };
     }, [bundle, customer, enabled]);
 
+    // A customer's default template is applied to their new bundles, as the corporate theme does by starting them from
+    // a copy of it. Here the bundle is already there, so its shared options are set instead. A bundle which already has
+    // designs (such as a draft) or has had branding applied is left alone, and each is only tried once.
+    const defaultTemplateTried = useRef(new WeakSet<object>());
+    useEffect(() => {
+        const templateBundleId = customer?.defaultTemplateBundleId;
+        if (!enabled || !templateBundleId || defaultTemplateTried.current.has(bundle)) return;
+        if (bundle.getWorkflowExperiences().length > 0 || bundle.getMetadata().has("template")) return;
+        defaultTemplateTried.current.add(bundle);
+        (async () => {
+            try {
+                const state = await getGlobalPropertyStateForBundle(templateBundleId);
+                if (!state) return;
+                const template = await client.getExistingBundle(templateBundleId);
+                await bundle.applyGlobalPropertyState(state);
+                const metadata = new Map(bundle.getMetadata());
+                metadata.set("template", template.getName());
+                await bundle.setMetadata(metadata);
+            } catch (error) {
+                console.error("Error applying the customer's default template:", error);
+            }
+        })();
+    }, [bundle, client, customer, enabled]);
+
     const sendVerificationCode = useCallback(
         (emailAddress: string) => client.generateVerificationCode(emailAddress),
         [client],
@@ -135,6 +163,11 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
         setCustomer(undefined);
         await startNewBundle();
     }, [client, startNewBundle]);
+
+    const resetSession = useCallback(async () => {
+        if (customer) await signOut();
+        else await startNewBundle();
+    }, [customer, signOut, startNewBundle]);
 
     const bundleOptions = useMemo(() => ({ test: enableTestOrders || undefined }), [enableTestOrders]);
 
@@ -162,10 +195,20 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
             sendVerificationCode,
             submitVerificationCode,
             signOut,
+            resetSession,
             openDraft,
             duplicateBundle,
         }),
-        [customer, duplicateBundle, enabled, openDraft, sendVerificationCode, signOut, submitVerificationCode],
+        [
+            customer,
+            duplicateBundle,
+            enabled,
+            openDraft,
+            resetSession,
+            sendVerificationCode,
+            signOut,
+            submitVerificationCode,
+        ],
     );
 
     return <AccountContext.Provider value={value}>{children}</AccountContext.Provider>;

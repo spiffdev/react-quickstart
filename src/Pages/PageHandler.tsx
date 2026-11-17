@@ -38,6 +38,9 @@ import ConversionDialog from "../components/ConversionDialog";
 import AccountDialog from "../components/AccountDialog";
 import GuestEmailDialog from "../components/GuestEmailDialog";
 import OrderDetailsDialog from "../components/OrderDetailsDialog";
+import WelcomePage from "./Welcome";
+import type { AccountPage } from "../components/AccountDialog";
+import { useStartNewBundle } from "../hooks/useBundle";
 import useOrderDetailFields from "../hooks/useOrderDetails";
 import { missingOrderDetails, readOrderDetails } from "../utils/orderDetails";
 import useAccount from "../hooks/useAccount";
@@ -71,12 +74,17 @@ const DetailsButton = styled.button`
     }
 `;
 
-type PageType = "collection" | "product" | "workflow" | "experience" | "shared" | "review" | "thankyou";
+type PageType = "welcome" | "collection" | "product" | "workflow" | "experience" | "shared" | "review" | "thankyou";
 
 /** What the thank you page waits for before the customer can leave. */
 export type PreparedHandOff = {
     /** Hands the design off, which ends the experience. */
     leave: () => void;
+    /**
+     * Whatever of the hand-off is still to do when the customer starts a new order instead of leaving, which doesn't
+     * end the experience. Nothing when the design has already been placed (test orders) or is only a quote.
+     */
+    complete?: () => void;
     /** The number of the order that was placed, if the theme placed one. */
     orderNumber?: string;
 };
@@ -141,11 +149,22 @@ const PageHandler: FunctionComponent<{
         addToCartLabel,
         portalPromptEmail,
         portalEnforceLogin,
+        portalInactivitySeconds,
+        thankYouShowStartOver,
+        thankYouStartOverLabel,
     } = useThemeConfiguration();
     // The corporate portal completely replaces the conversion configuration, which is treated as if it was never set.
-    const { enabled: portalEnabled, customer } = useAccount();
+    const { enabled: portalEnabled, customer, resetSession } = useAccount();
+    const startNewBundle = useStartNewBundle();
+    const welcomeEnabled = usePageEnabled("welcome");
     const conversionConfiguration = portalEnabled ? undefined : themeConversionConfiguration;
     const [accountOpen, setAccountOpen] = useState(false);
+    // The page of the account dialog to open on, which depends on where it was opened from.
+    const [accountPage, setAccountPage] = useState<AccountPage>("menu");
+    const openAccount = useCallback((initialPage: AccountPage = "menu") => {
+        setAccountPage(initialPage);
+        setAccountOpen(true);
+    }, []);
     // The order details dialog, and what is waiting on it.
     const orderDetailFields = useOrderDetailFields();
     const [pendingOrderDetails, setPendingOrderDetails] = useState<{ resolve: (saved: boolean) => void } | undefined>(
@@ -171,8 +190,8 @@ const PageHandler: FunctionComponent<{
     // The page where the customer starts personalising.
     const firstPersonalizePage: PageType = sharedFirst ? "shared" : "experience";
     // Read by the effect which starts a bundle off, which mustn't run again just because these change.
-    const startingPoint = useRef({ firstPersonalizePage, pageRank });
-    startingPoint.current = { firstPersonalizePage, pageRank };
+    const startingPoint = useRef({ firstPersonalizePage, pageRank, welcomeEnabled });
+    startingPoint.current = { firstPersonalizePage, pageRank, welcomeEnabled };
     // In single product mode the customer works on one design at a time: they choose a product (and a workflow, if it
     // has several) and that replaces the previous choice. Otherwise they build a cart of any number of designs.
     const singleMode = !!activation.singleProductMode;
@@ -278,6 +297,8 @@ const PageHandler: FunctionComponent<{
         setPresetStartFailed(false);
         setCompletion(undefined);
         preparation.current = undefined;
+        // Anything which was open belonged to the previous bundle.
+        setAccountOpen(false);
 
         // A reloaded bundle already has products, so pick up where the customer left off.
         const experiences = bundle.getWorkflowExperiences();
@@ -285,6 +306,11 @@ const PageHandler: FunctionComponent<{
             setExperience(experiences[0]);
             setPage(startingPoint.current.firstPersonalizePage);
             setReachedRank(startingPoint.current.pageRank(startingPoint.current.firstPersonalizePage));
+        } else if (startingPoint.current.welcomeEnabled) {
+            // Where the customer goes from there is worked out when they leave, as it can change meanwhile.
+            setExperience(undefined);
+            setPage("welcome");
+            setReachedRank(0);
         } else {
             setExperience(undefined);
             if (presetProduct) {
@@ -750,6 +776,41 @@ const PageHandler: FunctionComponent<{
         setReachedRank((reached) => Math.max(reached, pageRank(firstPersonalizePage)));
         setPage(firstPersonalizePage);
     }, [experienceToOpen, firstPersonalizePage, pageRank]);
+    // Moves on from the welcome page to wherever a new order starts. This is decided now, rather than when the bundle
+    // was loaded, as the only collection may have been selected for the customer in the meantime.
+    const startFromWelcome = useCallback(() => {
+        const target: PageType = presetProduct ? "workflow" : collection ? "product" : "collection";
+        setReachedRank((reached) => Math.max(reached, pageRank(target)));
+        setPage(target);
+    }, [collection, pageRank, presetProduct]);
+
+    // With a timeout set, a screen left alone starts over for the next customer: whoever is signed in is signed out and
+    // their design is cleared. A screen with nothing to clear is only taken back to the welcome page.
+    useEffect(() => {
+        if (!portalEnabled || !portalInactivitySeconds || portalInactivitySeconds <= 0) return;
+        if (page === "welcome" && !customer) return;
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const startOver = () => {
+            if (customer || bundle.getWorkflowExperiences().length > 0) {
+                resetSession().catch((error) => console.error("Error starting over after inactivity:", error));
+            } else if (welcomeEnabled) {
+                setPage("welcome");
+                setReachedRank(0);
+            }
+        };
+        const restart = () => {
+            clearTimeout(timer);
+            timer = setTimeout(startOver, portalInactivitySeconds * 1000);
+        };
+        const events = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
+        events.forEach((name) => window.addEventListener(name, restart, { passive: true }));
+        restart();
+        return () => {
+            clearTimeout(timer);
+            events.forEach((name) => window.removeEventListener(name, restart));
+        };
+    }, [bundle, customer, page, portalEnabled, portalInactivitySeconds, resetSession, welcomeEnabled]);
+
     const onExperiencePage = (page === "experience" || page === "shared") && !!experience;
     useEffect(() => {
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
@@ -807,7 +868,10 @@ const PageHandler: FunctionComponent<{
             const order = await bundle.placeOrder();
             return { leave: () => spiffThemeLoader.close(), orderNumber: String(order.internalId) };
         }
-        return { leave: () => spiffThemeLoader.addToEcommerceCart(result) };
+        return {
+            leave: () => spiffThemeLoader.addToEcommerceCart(result),
+            complete: () => spiffThemeLoader.addToEcommerceCart(result),
+        };
     }, [bundle, takeScreenshot]);
 
     // The design can't be completed (or a quote requested) until the order details the partner requires are filled in.
@@ -917,7 +981,7 @@ const PageHandler: FunctionComponent<{
             );
         }
         if (!customer) {
-            setAccountOpen(true);
+            openAccount();
             setErrorMessage("Please sign in to request a quote.");
             return false;
         }
@@ -929,7 +993,7 @@ const PageHandler: FunctionComponent<{
             setErrorMessage(error instanceof Error ? error.message : "We couldn't request your quote.");
             return false;
         }
-    }, [confirmQuote, customer, ensureOrderDetails, existingDetails, portalEnabled]);
+    }, [confirmQuote, customer, ensureOrderDetails, existingDetails, openAccount, portalEnabled]);
 
     const saveConversionDetails = useCallback(
         async (details: QuoteDetails) => {
@@ -973,57 +1037,66 @@ const PageHandler: FunctionComponent<{
                 position: "relative",
             }}
         >
-            <PageStepper
-                steps={steps.map((pageStep) => pageStep.label)}
-                currentIndex={stepIndex(page)}
-                enabledSteps={steps.map((_, index) => canVisit(index))}
-                onStepSelected={(index) => {
-                    setErrorMessage(undefined);
-                    const target = steps[index].page;
-                    if (target === "experience" || target === "shared" || target === "review") {
-                        setExperience(experienceToOpen());
-                    }
-                    setPage(target);
-                }}
-                actions={
-                    portalEnabled ? (
-                        <>
-                            {orderDetailFields.length > 0 && (
-                                <DetailsButton
-                                    disabled={!!pendingOrderDetails}
-                                    onClick={() => setPendingOrderDetails({ resolve: () => {} })}
-                                >
-                                    Order details
-                                    <ClipboardList size={16} aria-hidden="true" />
+            {page !== "welcome" && (
+                <PageStepper
+                    steps={steps.map((pageStep) => pageStep.label)}
+                    currentIndex={stepIndex(page)}
+                    enabledSteps={steps.map((_, index) => canVisit(index))}
+                    onStepSelected={(index) => {
+                        setErrorMessage(undefined);
+                        const target = steps[index].page;
+                        if (target === "experience" || target === "shared" || target === "review") {
+                            setExperience(experienceToOpen());
+                        }
+                        setPage(target);
+                    }}
+                    actions={
+                        portalEnabled ? (
+                            <>
+                                {orderDetailFields.length > 0 && (
+                                    <DetailsButton
+                                        disabled={!!pendingOrderDetails}
+                                        onClick={() => setPendingOrderDetails({ resolve: () => {} })}
+                                    >
+                                        Order details
+                                        <ClipboardList size={16} aria-hidden="true" />
+                                    </DetailsButton>
+                                )}
+                                <DetailsButton disabled={accountOpen} onClick={() => openAccount()}>
+                                    {customer ? customer.emailAddress : "Sign in"}
+                                    <CircleUserRound size={16} aria-hidden="true" />
                                 </DetailsButton>
-                            )}
-                            <DetailsButton disabled={accountOpen} onClick={() => setAccountOpen(true)}>
-                                {customer ? customer.emailAddress : "Sign in"}
-                                <CircleUserRound size={16} aria-hidden="true" />
+                            </>
+                        ) : manualConversionAvailable ? (
+                            <DetailsButton
+                                disabled={!!pendingConversion}
+                                onClick={() =>
+                                    void new Promise<void>((resolve) =>
+                                        setPendingConversion({
+                                            resolve: () => resolve(),
+                                            manual: true,
+                                            initialValues: existingDetails(),
+                                        }),
+                                    )
+                                }
+                            >
+                                Your details
+                                <UserRound size={16} aria-hidden="true" />
                             </DetailsButton>
-                        </>
-                    ) : manualConversionAvailable ? (
-                        <DetailsButton
-                            disabled={!!pendingConversion}
-                            onClick={() =>
-                                void new Promise<void>((resolve) =>
-                                    setPendingConversion({
-                                        resolve: () => resolve(),
-                                        manual: true,
-                                        initialValues: existingDetails(),
-                                    }),
-                                )
-                            }
-                        >
-                            Your details
-                            <UserRound size={16} aria-hidden="true" />
-                        </DetailsButton>
-                    ) : undefined
-                }
-            />
+                        ) : undefined
+                    }
+                />
+            )}
             {bundle.getTest() && <TestOrderBanner />}
             {errorMessage && <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(undefined)} />}
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", position: "relative" }}>
+                {page === "welcome" && (
+                    <WelcomePage
+                        onStart={startFromWelcome}
+                        onOpenAccount={openAccount}
+                        brandingAvailable={!!bundle.getGlobalPropertyConfiguration()}
+                    />
+                )}
                 {page === "collection" &&
                     (autoSelectCollection ? (
                         <LoadingOverlay />
@@ -1120,6 +1193,8 @@ const PageHandler: FunctionComponent<{
                         closeLabel={thankYouCloseLabel}
                         quoteId={completion.kind === "quote" ? completion.quoteId : undefined}
                         onPrepare={prepareHandOff}
+                        onStartOver={thankYouShowStartOver === false ? undefined : startNewBundle}
+                        startOverLabel={thankYouStartOverLabel}
                     />
                 )}
             </div>
@@ -1133,8 +1208,18 @@ const PageHandler: FunctionComponent<{
             )}
             {accountOpen && (
                 <AccountDialog
+                    initialPage={accountPage}
                     onClose={() => setAccountOpen(false)}
-                    onTemplateApplied={() => setTemplateRevision((revision) => revision + 1)}
+                    onTemplateApplied={() => {
+                        setTemplateRevision((revision) => revision + 1);
+                        if (page === "welcome") {
+                            // Branding is applied to start an order with, so carry on once it has been seen to apply.
+                            setTimeout(() => {
+                                setAccountOpen(false);
+                                startFromWelcome();
+                            }, 1200);
+                        }
+                    }}
                 />
             )}
             {guestPromptOpen && !accountOpen && (

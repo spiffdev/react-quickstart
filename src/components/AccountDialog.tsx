@@ -1,14 +1,41 @@
 import { FunctionComponent, useCallback, useEffect, useRef, useState } from "react";
-import type { BundleRaw, GlobalPropertyTemplate } from "@spiffcommerce/core";
+import {
+    assetConfigurationDeleteMutation,
+    assetConfigurationsQuery,
+    assetService,
+    getProductCollections,
+    getTransformedAssetURL,
+    graphQlManager,
+    type Asset,
+    type BundleRaw,
+    type GlobalPropertyTemplate,
+    type ProductCollection,
+} from "@spiffcommerce/core";
 import Button from "./button";
 import ErrorBanner from "./ErrorBanner";
 import useAccount from "../hooks/useAccount";
+import useActivation from "../hooks/useActivation";
 import useBundle from "../hooks/useBundle";
 import useClient from "../hooks/useClient";
 import useOrderDetailFields from "../hooks/useOrderDetails";
 import { EMPTY_ORDER_DETAILS } from "../utils/orderDetails";
 import OrderDetailsForm from "./OrderDetailsForm";
-import { Backdrop, Dialog, Header, Input, List, Muted, Row, RowText, MenuItem, TextButton, Title } from "./dialogParts";
+import {
+    Backdrop,
+    Chip,
+    Chips,
+    Dialog,
+    Header,
+    Input,
+    List,
+    MenuItem,
+    Muted,
+    Row,
+    RowText,
+    TextButton,
+    Thumbnail,
+    Title,
+} from "./dialogParts";
 
 const PAGE_SIZE = 10;
 
@@ -196,8 +223,12 @@ const BundleList: FunctionComponent<{
 const TemplateList: FunctionComponent<{ onApplied: () => void }> = ({ onApplied }) => {
     const client = useClient();
     const bundle = useBundle();
+    const activation = useActivation();
+    // Only branding made from the bundle's own configuration can be applied to it.
     const configurationId = bundle.getGlobalPropertyConfiguration()?.id;
     const [items, setItems] = useState<GlobalPropertyTemplate[]>([]);
+    const [applied, setApplied] = useState<string | undefined>(undefined);
+    const [collections, setCollections] = useState<ProductCollection[]>([]);
     const [total, setTotal] = useState(0);
     const requested = useRef(0);
     const [loading, setLoading] = useState(true);
@@ -213,7 +244,6 @@ const TemplateList: FunctionComponent<{ onApplied: () => void }> = ({ onApplied 
             const result = await client.getTemplatesForCustomer({
                 limit: PAGE_SIZE,
                 offset: requested.current,
-                globalPropertyConfigurationId: configurationId,
             });
             requested.current += result.items.length;
             setItems((previous) => [...previous, ...result.items]);
@@ -224,13 +254,33 @@ const TemplateList: FunctionComponent<{ onApplied: () => void }> = ({ onApplied 
         } finally {
             setLoading(false);
         }
-    }, [client, configurationId]);
+    }, [client]);
 
     useEffect(() => {
         void loadMore();
         // Only the first page is loaded on its own.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // The collections, which say where each branding is available.
+    useEffect(() => {
+        const ids = activation.activationProductCollections?.map((apc) => apc.productCollection.id) ?? [];
+        if (ids.length === 0) return;
+        let canceled = false;
+        getProductCollections(ids)
+            .then((loaded) => !canceled && setCollections(loaded ?? []))
+            .catch((caught) => console.error("Error loading the collections:", caught));
+        return () => {
+            canceled = true;
+        };
+    }, [activation.activationProductCollections]);
+
+    // Collections are only worth listing when they use different options. Otherwise every branding is in all of them.
+    const collectionConfigurationId = (collection: ProductCollection) =>
+        collection.getResource().globalPropertyConfiguration?.id;
+    const collectionsDiffer = collections.some(
+        (collection) => collectionConfigurationId(collection) !== collectionConfigurationId(collections[0]),
+    );
 
     const apply = async (template: GlobalPropertyTemplate) => {
         setWorking(template.getId());
@@ -240,6 +290,7 @@ const TemplateList: FunctionComponent<{ onApplied: () => void }> = ({ onApplied 
             const metadata = new Map(bundle.getMetadata());
             metadata.set("template", template.getName());
             await bundle.setMetadata(metadata);
+            setApplied(template.getId());
             onApplied();
         } catch (caught) {
             console.error("Error applying the template:", caught);
@@ -305,22 +356,48 @@ const TemplateList: FunctionComponent<{ onApplied: () => void }> = ({ onApplied 
             </form>
             {!loading && items.length === 0 && !error && <Muted>You have no saved branding yet.</Muted>}
             <List>
-                {items.map((item) => (
-                    <Row key={item.getId()}>
-                        <RowText>
-                            <strong>{item.getName() || "Unnamed branding"}</strong>
-                            <span>
-                                {item.getUpdatedDate().toLocaleDateString()} ·{" "}
-                                <TextButton type="button" disabled={!!working} onClick={() => void remove(item)}>
-                                    Remove
-                                </TextButton>
-                            </span>
-                        </RowText>
-                        <Button disabled={!!working || saving} onClick={() => void apply(item)}>
-                            {working === item.getId() ? "Applying..." : "Apply"}
-                        </Button>
-                    </Row>
-                ))}
+                {items.map((item) => {
+                    const itemConfigurationId = item.getGlobalPropertyConfiguration().id;
+                    const incompatible = !!configurationId && itemConfigurationId !== configurationId;
+                    const availableIn = collectionsDiffer
+                        ? collections.filter(
+                              (collection) => collectionConfigurationId(collection) === itemConfigurationId,
+                          )
+                        : [];
+                    return (
+                        <Row key={item.getId()}>
+                            <RowText>
+                                <strong>{item.getName() || "Unnamed branding"}</strong>
+                                <span>
+                                    {item.getUpdatedDate().toLocaleDateString()} ·{" "}
+                                    <TextButton type="button" disabled={!!working} onClick={() => void remove(item)}>
+                                        Remove
+                                    </TextButton>
+                                </span>
+                                {incompatible && (
+                                    <span>Made for a different product range, so it can't be used here.</span>
+                                )}
+                                {availableIn.length > 0 && (
+                                    <Chips aria-label="Available in">
+                                        {availableIn.map((collection) => (
+                                            <Chip key={collection.getId()}>{collection.getName()}</Chip>
+                                        ))}
+                                    </Chips>
+                                )}
+                            </RowText>
+                            <Button
+                                disabled={!!working || saving || incompatible || applied === item.getId()}
+                                onClick={() => void apply(item)}
+                            >
+                                {working === item.getId()
+                                    ? "Applying..."
+                                    : applied === item.getId()
+                                      ? "Applied ✓"
+                                      : "Apply"}
+                            </Button>
+                        </Row>
+                    );
+                })}
             </List>
             {loading && <Muted>Loading...</Muted>}
             {!loading && requested.current < total && (
@@ -332,7 +409,115 @@ const TemplateList: FunctionComponent<{ onApplied: () => void }> = ({ onApplied 
     );
 };
 
-type AccountPage = "menu" | "drafts" | "orders" | "templates";
+/**
+ * What the customer has uploaded while signed in. Assets are linked to the customer as they're created, so this list
+ * only reads and removes them.
+ */
+interface SavedAsset {
+    id: string;
+    assetKey: string;
+    asset?: Asset;
+    colorOption?: { id: string; name: string };
+    channelNumbers?: { id: string; number: number }[];
+}
+
+const AssetList: FunctionComponent = () => {
+    const [assets, setAssets] = useState<SavedAsset[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [removing, setRemoving] = useState<string | undefined>(undefined);
+    const [error, setError] = useState<string | undefined>(undefined);
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError(undefined);
+        try {
+            const response = await graphQlManager.getShadowGraphqlClient().query<{
+                assetConfigurations: Omit<SavedAsset, "asset">[];
+            }>({ query: assetConfigurationsQuery, errorPolicy: "all", fetchPolicy: "network-only" });
+            const configurations = response.data?.assetConfigurations ?? [];
+            setAssets(
+                await Promise.all(
+                    configurations.map(async (configuration) => {
+                        try {
+                            return {
+                                ...configuration,
+                                asset: await assetService.getLocalOrFromServer(configuration.assetKey),
+                            };
+                        } catch (caught) {
+                            console.error(`Error loading the asset ${configuration.assetKey}:`, caught);
+                            return configuration;
+                        }
+                    }),
+                ),
+            );
+        } catch (caught) {
+            console.error("Error loading the customer's assets:", caught);
+            setError("We couldn't load your saved assets. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => {
+        void load();
+    }, [load]);
+
+    const remove = async (item: SavedAsset) => {
+        if (!window.confirm("Remove this asset? It can't be recovered.")) return;
+        setRemoving(item.id);
+        setError(undefined);
+        try {
+            await graphQlManager
+                .getShadowGraphqlClient()
+                .mutate({ mutation: assetConfigurationDeleteMutation, variables: { id: item.id } });
+            setAssets((previous) => previous.filter((candidate) => candidate.id !== item.id));
+        } catch (caught) {
+            console.error("Error removing the asset:", caught);
+            setError("We couldn't remove that asset. Please try again.");
+        } finally {
+            setRemoving(undefined);
+        }
+    };
+
+    return (
+        <>
+            {error && <ErrorBanner message={error} onDismiss={() => setError(undefined)} />}
+            {loading && <Muted>Loading...</Muted>}
+            {!loading && assets.length === 0 && !error && <Muted>You have no saved assets yet.</Muted>}
+            <List>
+                {assets.map((item) => {
+                    const thumbnail = item.asset ? getTransformedAssetURL(item.asset, 200, "webp") : undefined;
+                    const name = item.asset?.name || item.colorOption?.name || "Untitled asset";
+                    const channels = item.channelNumbers?.length ?? 0;
+                    return (
+                        <Row key={item.id}>
+                            {thumbnail && (
+                                <Thumbnail
+                                    src={thumbnail}
+                                    alt=""
+                                    onError={(event) => (event.currentTarget.style.display = "none")}
+                                />
+                            )}
+                            <RowText style={{ flex: 1 }}>
+                                <strong>{name}</strong>
+                                <span>
+                                    {channels > 0
+                                        ? `${channels} colour channel${channels === 1 ? "" : "s"}`
+                                        : "No colour data"}
+                                </span>
+                            </RowText>
+                            <TextButton type="button" disabled={!!removing} onClick={() => void remove(item)}>
+                                {removing === item.id ? "Removing..." : "Remove"}
+                            </TextButton>
+                        </Row>
+                    );
+                })}
+            </List>
+        </>
+    );
+};
+
+export type AccountPage = "menu" | "drafts" | "orders" | "templates" | "assets";
 
 /**
  * The corporate portal. Customers sign in with a code sent to their email, then from the menu can pick a draft up where
@@ -342,13 +527,15 @@ const AccountDialog: FunctionComponent<{
     onClose: () => void;
     /** Called once a saved branding template has been applied to the bundle. */
     onTemplateApplied: () => void;
-}> = ({ onClose, onTemplateApplied }) => {
+    /** The page to open on once the customer is signed in. The menu when unset. */
+    initialPage?: AccountPage;
+}> = ({ onClose, onTemplateApplied, initialPage = "menu" }) => {
     const { customer, signOut, openDraft, duplicateBundle } = useAccount();
     const bundle = useBundle();
     const orderDetailFields = useOrderDetailFields();
     // Branding is the shared options, which only some activations have.
     const templatesAvailable = !!bundle.getGlobalPropertyConfiguration();
-    const [page, setPage] = useState<AccountPage>("menu");
+    const [page, setPage] = useState<AccountPage>(initialPage);
     // The previous order being duplicated, while the customer is asked for the new order's details.
     const [reorder, setReorder] = useState<BundleRaw | undefined>(undefined);
     const [signOutError, setSignOutError] = useState<string | undefined>(undefined);
@@ -423,6 +610,8 @@ const AccountDialog: FunctionComponent<{
                 );
             case "templates":
                 return <TemplateList onApplied={onTemplateApplied} />;
+            case "assets":
+                return <AssetList />;
             default:
                 return (
                     <>
@@ -443,6 +632,10 @@ const AccountDialog: FunctionComponent<{
                                 <span>Apply, save or remove your saved branding.</span>
                             </MenuItem>
                         )}
+                        <MenuItem type="button" onClick={() => setPage("assets")}>
+                            <strong>Saved assets</strong>
+                            <span>The images and colours you've uploaded while signed in.</span>
+                        </MenuItem>
                         <MenuItem type="button" disabled={signingOut} onClick={() => void handleSignOut()}>
                             <strong>{signingOut ? "Signing out..." : "Sign out"}</strong>
                             <span>
@@ -462,7 +655,9 @@ const AccountDialog: FunctionComponent<{
             ? "Previous orders"
             : page === "templates"
               ? "Saved branding"
-              : "My account";
+              : page === "assets"
+                ? "Saved assets"
+                : "My account";
 
     return (
         <Backdrop>
