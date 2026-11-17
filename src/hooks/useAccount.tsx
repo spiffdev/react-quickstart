@@ -17,7 +17,7 @@ import useClient from "./useClient";
 import useThemeConfiguration from "./useThemeConfiguration";
 
 interface AccountContextType {
-    /** Whether the corporate portal is switched on. When it is, the conversion configuration isn't used at all. */
+    /** Whether the user portal is switched on. When it is, the conversion configuration isn't used at all. */
     enabled: boolean;
     /** The signed in customer, if any. */
     customer: Customer | undefined;
@@ -50,8 +50,8 @@ const AccountContext = createContext<AccountContextType>({
 
 const useAccount = () => useContext(AccountContext);
 
-/** Whether the corporate portal is on. */
-export const useCorporatePortalEnabled = () => useContext(AccountContext).enabled;
+/** Whether the user portal is on. */
+export const useUserPortalEnabled = () => useContext(AccountContext).enabled;
 
 export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ children }) => {
     const client = useClient();
@@ -59,8 +59,8 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
     const setBundle = useSetBundle();
     const startNewBundle = useStartNewBundle();
     const orderDetailFields = useOrderDetailFields();
-    const { enableCorporatePortal, enableTestOrders } = useThemeConfiguration();
-    const enabled = !!enableCorporatePortal;
+    const { enableUserPortal, enableTestOrders } = useThemeConfiguration();
+    const enabled = !!enableUserPortal;
     const [customer, setCustomer] = useState<Customer | undefined>(undefined);
 
     // Resumes the customer's session from a previous visit.

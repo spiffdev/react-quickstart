@@ -77,13 +77,13 @@ const setup = (client: FakeClient, bundle: FakeBundle) => {
 
 beforeEach(() => {
     for (const key of Object.keys(config)) delete config[key];
-    config.enableCorporatePortal = true;
+    config.enableUserPortal = true;
     globalPropertyState.mockReset();
 });
 
 describe("when the portal is off", () => {
     it("does nothing: no session is restored and the bundle isn't touched", async () => {
-        config.enableCorporatePortal = false;
+        config.enableUserPortal = false;
         const { client, signInOnLoad } = makeClient();
         signInOnLoad();
         const bundle = makeBundle();

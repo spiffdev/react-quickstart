@@ -69,21 +69,21 @@ export interface ThemeConfiguration {
      */
     allowCartRequests?: boolean;
     /**
-     * Turns on the corporate portal: customers sign in with an email code, their bundle is attached to them, and they
+     * Turns on the user portal: customers sign in with an email code, their bundle is attached to them, and they
      * can re-open their drafts or duplicate their previous orders. Completely replaces the conversion configuration.
      */
-    enableCorporatePortal?: boolean;
+    enableUserPortal?: boolean;
     /**
-     * With the corporate portal, asks customers who haven't signed in for their email address when they start
+     * With the user portal, asks customers who haven't signed in for their email address when they start
      * personalising. They can always continue as a guest instead.
      */
     portalPromptEmail?: boolean;
     /**
-     * With the corporate portal's email prompt, customers sign in with a code rather than only giving their email.
+     * With the user portal's email prompt, customers sign in with a code rather than only giving their email.
      */
     portalEnforceLogin?: boolean;
     /**
-     * With the corporate portal, whether customers are asked to name their order: "off" (the default), "optional" or
+     * With the user portal, whether customers are asked to name their order: "off" (the default), "optional" or
      * "required". Also asked when duplicating a previous order.
      */
     portalOrderName?: OrderDetailMode;
@@ -93,7 +93,7 @@ export interface ThemeConfiguration {
     portalDispatchDate?: OrderDetailMode;
     /**
      * The details asked of the customer when they request a quote. Only an email is asked for when unset.
-     * Ignored when the corporate portal is enabled.
+     * Ignored when the user portal is enabled.
      */
     conversionConfiguration?: ConversionConfiguration;
     /**
@@ -113,12 +113,12 @@ export interface ThemeConfiguration {
     /** The text of the thank you page's start over button. */
     thankYouStartOverLabel?: string;
     /**
-     * With the corporate portal, the seconds without any activity after which the experience starts over: the
+     * With the user portal, the seconds without any activity after which the experience starts over: the
      * customer is signed out and their design is cleared. Never when unset or zero.
      */
     portalInactivitySeconds?: number;
     /**
-     * With the corporate portal, whether customers can save their design as a draft and leave, from a button on the
+     * With the user portal, whether customers can save their design as a draft and leave, from a button on the
      * stepper bar. On by default.
      */
     portalSaveAndExit?: boolean;
@@ -130,13 +130,13 @@ export interface ThemeConfiguration {
     welcomeDescription?: string;
     /** The text of the button that starts a new order. */
     welcomeStartLabel?: string;
-    /** The text of the button that applies saved branding (corporate portal only). */
+    /** The text of the button that applies saved branding (user portal only). */
     welcomeBrandingLabel?: string;
-    /** The text of the button that duplicates a previous order (corporate portal only). */
+    /** The text of the button that duplicates a previous order (user portal only). */
     welcomeDuplicateLabel?: string;
-    /** The text of the button that re-opens a draft (corporate portal only). */
+    /** The text of the button that re-opens a draft (user portal only). */
     welcomeContinueLabel?: string;
-    /** The text of the button that signs in (corporate portal only). */
+    /** The text of the button that signs in (user portal only). */
     welcomeSignInLabel?: string;
 }
 
@@ -230,8 +230,8 @@ export const configurationSchema: ThemeConfigurationSchema = {
         },
         {
             type: FieldType.Boolean,
-            key: "enableCorporatePortal",
-            title: "Enable Corporate Portal",
+            key: "enableUserPortal",
+            title: "Enable User Portal",
             defaultValue: "false",
             description:
                 "When true, customers sign in with an email code and can continue their drafts or duplicate previous orders. This completely replaces the conversion configuration.",
@@ -239,15 +239,15 @@ export const configurationSchema: ThemeConfigurationSchema = {
         {
             type: FieldType.Boolean,
             key: "portalPromptEmail",
-            title: "Corporate Portal: Ask for Email",
+            title: "User Portal: Ask for Email",
             defaultValue: "false",
             description:
-                "When the corporate portal is enabled, asks customers who haven't signed in for their email address when they start personalising. They can continue as a guest.",
+                "When the user portal is enabled, asks customers who haven't signed in for their email address when they start personalising. They can continue as a guest.",
         },
         {
             type: FieldType.Boolean,
             key: "portalEnforceLogin",
-            title: "Corporate Portal: Enforce Sign-in",
+            title: "User Portal: Enforce Sign-in",
             defaultValue: "false",
             description:
                 "When the email prompt is shown, customers are asked to sign in with a code instead of only entering their email. They can still continue as a guest.",
@@ -255,7 +255,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
         {
             type: FieldType.Select,
             key: "portalOrderName",
-            title: "Corporate Portal: Order Name",
+            title: "User Portal: Order Name",
             defaultValue: "off",
             description:
                 "Whether customers can name their order. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
@@ -268,7 +268,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
         {
             type: FieldType.Select,
             key: "portalPurchaseOrder",
-            title: "Corporate Portal: Purchase Order",
+            title: "User Portal: Purchase Order",
             defaultValue: "off",
             description:
                 "Whether customers can enter a purchase order number. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
@@ -281,7 +281,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
         {
             type: FieldType.Select,
             key: "portalDispatchDate",
-            title: "Corporate Portal: Dispatch Date",
+            title: "User Portal: Dispatch Date",
             defaultValue: "off",
             description:
                 "Whether customers can choose a dispatch date, within the product collection's dispatch dates when it has them. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
@@ -294,7 +294,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
         {
             type: FieldType.Boolean,
             key: "portalSaveAndExit",
-            title: "Corporate Portal: Save and Exit",
+            title: "User Portal: Save and Exit",
             defaultValue: "true",
             description:
                 "When true, customers can save their design as a draft and leave, using a button on the stepper bar. They can pick it up again from their drafts.",
@@ -302,7 +302,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
         {
             type: FieldType.Number,
             key: "portalInactivitySeconds",
-            title: "Corporate Portal: Inactivity Timeout (seconds)",
+            title: "User Portal: Inactivity Timeout (seconds)",
             description:
                 "When set, the experience starts over after this many seconds without any activity: the customer is signed out and their design is cleared. Leave empty to never time out. Useful for shared screens.",
         },
@@ -340,15 +340,14 @@ export const configurationSchema: ThemeConfigurationSchema = {
             title: "Saved Branding Button Text",
             defaultValue: "Use saved branding",
             description:
-                "The text of the button that applies the customer's saved branding. Only shown with the corporate portal.",
+                "The text of the button that applies the customer's saved branding. Only shown with the user portal.",
         },
         {
             type: FieldType.Text,
             key: "welcomeDuplicateLabel",
             title: "Duplicate Button Text",
             defaultValue: "Duplicate a previous order",
-            description:
-                "The text of the button that starts from a previous order. Only shown with the corporate portal.",
+            description: "The text of the button that starts from a previous order. Only shown with the user portal.",
         },
         {
             type: FieldType.Text,
@@ -356,14 +355,14 @@ export const configurationSchema: ThemeConfigurationSchema = {
             title: "Continue Draft Button Text",
             defaultValue: "Continue a draft",
             description:
-                "The text of the button that re-opens a draft, when the customer is signed in. Only shown with the corporate portal.",
+                "The text of the button that re-opens a draft, when the customer is signed in. Only shown with the user portal.",
         },
         {
             type: FieldType.Text,
             key: "welcomeSignInLabel",
             title: "Sign In Button Text",
             defaultValue: "Sign in",
-            description: "The text of the button that signs the customer in. Only shown with the corporate portal.",
+            description: "The text of the button that signs the customer in. Only shown with the user portal.",
         },
         {
             type: FieldType.Boolean,
@@ -384,7 +383,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
             key: "conversionConfiguration",
             title: "Conversion Configuration",
             description:
-                "The details asked of the customer when they request a quote. Ignored when the corporate portal is enabled.",
+                "The details asked of the customer when they request a quote. Ignored when the user portal is enabled.",
         },
         {
             type: FieldType.Text,
@@ -494,7 +493,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             key: "welcome",
             title: "Welcome",
             subtitle:
-                "An optional landing page shown before anything else. With the corporate portal it also offers saved branding, previous orders and drafts.",
+                "An optional landing page shown before anything else. With the user portal it also offers saved branding, previous orders and drafts.",
             icon: "play",
             // Whether the page is shown is set by the page's toggle, and the page is off until it is switched on.
             toggleable: true,
@@ -537,7 +536,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                         "addToCartLabel",
                         "allowCartRequests",
                         "allowQuoteRequests",
-                        "enableCorporatePortal",
+                        "enableUserPortal",
                         "portalPromptEmail",
                         "portalEnforceLogin",
                         "portalOrderName",

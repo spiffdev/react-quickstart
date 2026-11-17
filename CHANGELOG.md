@@ -2,11 +2,22 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — Local configuration is loaded by theme-bridge
+
+- Loading the local development configuration is now done by the theme plugin in `@spiffcommerce/theme-bridge` (updated to 1.29.1-alpha.0) rather than by this theme's own code. `vite.config.ts` no longer reads the file or sets `__LOCAL_DEV_CONFIGURATION__` itself, and no longer lists the files for `vite-plugin-restart` to watch. (`localConfiguration.ts`, the first version of this, has been removed.)
+- The behaviour is the same, and JSONC is supported: **`.env.<mode>.jsonc`** (comments and trailing commas allowed) is used first, and failing that `.env.<mode>.json`. A file which can't be parsed stops the dev server with "Failed to parse development configuration" and the file's path, and the dev server restarts when either kind of file is added, changed or removed in the project's root folder.
+- The plugin only sets `__LOCAL_DEV_CONFIGURATION__` if `vite.config.ts` hasn't defined it, and loading can be switched off with the plugin's `loadDevelopmentConfiguration: false` option.
+
+## 2026-11-18 — "Corporate portal" is now the "user portal"
+
+- Renamed everywhere it's shown or named: the settings now read **Enable User Portal** and **User Portal: …**, and the setting's key is `enableUserPortal` (was `enableCorporatePortal`), with `useUserPortalEnabled` for the hook. The other portal settings keep their `portal…` keys. Earlier entries below were updated to match. Anything which refers to the corporate *theme* (which this was modelled on) is unchanged.
+- **A partner who had already switched the portal on under the old key will need to switch it on again**, as nothing reads `enableCorporatePortal` any more.
+
 ## 2026-11-18 — Portal as a sidebar, save and exit, richer rows
 
 - **Sidebar:** the portal's dialogs (account, order details, guest email, save and exit) are now a panel on the right of larger screens, so the experience stays in view beside them, and the whole view on phones (compact width). The panel slides in, unless the customer prefers reduced motion.
-- **Email prompt on the welcome page:** with **Corporate Portal: Ask for Email** on, leaving the welcome page (with **Start a new order**, or after applying saved branding) asks for the email first. The prompt is still asked on first reaching the personalise page when there's no welcome page, and each bundle is only asked once.
-- **Save and exit:** new **Corporate Portal: Save and Exit** setting (on by default) adds a button to the stepper bar once there are designs. It names the draft (blank is fine), asks a guest for the email address which makes them its owner (a signed in customer, or a bundle which has an owner, isn't asked), then leaves: it closes the experience when it's in a frame, and otherwise starts over for the next customer.
+- **Email prompt on the welcome page:** with **User Portal: Ask for Email** on, leaving the welcome page (with **Start a new order**, or after applying saved branding) asks for the email first. The prompt is still asked on first reaching the personalise page when there's no welcome page, and each bundle is only asked once.
+- **Save and exit:** new **User Portal: Save and Exit** setting (on by default) adds a button to the stepper bar once there are designs. It names the draft (blank is fine), asks a guest for the email address which makes them its owner (a signed in customer, or a bundle which has an owner, isn't asked), then leaves: it closes the experience when it's in a frame, and otherwise starts over for the next customer.
 - **Richer rows:** orders and drafts show the order or quote number before the name (falling back to the collection's name), when they were created, how many **products** they have (not designs or recipients) and their total, where there's a presentment currency.
 - Not done by choice: localization of the portal's text, and a separate landing page. Invalid dispatch dates are left for something more first-class than a theme setting.
 
@@ -17,33 +28,33 @@ Every notable change to this theme, newest first.
 
 ## 2026-11-17 — Welcome page, saved assets, default template, timeout and start over
 
-- **Welcome page:** a new optional page (Welcome, off until switched on) in a group of its own, so it can't be moved: it's always first. Title, description, background image and every button's text are settings. It starts a new order, and with the corporate portal also offers **saved branding**, **duplicate a previous order** and **continue a draft / sign in**, which open the account dialog on that page (the customer signs in first if they haven't). Applying branding from it carries straight on to the order. A bundle that already has designs (a draft, a duplicate) skips it, and it comes back whenever the bundle is replaced (sign-out, timeout, start over).
+- **Welcome page:** a new optional page (Welcome, off until switched on) in a group of its own, so it can't be moved: it's always first. Title, description, background image and every button's text are settings. It starts a new order, and with the user portal also offers **saved branding**, **duplicate a previous order** and **continue a draft / sign in**, which open the account dialog on that page (the customer signs in first if they haven't). Applying branding from it carries straight on to the order. A bundle that already has designs (a draft, a duplicate) skips it, and it comes back whenever the bundle is replaced (sign-out, timeout, start over).
 - **Saved assets:** new **Saved assets** page in the account menu listing the customer's asset configurations (thumbnail, name, colour channels) with remove, as in the corporate theme. Assets a signed-in customer creates (e.g. uploading in a frame step) will be linked to them automatically, so they'll appear here with nothing more to do.
 - **Default template:** a signed-in customer with a default template has it applied to their new bundle (its shared options, and its name in the bundle's `template` metadata). Bundles with designs or branding already are left alone. The corporate theme starts the new bundle as a copy; here the bundle already exists, so its options are set instead.
-- **Inactivity timeout:** new **Corporate Portal: Inactivity Timeout (seconds)** setting. After that long without a click, touch, key press or movement, the customer is signed out and the bundle replaced (or, with nothing to clear, the welcome page is shown again).
+- **Inactivity timeout:** new **User Portal: Inactivity Timeout (seconds)** setting. After that long without a click, touch, key press or movement, the customer is signed out and the bundle replaced (or, with nothing to clear, the welcome page is shown again).
 - **Start over:** the thank you page has a **Start a new order** button (**Show Start Over Button** / **Start Over Button Text** settings). It does whatever of the hand-off is left (adding the design to the e-commerce cart; nothing for test orders and quotes, which are already done) and then starts a new bundle.
 - **Collection badges:** saved branding shows the collections it's available in when the activation's collections use different shared options, and is disabled with a reason if it was made for a different configuration than the current bundle's. Applying it now shows "Applied ✓".
 
-## 2026-11-17 — Corporate portal: menu, sign-out and order details
+## 2026-11-17 — User portal: menu, sign-out and order details
 
 - **Menu:** the account dialog now opens on a menu (Draft orders, Previous orders, Saved branding, Sign out) in place of tabs, with a "← Menu" link back from each page.
 - **Sign out** also replaces the bundle with a new empty one (`startNewBundle`, shared with the first load in `App`), so the next person at the screen doesn't see the last customer's design. Their drafts are still saved against their account.
-- **Order details:** three new settings, **Corporate Portal: Order Name / Purchase Order / Dispatch Date**, each *Not asked* (the default), *Asked, optional* or *Asked, required*. They're recorded on the bundle's own `name`, `purchaseOrder` and `dispatchDate` fields (not its metadata), and only those which have changed are sent.
+- **Order details:** three new settings, **User Portal: Order Name / Purchase Order / Dispatch Date**, each *Not asked* (the default), *Asked, optional* or *Asked, required*. They're recorded on the bundle's own `name`, `purchaseOrder` and `dispatchDate` fields (not its metadata), and only those which have changed are sent.
   - Whichever are switched on are asked in an **Order details** button on the stepper bar, at any time, and when **duplicating** a previous order (before the copy is made).
   - Required ones must be filled in before a design can be completed or a quote requested; the dialog opens for them if they aren't.
   - The dispatch date is saved as the corporate theme does: the chosen day at the current local time, as an ISO instant, and read back as a local day.
   - The dispatch date can't be in the past, and is kept within the product collection's dispatch dates when it has them.
 - New: `utils/orderDetails.ts`, `hooks/useOrderDetails.ts`, `components/OrderDetailsForm.tsx`, `components/OrderDetailsDialog.tsx`.
 
-## 2026-11-17 — Corporate portal: saved branding and guest email
+## 2026-11-17 — User portal: saved branding and guest email
 
 - **Saved branding:** with the portal on and an activation that has shared options (a Global Property Configuration), the account dialog gains a **Saved branding** tab. It lists the signed-in customer's templates for that configuration, and **Apply** puts one on the bundle (recording its name in the bundle's `template` metadata) and shows the shared page afresh. The tab can also save the current shared options as a new template, and remove one.
-- **Guest email prompt:** new **Corporate Portal: Ask for Email** setting. When on, a customer who isn't signed in is asked for their email as they first reach the personalise page (once per bundle, never when the bundle already has an owner). The email becomes the bundle's owner. **Continue as guest** closes it. With **Corporate Portal: Enforce Sign-in** the prompt is the sign-in form (email and code) instead.
+- **Guest email prompt:** new **User Portal: Ask for Email** setting. When on, a customer who isn't signed in is asked for their email as they first reach the personalise page (once per bundle, never when the bundle already has an owner). The email becomes the bundle's owner. **Continue as guest** closes it. With **User Portal: Enforce Sign-in** the prompt is the sign-in form (email and code) instead.
 - New: `components/GuestEmailDialog.tsx`, `components/dialogParts.tsx` (the dialogs' shared styling).
 
-## 2026-11-17 — Corporate portal
+## 2026-11-17 — User portal
 
-- New **Enable Corporate Portal** setting (Personalise > Checkout), modelled on the corporate theme's portal. When it's on it **completely replaces the conversion configuration**: the details dialog, its start/end/manual locations, the "Your details" button, the recipient's conversion configuration id and the details saved to the bundle's metadata are all skipped.
+- New **Enable User Portal** setting (Personalise > Checkout), modelled on the corporate theme's portal. When it's on it **completely replaces the conversion configuration**: the details dialog, its start/end/manual locations, the "Your details" button, the recipient's conversion configuration id and the details saved to the bundle's metadata are all skipped.
 - **Sign-in:** the stepper bar's button opens an account dialog where the customer enters their email and the code sent to it (`generateVerificationCode` / `verifyCode`). A session from a previous visit is restored (and dropped if the customer belongs to another partner). Signing in attaches the current bundle to the customer as its owner, unless it already has one.
 - **Re-open drafts:** the **Drafts** tab lists the customer's unordered bundles which have designs in them, and **Continue** loads one in place of the current bundle, picking up at the personalise page.
 - **Duplicate orders:** the **Previous orders** tab lists their ordered bundles, and **Duplicate** copies one (designs included) and works on the copy.

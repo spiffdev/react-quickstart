@@ -524,7 +524,7 @@ const AssetList: FunctionComponent = () => {
 export type AccountPage = "menu" | "drafts" | "orders" | "templates" | "assets";
 
 /**
- * The corporate portal. Customers sign in with a code sent to their email, then from the menu can pick a draft up where
+ * The user portal. Customers sign in with a code sent to their email, then from the menu can pick a draft up where
  * they left it, duplicate one of their previous orders, or apply their saved branding.
  */
 const AccountDialog: FunctionComponent<{

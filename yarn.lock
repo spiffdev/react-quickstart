@@ -1013,10 +1013,10 @@
     svg-path-bbox "^1.2.4"
     unicode-default-word-boundary "^13.0.0"
 
-"@spiffcommerce/core@^44.19.0":
-  version "44.19.0"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.19.0.tgz#0deac10d944d71d092412317d6173b4f30c9e77c"
-  integrity sha512-o8kPdwqkLet7fn/4F3kjv9QawHInRSj9+l/uH37YRjlQCd9K1Bcynzd8IiLJUcOeOD87Ki6oFFE6dX0AZ2S8og==
+"@spiffcommerce/core@^44.21.1-alpha.1":
+  version "44.21.1-alpha.1"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.21.1-alpha.1.tgz#7060c377269c7121b7350527d9b7e3a7a446ac21"
+  integrity sha512-pKVpCthOAWGpvGa+3CyPE/CAfU5C5iYWtCNhVuxnV08A+FgV0LM95w7io89KTqlUWRRSqQZlkJPAgd2B8ewzgA==
   dependencies:
     "@adobe/css-tools" "^4.5.0"
     "@apollo/client" "^3.11.8"
@@ -1050,12 +1050,12 @@
     "@babylonjs/loaders" "8.53.0"
     babylonjs-gltf2interface "8.53.0"
 
-"@spiffcommerce/theme-bridge@1.29.0":
-  version "1.29.0"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.29.0.tgz#852d2667b69ee09bd9d8faf0f5e3ea1e88a72240"
-  integrity sha512-ozNhZ4mKITD7yxkTt8BgP4sUI6dllCWzrLbrh4aOLELaS8km+5gMNw68hhhGOQ39xvjMGNOYr6gXwua0RBiwGg==
+"@spiffcommerce/theme-bridge@1.29.1-alpha.0":
+  version "1.29.1-alpha.0"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.29.1-alpha.0.tgz#61fb881adcdc0e3bfdc0e93a7b622bee9b0d1824"
+  integrity sha512-5YV1VYbobowtp3hlk9HcsAo6mmYZnkREeQrOloOBH4CXD35gM6gcWe1pQVdl2KD+ApHsyUtCsq5s+aZdW9O+aA==
   dependencies:
-    "@spiffcommerce/core" "^44.19.0"
+    "@spiffcommerce/core" "^44.21.1-alpha.1"
 
 "@svgr/babel-plugin-add-jsx-attribute@8.0.0":
   version "8.0.0"

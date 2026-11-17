@@ -156,7 +156,7 @@ const PageHandler: FunctionComponent<{
         thankYouShowStartOver,
         thankYouStartOverLabel,
     } = useThemeConfiguration();
-    // The corporate portal completely replaces the conversion configuration, which is treated as if it was never set.
+    // The user portal completely replaces the conversion configuration, which is treated as if it was never set.
     const { enabled: portalEnabled, customer, resetSession } = useAccount();
     const startNewBundle = useStartNewBundle();
     const welcomeEnabled = usePageEnabled("welcome");
@@ -811,7 +811,7 @@ const PageHandler: FunctionComponent<{
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
     }, [onExperiencePage, requestConversionIfRequired]);
 
-    // With the corporate portal, a customer who hasn't signed in can be asked for their email as they start, either on
+    // With the user portal, a customer who hasn't signed in can be asked for their email as they start, either on
     // leaving the welcome page or on first reaching the personalise page. Each bundle is only asked once, and never when
     // it already has an owner. Resolves once the prompt has been dealt with (at once when there's nothing to ask).
     const promptForEmailIfRequired = useCallback(async () => {
@@ -973,7 +973,7 @@ const PageHandler: FunctionComponent<{
     const confirmQuote = useCallback(
         async (details: QuoteDetails) => {
             try {
-                // With the corporate portal the customer is already attached to the bundle by signing in.
+                // With the user portal the customer is already attached to the bundle by signing in.
                 if (!portalEnabled) await saveDetails(details);
                 const quoteId = await bundle.generateQuoteId();
                 if (thankYouPageEnabled) {
@@ -997,7 +997,7 @@ const PageHandler: FunctionComponent<{
 
     // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
     // This resolves with whether the quote was requested, which is false when the customer cancels.
-    // With the corporate portal the customer's details are those of their account, so they sign in instead.
+    // With the user portal the customer's details are those of their account, so they sign in instead.
     const handleRequestQuote = useCallback(async () => {
         if (!portalEnabled) {
             return new Promise<boolean>((resolve) =>

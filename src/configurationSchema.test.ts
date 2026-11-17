@@ -23,7 +23,7 @@ describe("configurationSchema", () => {
         }
     });
 
-    it("keeps the corporate portal's order details off by default", () => {
+    it("keeps the user portal's order details off by default", () => {
         for (const key of ["portalOrderName", "portalPurchaseOrder", "portalDispatchDate"]) {
             const field = configurationSchema.fields.find((candidate) => "key" in candidate && candidate.key === key);
             expect(field?.type).toBe(FieldType.Select);

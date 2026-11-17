@@ -2,19 +2,19 @@ import { useMemo } from "react";
 import { orderDetailFields, type OrderDetailField } from "../utils/orderDetails";
 import useThemeConfiguration from "./useThemeConfiguration";
 
-/** The order details customers are asked for. None unless the corporate portal is on. */
+/** The order details customers are asked for. None unless the user portal is on. */
 const useOrderDetailFields = (): OrderDetailField[] => {
-    const { enableCorporatePortal, portalOrderName, portalPurchaseOrder, portalDispatchDate } = useThemeConfiguration();
+    const { enableUserPortal, portalOrderName, portalPurchaseOrder, portalDispatchDate } = useThemeConfiguration();
     return useMemo(
         () =>
-            enableCorporatePortal
+            enableUserPortal
                 ? orderDetailFields({
                       name: portalOrderName,
                       purchaseOrder: portalPurchaseOrder,
                       dispatchDate: portalDispatchDate,
                   })
                 : [],
-        [enableCorporatePortal, portalDispatchDate, portalOrderName, portalPurchaseOrder],
+        [enableUserPortal, portalDispatchDate, portalOrderName, portalPurchaseOrder],
     );
 };
 

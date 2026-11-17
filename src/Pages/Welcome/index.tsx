@@ -59,7 +59,7 @@ const Secondary = styled(Button)`
 `;
 
 /**
- * The first page, when the partner has switched it on. Starts a new order or, with the corporate portal, goes
+ * The first page, when the partner has switched it on. Starts a new order or, with the user portal, goes
  * somewhere in the customer's account instead.
  */
 const WelcomePage: FunctionComponent<{
