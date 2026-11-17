@@ -2,6 +2,11 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — Tests
+
+- `yarn test` runs the first tests (Vitest, with jsdom and Testing Library; config in `vitest.config.ts`, not `vite.config.ts`, so the theme plugin isn't loaded). Covered: the order details helpers (`utils/orderDetails`), the account logic (`hooks/useAccount`: session restore, attaching the bundle, sign-in, sign-out and reset, drafts, duplicating, the default template), the order details form, the inactivity timer, and the configuration schema and page settings (unique keys, every configured field exists, the welcome page's place).
+- The inactivity timer moved out of `PageHandler` into `hooks/useInactivityTimeout` so it can be tested. It now uses the latest callback without restarting the wait whenever the page re-renders.
+
 ## 2026-11-17 — Welcome page, saved assets, default template, timeout and start over
 
 - **Welcome page:** a new optional page (Welcome, off until switched on) in a group of its own, so it can't be moved: it's always first. Title, description, background image and every button's text are settings. It starts a new order, and with the corporate portal also offers **saved branding**, **duplicate a previous order** and **continue a draft / sign in**, which open the account dialog on that page (the customer signs in first if they haven't). Applying branding from it carries straight on to the order. A bundle that already has designs (a draft, a duplicate) skips it, and it comes back whenever the bundle is replaced (sign-out, timeout, start over).

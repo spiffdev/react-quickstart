@@ -39,6 +39,7 @@ import AccountDialog from "../components/AccountDialog";
 import GuestEmailDialog from "../components/GuestEmailDialog";
 import OrderDetailsDialog from "../components/OrderDetailsDialog";
 import WelcomePage from "./Welcome";
+import useInactivityTimeout from "../hooks/useInactivityTimeout";
 import type { AccountPage } from "../components/AccountDialog";
 import { useStartNewBundle } from "../hooks/useBundle";
 import useOrderDetailFields from "../hooks/useOrderDetails";
@@ -786,30 +787,14 @@ const PageHandler: FunctionComponent<{
 
     // With a timeout set, a screen left alone starts over for the next customer: whoever is signed in is signed out and
     // their design is cleared. A screen with nothing to clear is only taken back to the welcome page.
-    useEffect(() => {
-        if (!portalEnabled || !portalInactivitySeconds || portalInactivitySeconds <= 0) return;
-        if (page === "welcome" && !customer) return;
-        let timer: ReturnType<typeof setTimeout> | undefined;
-        const startOver = () => {
-            if (customer || bundle.getWorkflowExperiences().length > 0) {
-                resetSession().catch((error) => console.error("Error starting over after inactivity:", error));
-            } else if (welcomeEnabled) {
-                setPage("welcome");
-                setReachedRank(0);
-            }
-        };
-        const restart = () => {
-            clearTimeout(timer);
-            timer = setTimeout(startOver, portalInactivitySeconds * 1000);
-        };
-        const events = ["pointerdown", "pointermove", "keydown", "touchstart", "wheel"] as const;
-        events.forEach((name) => window.addEventListener(name, restart, { passive: true }));
-        restart();
-        return () => {
-            clearTimeout(timer);
-            events.forEach((name) => window.removeEventListener(name, restart));
-        };
-    }, [bundle, customer, page, portalEnabled, portalInactivitySeconds, resetSession, welcomeEnabled]);
+    useInactivityTimeout(portalInactivitySeconds, portalEnabled && !(page === "welcome" && !customer), () => {
+        if (customer || bundle.getWorkflowExperiences().length > 0) {
+            resetSession().catch((error) => console.error("Error starting over after inactivity:", error));
+        } else if (welcomeEnabled) {
+            setPage("welcome");
+            setReachedRank(0);
+        }
+    });
 
     const onExperiencePage = (page === "experience" || page === "shared") && !!experience;
     useEffect(() => {
