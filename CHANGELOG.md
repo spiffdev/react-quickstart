@@ -2,6 +2,14 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — Portal as a sidebar, save and exit, richer rows
+
+- **Sidebar:** the portal's dialogs (account, order details, guest email, save and exit) are now a panel on the right of larger screens, so the experience stays in view beside them, and the whole view on phones (compact width). The panel slides in, unless the customer prefers reduced motion.
+- **Email prompt on the welcome page:** with **Corporate Portal: Ask for Email** on, leaving the welcome page (with **Start a new order**, or after applying saved branding) asks for the email first. The prompt is still asked on first reaching the personalise page when there's no welcome page, and each bundle is only asked once.
+- **Save and exit:** new **Corporate Portal: Save and Exit** setting (on by default) adds a button to the stepper bar once there are designs. It names the draft (blank is fine), asks a guest for the email address which makes them its owner (a signed in customer, or a bundle which has an owner, isn't asked), then leaves: it closes the experience when it's in a frame, and otherwise starts over for the next customer.
+- **Richer rows:** orders and drafts show the order or quote number before the name (falling back to the collection's name), when they were created, how many **products** they have (not designs or recipients) and their total, where there's a presentment currency.
+- Not done by choice: localization of the portal's text, and a separate landing page. Invalid dispatch dates are left for something more first-class than a theme setting.
+
 ## 2026-11-18 — Tests
 
 - `yarn test` runs the first tests (Vitest, with jsdom and Testing Library; config in `vitest.config.ts`, not `vite.config.ts`, so the theme plugin isn't loaded). Covered: the order details helpers (`utils/orderDetails`), the account logic (`hooks/useAccount`: session restore, attaching the bundle, sign-in, sign-out and reset, drafts, duplicating, the default template), the order details form, the inactivity timer, and the configuration schema and page settings (unique keys, every configured field exists, the welcome page's place).

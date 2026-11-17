@@ -2,9 +2,8 @@ import { FunctionComponent, useState } from "react";
 import Button from "./button";
 import ErrorBanner from "./ErrorBanner";
 import { SignIn } from "./AccountDialog";
+import { isEmail } from "../utils/email";
 import { Backdrop, Dialog, Header, Input, Muted, TextButton, Title } from "./dialogParts";
-
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Offered to customers who haven't signed in, as they start personalising. They can give their email address (or sign
@@ -20,7 +19,7 @@ const GuestEmailDialog: FunctionComponent<{
     const [error, setError] = useState<string | undefined>(undefined);
 
     const submit = async () => {
-        if (!EMAIL_PATTERN.test(email.trim())) {
+        if (!isEmail(email)) {
             setError("Please enter a valid email address.");
             return;
         }

@@ -1,26 +1,53 @@
-import styled from "styled-components";
+import styled, { keyframes } from "styled-components";
+import { MEDIA } from "../layout";
 
+const slideIn = keyframes`
+    from {
+        transform: translateX(32px);
+        opacity: 0;
+    }
+
+    to {
+        transform: none;
+        opacity: 1;
+    }
+`;
+
+/** Covers the experience, with the panel on its right. */
 export const Backdrop = styled.div`
     position: absolute;
     inset: 0;
     z-index: 10000; /* Above the loading overlay (9999) */
     display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 16px;
+    align-items: stretch;
+    justify-content: flex-end;
     background: rgba(0, 0, 0, 0.5);
 `;
 
+/**
+ * The portal's panel. A sidebar on larger screens, so the experience stays in view beside it, and the whole view on
+ * phones, where there's no room for both.
+ */
 export const Dialog = styled.div`
     width: 100%;
-    max-width: 520px;
-    max-height: 100%;
+    max-width: 480px;
+    height: 100%;
     overflow-y: auto;
     padding: 24px;
-    border-radius: 8px;
     background: #ffffff;
     box-sizing: border-box;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+    box-shadow: -8px 0 32px rgba(0, 0, 0, 0.25);
+    animation: ${slideIn} 0.2s ease-out;
+
+    @media (prefers-reduced-motion: reduce) {
+        animation: none;
+    }
+
+    @media ${MEDIA.compact} {
+        max-width: none;
+        padding: 16px;
+        box-shadow: none;
+    }
 `;
 
 export const Header = styled.div`

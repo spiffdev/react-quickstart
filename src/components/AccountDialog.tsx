@@ -17,6 +17,8 @@ import useAccount from "../hooks/useAccount";
 import useActivation from "../hooks/useActivation";
 import useBundle from "../hooks/useBundle";
 import useClient from "../hooks/useClient";
+import useCurrency from "../hooks/useCurrency";
+import { bundleTitle, createdLabel, priceLabel, productCountLabel } from "../utils/bundleSummary";
 import useOrderDetailFields from "../hooks/useOrderDetails";
 import { EMPTY_ORDER_DETAILS } from "../utils/orderDetails";
 import OrderDetailsForm from "./OrderDetailsForm";
@@ -134,6 +136,7 @@ const BundleList: FunctionComponent<{
 }> = ({ ordered, emptyMessage, actionLabel, busyLabel, onAction }) => {
     const client = useClient();
     const current = useBundle();
+    const formatPrice = useCurrency();
     const [items, setItems] = useState<BundleRaw[]>([]);
     const [total, setTotal] = useState(0);
     // The number of bundles asked for so far, counting those which were left out because they're empty.
@@ -191,10 +194,11 @@ const BundleList: FunctionComponent<{
                 {items.map((item) => (
                     <Row key={item.id}>
                         <RowText>
-                            <strong>{item.name || "Unnamed order"}</strong>
+                            <strong>{bundleTitle(item)}</strong>
+                            <span>Created: {createdLabel(item)}</span>
                             <span>
-                                {item.transactionsCount} {item.transactionsCount === 1 ? "design" : "designs"} ·{" "}
-                                {new Date(item.updatedAt).toLocaleDateString()}
+                                {productCountLabel(item)}
+                                {priceLabel(item, formatPrice) ? ` · ${priceLabel(item, formatPrice)}` : ""}
                             </span>
                         </RowText>
                         <Button

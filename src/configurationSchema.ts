@@ -103,6 +103,11 @@ export interface ThemeConfiguration {
      * customer is signed out and their design is cleared. Never when unset or zero.
      */
     portalInactivitySeconds?: number;
+    /**
+     * With the corporate portal, whether customers can save their design as a draft and leave, from a button on the
+     * stepper bar. On by default.
+     */
+    portalSaveAndExit?: boolean;
     /** An image shown behind the welcome page. */
     welcomeBackgroundImage?: AssetResource;
     /** The welcome page's heading. */
@@ -271,6 +276,14 @@ export const configurationSchema: ThemeConfigurationSchema = {
                 { key: "optional", value: "Asked, optional" },
                 { key: "required", value: "Asked, required" },
             ],
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalSaveAndExit",
+            title: "Corporate Portal: Save and Exit",
+            defaultValue: "true",
+            description:
+                "When true, customers can save their design as a draft and leave, using a button on the stepper bar. They can pick it up again from their drafts.",
         },
         {
             type: FieldType.Number,
@@ -516,6 +529,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                         "portalOrderName",
                         "portalPurchaseOrder",
                         "portalDispatchDate",
+                        "portalSaveAndExit",
                         "portalInactivitySeconds",
                         "conversionConfiguration",
                     ],

@@ -1,6 +1,6 @@
 import { FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { CircleUserRound, ClipboardList, UserRound } from "lucide-react";
+import { CircleUserRound, ClipboardList, LogOut, UserRound } from "lucide-react";
 import useBundle from "../hooks/useBundle";
 import ProductCollectionSelector from "./ProductCollectionSelector";
 import {
@@ -37,6 +37,7 @@ import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm
 import ConversionDialog from "../components/ConversionDialog";
 import AccountDialog from "../components/AccountDialog";
 import GuestEmailDialog from "../components/GuestEmailDialog";
+import SaveAndExitDialog from "../components/SaveAndExitDialog";
 import OrderDetailsDialog from "../components/OrderDetailsDialog";
 import WelcomePage from "./Welcome";
 import useInactivityTimeout from "../hooks/useInactivityTimeout";
@@ -151,6 +152,7 @@ const PageHandler: FunctionComponent<{
         portalPromptEmail,
         portalEnforceLogin,
         portalInactivitySeconds,
+        portalSaveAndExit,
         thankYouShowStartOver,
         thankYouStartOverLabel,
     } = useThemeConfiguration();
@@ -176,6 +178,14 @@ const PageHandler: FunctionComponent<{
     // Whether the guest email prompt is showing, and the bundles it has already been shown for.
     const [guestPromptOpen, setGuestPromptOpen] = useState(false);
     const guestPromptedBundles = useRef(new WeakSet<object>());
+    // Settles whatever is waiting on the prompt.
+    const guestPromptResolve = useRef<(() => void) | undefined>(undefined);
+    const closeGuestPrompt = useCallback(() => {
+        guestPromptResolve.current?.();
+        guestPromptResolve.current = undefined;
+        setGuestPromptOpen(false);
+    }, []);
+    const [saveAndExitOpen, setSaveAndExitOpen] = useState(false);
     const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
     const thankYouPageEnabled = usePageEnabled("thank-you");
@@ -801,26 +811,55 @@ const PageHandler: FunctionComponent<{
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
     }, [onExperiencePage, requestConversionIfRequired]);
 
-    // With the corporate portal, a customer who hasn't signed in can be asked for their email as they start.
-    // Each bundle is only asked once, and never when it already has an owner.
-    useEffect(() => {
-        if (!onExperiencePage || !portalEnabled || !portalPromptEmail || customer) return;
-        if (guestPromptedBundles.current.has(bundle)) return;
+    // With the corporate portal, a customer who hasn't signed in can be asked for their email as they start, either on
+    // leaving the welcome page or on first reaching the personalise page. Each bundle is only asked once, and never when
+    // it already has an owner. Resolves once the prompt has been dealt with (at once when there's nothing to ask).
+    const promptForEmailIfRequired = useCallback(async () => {
+        if (!portalEnabled || !portalPromptEmail || customer || guestPromptedBundles.current.has(bundle)) return;
         guestPromptedBundles.current.add(bundle);
-        bundle
-            .getAllStakeholders()
-            .then((stakeholders) => {
-                if (!stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) {
-                    setGuestPromptOpen(true);
-                }
-            })
-            .catch((error) => console.error("Error checking the customer's details:", error));
-    }, [bundle, customer, onExperiencePage, portalEnabled, portalPromptEmail]);
+        const stakeholders = await bundle.getAllStakeholders();
+        if (stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) return;
+        await new Promise<void>((resolve) => {
+            guestPromptResolve.current = resolve;
+            setGuestPromptOpen(true);
+        });
+    }, [bundle, customer, portalEnabled, portalPromptEmail]);
+    useEffect(() => {
+        if (onExperiencePage) {
+            promptForEmailIfRequired().catch((error) => console.error("Error checking the customer's details:", error));
+        }
+    }, [onExperiencePage, promptForEmailIfRequired]);
     // Signing in answers the prompt, as does the bundle being swapped for another.
     useEffect(() => {
-        if (customer) setGuestPromptOpen(false);
-    }, [customer]);
-    useEffect(() => setGuestPromptOpen(false), [bundle]);
+        if (customer) closeGuestPrompt();
+    }, [closeGuestPrompt, customer]);
+    useEffect(() => closeGuestPrompt(), [bundle, closeGuestPrompt]);
+    useEffect(() => setSaveAndExitOpen(false), [bundle]);
+
+    // Leaving the welcome page asks for the customer's email first, when that's what the partner wants.
+    const currentBundle = useRef(bundle);
+    currentBundle.current = bundle;
+    const handleWelcomeStart = useCallback(async () => {
+        const startedWith = bundle;
+        try {
+            await promptForEmailIfRequired();
+        } catch (error) {
+            console.error("Error checking the customer's details:", error);
+        }
+        // The bundle was replaced meanwhile (such as by signing out), so this start is no longer wanted.
+        if (currentBundle.current === startedWith) startFromWelcome();
+    }, [bundle, promptForEmailIfRequired, startFromWelcome]);
+
+    // Leaves the experience once the draft is saved: closes it when it's in a frame, otherwise starts over for the next
+    // customer, as there's nowhere else to go.
+    const exitAfterSaving = useCallback(async () => {
+        setSaveAndExitOpen(false);
+        if (window.self !== window.top) {
+            ((window as any).SpiffThemeLoader as SpiffThemeLoader).close();
+        } else {
+            await resetSession();
+        }
+    }, [resetSession]);
 
     // A preview image is only needed for the first experience. It comes from the 3D scene when the workflow is set up
     // for that, which `finishBundle` makes sure is loaded.
@@ -1038,6 +1077,12 @@ const PageHandler: FunctionComponent<{
                     actions={
                         portalEnabled ? (
                             <>
+                                {portalSaveAndExit !== false && switcherExperiences.length > 0 && (
+                                    <DetailsButton disabled={saveAndExitOpen} onClick={() => setSaveAndExitOpen(true)}>
+                                        Save and exit
+                                        <LogOut size={16} aria-hidden="true" />
+                                    </DetailsButton>
+                                )}
                                 {orderDetailFields.length > 0 && (
                                     <DetailsButton
                                         disabled={!!pendingOrderDetails}
@@ -1077,7 +1122,7 @@ const PageHandler: FunctionComponent<{
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", position: "relative" }}>
                 {page === "welcome" && (
                     <WelcomePage
-                        onStart={startFromWelcome}
+                        onStart={handleWelcomeStart}
                         onOpenAccount={openAccount}
                         brandingAvailable={!!bundle.getGlobalPropertyConfiguration()}
                     />
@@ -1201,20 +1246,23 @@ const PageHandler: FunctionComponent<{
                             // Branding is applied to start an order with, so carry on once it has been seen to apply.
                             setTimeout(() => {
                                 setAccountOpen(false);
-                                startFromWelcome();
+                                void handleWelcomeStart();
                             }, 1200);
                         }
                     }}
                 />
+            )}
+            {saveAndExitOpen && (
+                <SaveAndExitDialog onClose={() => setSaveAndExitOpen(false)} onSaved={exitAfterSaving} />
             )}
             {guestPromptOpen && !accountOpen && (
                 <GuestEmailDialog
                     enforceLogin={!!portalEnforceLogin}
                     onEmailProvided={async (email) => {
                         await bundle.addStakeholder({ emailAddress: email }, StakeholderType.Owner);
-                        setGuestPromptOpen(false);
+                        closeGuestPrompt();
                     }}
-                    onContinueAsGuest={() => setGuestPromptOpen(false)}
+                    onContinueAsGuest={closeGuestPrompt}
                 />
             )}
             {pendingConversion && (
