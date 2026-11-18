@@ -140,7 +140,7 @@ const BundleList: FunctionComponent<{
     const formatPrice = useCurrency();
     const [items, setItems] = useState<BundleRaw[]>([]);
     const [total, setTotal] = useState(0);
-    // The number of bundles asked for so far, counting those which were left out because they're empty.
+    // The number of bundles asked for so far, which is where the next page starts.
     const requested = useRef(0);
     const [loading, setLoading] = useState(true);
     const [working, setWorking] = useState<string | undefined>(undefined);
@@ -157,9 +157,7 @@ const BundleList: FunctionComponent<{
                 offset: requested.current,
             });
             requested.current += result.items.length;
-            // A bundle with no designs in it is nothing worth coming back to.
-            const useful = result.items.filter((item) => (item.transactionsCount ?? 0) > 0);
-            setItems((previous) => [...previous, ...useful]);
+            setItems((previous) => [...previous, ...result.items]);
             setTotal(result.total);
         } catch (caught) {
             console.error("Error loading the customer's bundles:", caught);
@@ -673,7 +671,7 @@ const AccountDialog: FunctionComponent<{
                   : "My account";
 
     return (
-        <Backdrop>
+        <Backdrop onDismiss={onClose}>
             <Dialog role="dialog" aria-modal="true" aria-labelledby="account-title">
                 <Header>
                     <Title id="account-title">{customer ? heading : "Sign in"}</Title>

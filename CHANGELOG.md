@@ -2,6 +2,14 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — The sidebar closes when you click away from it
+
+- The portal's sidebars (account, order details, guest email, save and exit) close when the customer presses anywhere outside them, or presses **Escape**. It's the press that counts, so selecting text in a sidebar and letting go outside doesn't close it. The same as their Close or Cancel button each time, except for the guest email prompt, where leaving is the same as **Continue as guest**. Save and exit, and the guest email prompt, can't be dismissed while they're saving. (`Backdrop` takes an `onDismiss`.)
+
+## 2026-11-18 — Drafts and orders list every bundle
+
+- **Draft orders** and **Previous orders** no longer leave out bundles with no designs in them. They hid anything whose `transactionsCount` wasn't above zero, which emptied the list when the server didn't report it for a real draft. The lists now show everything the server returns for the customer, so empty bundles (every new visit, sign-out or start over makes one) will show too, as "0 products" with the name "Unnamed order" if they have none. The bundle which is open is still listed, with its button disabled.
+
 ## 2026-11-18 — Signing out when saving and exiting is optional
 
 - A signed in customer saving and exiting chooses whether to be signed out, with a **Sign me out when I exit** option in the panel. It's **unticked to begin with**, so they stay signed in unless they say otherwise, and it isn't shown to guests, who have nothing to sign out of. Unticked, and when the theme isn't in a frame, the next design starts on a new bundle under their account; in a frame the experience closes either way, without starting a bundle that nobody would use.

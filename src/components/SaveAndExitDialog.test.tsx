@@ -218,6 +218,28 @@ describe("SaveAndExitDialog", () => {
         expect(save().disabled).toBe(false);
     });
 
+    it("closes when the customer clicks away from it, as with Cancel", async () => {
+        const { onClose } = renderDialog(makeBundle({ owner: true }));
+        fireEvent.mouseDown(screen.getByRole("dialog").parentElement!);
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    it("can't be clicked away from while it's saving", async () => {
+        account.customer = { emailAddress: "jo@example.com" };
+        const bundle = makeBundle({ owner: true });
+        const { onClose, save } = renderDialog(bundle);
+        await waitFor(() => expect(save().disabled).toBe(false));
+        let finish: () => void = () => {};
+        bundle.setName.mockImplementation(() => new Promise<void>((resolve) => (finish = resolve)) as never);
+        type(/order name/i, "Staff gifts");
+        fireEvent.click(save());
+        await waitFor(() => expect(save().textContent).toBe("Saving..."));
+        fireEvent.mouseDown(screen.getByRole("dialog").parentElement!);
+        fireEvent.keyDown(window, { key: "Escape" });
+        expect(onClose).not.toHaveBeenCalled();
+        finish();
+    });
+
     it("can be cancelled", async () => {
         const { onClose } = renderDialog(makeBundle({ owner: true }));
         fireEvent.click(screen.getByRole("button", { name: /cancel/i }));

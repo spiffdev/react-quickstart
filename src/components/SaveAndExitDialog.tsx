@@ -86,7 +86,7 @@ const SaveAndExitDialog: FunctionComponent<{
     };
 
     return (
-        <Backdrop>
+        <Backdrop onDismiss={saving ? undefined : onClose}>
             <Dialog role="dialog" aria-modal="true" aria-labelledby="save-exit-title">
                 <Header>
                     <Title id="save-exit-title">Save and exit</Title>

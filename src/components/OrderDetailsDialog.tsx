@@ -20,7 +20,7 @@ const OrderDetailsDialog: FunctionComponent<{
     };
 
     return (
-        <Backdrop>
+        <Backdrop onDismiss={() => onClose(false)}>
             <Dialog role="dialog" aria-modal="true" aria-labelledby="order-details-title">
                 <Header>
                     <Title id="order-details-title">Order details</Title>

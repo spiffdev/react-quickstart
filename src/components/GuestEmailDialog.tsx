@@ -35,7 +35,8 @@ const GuestEmailDialog: FunctionComponent<{
     };
 
     return (
-        <Backdrop>
+        // Leaving it is the same as carrying on as a guest, unless it's in the middle of saving an email address.
+        <Backdrop onDismiss={busy ? undefined : onContinueAsGuest}>
             <Dialog role="dialog" aria-modal="true" aria-labelledby="guest-title">
                 <Header>
                     <Title id="guest-title">{enforceLogin ? "Sign in" : "Your email address"}</Title>

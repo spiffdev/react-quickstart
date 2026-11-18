@@ -1,3 +1,4 @@
+import { FunctionComponent, ReactNode, useEffect } from "react";
 import styled, { keyframes } from "styled-components";
 import { MEDIA } from "../layout";
 
@@ -13,8 +14,7 @@ const slideIn = keyframes`
     }
 `;
 
-/** Covers the experience, with the panel on its right. */
-export const Backdrop = styled.div`
+const BackdropArea = styled.div`
     position: absolute;
     inset: 0;
     z-index: 10000; /* Above the loading overlay (9999) */
@@ -23,6 +23,35 @@ export const Backdrop = styled.div`
     justify-content: flex-end;
     background: rgba(0, 0, 0, 0.5);
 `;
+
+/**
+ * Covers the experience, with the panel on its right. Clicking the covered part, or pressing Escape, dismisses it.
+ * Leave `onDismiss` out for a panel which has to be answered, or while it's busy.
+ */
+export const Backdrop: FunctionComponent<{ onDismiss?: () => void; children: ReactNode }> = ({
+    onDismiss,
+    children,
+}) => {
+    useEffect(() => {
+        if (!onDismiss) return;
+        const dismissOnEscape = (event: KeyboardEvent) => {
+            if (event.key === "Escape") onDismiss();
+        };
+        window.addEventListener("keydown", dismissOnEscape);
+        return () => window.removeEventListener("keydown", dismissOnEscape);
+    }, [onDismiss]);
+
+    return (
+        <BackdropArea
+            // Pressing, rather than clicking, so selecting text in the panel and letting go outside it doesn't close it.
+            onMouseDown={(event) => {
+                if (event.target === event.currentTarget) onDismiss?.();
+            }}
+        >
+            {children}
+        </BackdropArea>
+    );
+};
 
 /**
  * The portal's panel. A sidebar on larger screens, so the experience stays in view beside it, and the whole view on
