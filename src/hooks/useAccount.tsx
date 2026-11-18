@@ -31,8 +31,11 @@ interface AccountContextType {
     sendVerificationCode: (emailAddress: string) => Promise<void>;
     /** Resolves true when the code was accepted, in which case the current bundle now belongs to the customer. */
     submitVerificationCode: (emailAddress: string, code: string) => Promise<boolean>;
-    /** Signs out, and replaces the bundle with a new one so the next customer doesn't see this one's design. */
-    signOut: () => Promise<void>;
+    /**
+     * Signs out, and replaces the bundle with a new one so the next customer doesn't see this one's design. Not
+     * replacing it is for when the experience is about to close.
+     */
+    signOut: (options?: { startNewBundle?: boolean }) => Promise<void>;
     /** Updates the signed in customer's own details. All of them are sent, as anything left out is cleared. */
     updateDetails: (details: CustomerDetails) => Promise<void>;
     /** Starts over for the next customer: signs out if anyone is, and replaces the bundle with a new one. */
@@ -168,11 +171,14 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
         [client],
     );
 
-    const signOut = useCallback(async () => {
-        await client.logOut();
-        setCustomer(undefined);
-        await startNewBundle();
-    }, [client, startNewBundle]);
+    const signOut = useCallback(
+        async ({ startNewBundle: startNew = true }: { startNewBundle?: boolean } = {}) => {
+            await client.logOut();
+            setCustomer(undefined);
+            if (startNew) await startNewBundle();
+        },
+        [client, startNewBundle],
+    );
 
     const updateDetails = useCallback(
         async (details: CustomerDetails) => {

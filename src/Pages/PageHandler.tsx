@@ -154,10 +154,11 @@ const PageHandler: FunctionComponent<{
         portalEnforceLogin,
         portalInactivitySeconds,
         portalSaveAndExit,
+        portalAllowStaySignedIn,
         thankYouShowStartOver,
         thankYouStartOverLabel,
     } = useThemeConfiguration();
-    const { enabled: portalEnabled, customer, resetSession } = useAccount();
+    const { enabled: portalEnabled, customer, resetSession, signOut } = useAccount();
     const startNewBundle = useStartNewBundle();
     const welcomeEnabled = usePageEnabled("welcome");
     const conversionConfiguration = themeConversionConfiguration;
@@ -904,16 +905,30 @@ const PageHandler: FunctionComponent<{
         if (currentBundle.current === startedWith) startFromWelcome();
     }, [bundle, promptForEmailIfRequired, startFromWelcome]);
 
-    // Leaves the experience once the draft is saved: closes it when it's in a frame, otherwise starts over for the next
-    // customer, as there's nowhere else to go.
-    const exitAfterSaving = useCallback(async () => {
-        setSaveAndExitOpen(false);
-        if (window.self !== window.top) {
-            ((window as any).SpiffThemeLoader as SpiffThemeLoader).close();
-        } else {
-            await resetSession();
-        }
-    }, [resetSession]);
+    // Starts a new order from the thank you page. The customer stays signed in, unless the theme says they're always
+    // signed out as they leave (for shared screens).
+    const startOverAfterThanks = useCallback(
+        () => (portalAllowStaySignedIn === false ? resetSession() : startNewBundle()),
+        [portalAllowStaySignedIn, resetSession, startNewBundle],
+    );
+
+    // Leaves the experience once the draft is saved: closes it when it's in a frame, otherwise starts over with a new
+    // bundle, as there's nowhere else to go. The customer is only signed out if they chose to be.
+    const exitAfterSaving = useCallback(
+        async ({ signOut: signOutToo }: { signOut: boolean }) => {
+            setSaveAndExitOpen(false);
+            if (window.self !== window.top) {
+                // The experience is closing, so there's no use starting a new bundle.
+                if (signOutToo) await signOut({ startNewBundle: false });
+                ((window as any).SpiffThemeLoader as SpiffThemeLoader).close();
+            } else if (signOutToo) {
+                await resetSession();
+            } else {
+                await startNewBundle();
+            }
+        },
+        [resetSession, signOut, startNewBundle],
+    );
 
     // A preview image is only needed for the first experience. It comes from the 3D scene when the workflow is set up
     // for that, which `finishBundle` makes sure is loaded.
@@ -1302,7 +1317,7 @@ const PageHandler: FunctionComponent<{
                         closeLabel={thankYouCloseLabel}
                         quoteId={completion.kind === "quote" ? completion.quoteId : undefined}
                         onPrepare={prepareHandOff}
-                        onStartOver={thankYouShowStartOver === false ? undefined : startNewBundle}
+                        onStartOver={thankYouShowStartOver === false ? undefined : startOverAfterThanks}
                         startOverLabel={thankYouStartOverLabel}
                     />
                 )}

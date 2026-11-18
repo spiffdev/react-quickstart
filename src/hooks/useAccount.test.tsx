@@ -247,6 +247,17 @@ describe("signing out and starting over", () => {
         expect(result.current.customer).toBeUndefined();
     });
 
+    it("can sign out without starting a new bundle, for when the experience is closing", async () => {
+        const { client, signInOnLoad } = makeClient();
+        signInOnLoad();
+        const { result, startNewBundle } = setup(client, makeBundle({ owner: true }));
+        await waitFor(() => expect(result.current.customer).toBeDefined());
+        await act(() => result.current.signOut({ startNewBundle: false }));
+        expect(client.logOut).toHaveBeenCalledTimes(1);
+        expect(startNewBundle).not.toHaveBeenCalled();
+        expect(result.current.customer).toBeUndefined();
+    });
+
     it("resets without signing out when nobody is signed in", async () => {
         const { client } = makeClient();
         const { result, startNewBundle } = setup(client, makeBundle());

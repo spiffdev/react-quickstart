@@ -13,7 +13,7 @@
     },
     "dependencies": {
         "@floating-ui/react": "^0.27.20",
-        "@spiffcommerce/core": "44.21.1-alpha.2",
+        "@spiffcommerce/core": "44.21.1-alpha.4",
         "@spiffcommerce/preview-3d": "6.0.1",
         "@spiffcommerce/theme-bridge": "1.29.1-alpha.5",
         "lucide-react": "^1.70.0",

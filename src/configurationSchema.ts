@@ -125,6 +125,12 @@ export interface ThemeConfiguration {
      * stepper bar. On by default.
      */
     portalSaveAndExit?: boolean;
+    /**
+     * With the user portal, whether a signed in customer can stay signed in when they leave (saving and exiting, or
+     * starting a new order from the thank you page). On by default. When off they're always signed out, which suits
+     * shared screens such as kiosks.
+     */
+    portalAllowStaySignedIn?: boolean;
     /** An image shown behind the welcome page. */
     welcomeBackgroundImage?: AssetResource;
     /** The welcome page's heading. */
@@ -301,6 +307,14 @@ export const configurationSchema: ThemeConfigurationSchema = {
             defaultValue: "true",
             description:
                 "When true, customers can save their design as a draft and leave, using a button on the stepper bar. They can pick it up again from their drafts.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalAllowStaySignedIn",
+            title: "User Portal: Allow Staying Signed In",
+            defaultValue: "true",
+            description:
+                "When true, customers can choose to stay signed in when they save and exit, and stay signed in when they start a new order from the thank you page. When false they're always signed out as they leave, which is for shared screens such as kiosks.",
         },
         {
             type: FieldType.Number,
@@ -546,6 +560,7 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                         "portalPurchaseOrder",
                         "portalDispatchDate",
                         "portalSaveAndExit",
+                        "portalAllowStaySignedIn",
                         "portalInactivitySeconds",
                         "conversionConfiguration",
                     ],

@@ -2,6 +2,12 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — Signing out when saving and exiting is optional
+
+- A signed in customer saving and exiting chooses whether to be signed out, with a **Sign me out when I exit** option in the panel. It's **unticked to begin with**, so they stay signed in unless they say otherwise, and it isn't shown to guests, who have nothing to sign out of. Unticked, and when the theme isn't in a frame, the next design starts on a new bundle under their account; in a frame the experience closes either way, without starting a bundle that nobody would use.
+- New **User Portal: Allow Staying Signed In** setting (on by default). Turned off, customers are **always** signed out as they leave, which suits shared screens such as kiosks: the panel just says "You'll be signed out when you exit." instead of offering the choice, and starting a new order from the thank you page signs them out as well (it leaves them signed in when the setting is on). Signing out from the account menu and the inactivity timeout always sign out and start over, whatever this is set to.
+- `useAccount().signOut` takes `{ startNewBundle: false }` for the case where the experience is about to close.
+
 ## 2026-11-18 — The conversion configuration with the user portal
 
 - The user portal no longer **completely** replaces the conversion configuration. With both on, the configuration's details are asked for **inline on the review page** (a "Your details" section above the terms and buttons), or, when the review page is off, in a **popup just before the design is finalised**. Its own locations (start, end and manual) don't apply with the portal, and there's no "Your details" button on the stepper bar.
@@ -16,7 +22,7 @@ Every notable change to this theme, newest first.
 
 ## 2026-11-18 — Save branding as a template when saving and exiting
 
-- The **Save and exit** panel has an **Also save my branding as a template** option (off to begin with, and only for a signed in customer when the design has shared options, as saved branding does; core won't make a template for a guest who has only given their email address). Ticking it asks for a name, which is needed, and saves the design's shared options as saved branding after the draft's name, then leaves. If the template can't be saved the panel stays open with a message, and trying again doesn't make it twice; unticking it saves the draft without one.
+- The **Save and exit** panel has an **Also save my branding as a template** option (off to begin with, and only for a signed in customer when the design has shared options, as saved branding does; core won't make a template for a guest who has only given their email address). The template is saved under the **order's name** (there's no separate name for it, as templates are listed apart from orders), so ticking it needs the order to have one, and the panel says so while it doesn't. It saves the design's shared options as saved branding after the draft's name, then leaves. If the template can't be saved the panel stays open with a message, and trying again doesn't make it twice; unticking it saves the draft without one.
 
 ## 2026-11-18 — Server addresses come from the region
 

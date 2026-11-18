@@ -4,6 +4,7 @@ import Button from "./button";
 import ErrorBanner from "./ErrorBanner";
 import useAccount from "../hooks/useAccount";
 import useBundle from "../hooks/useBundle";
+import useThemeConfiguration from "../hooks/useThemeConfiguration";
 import { isEmail } from "../utils/email";
 import { Backdrop, Checkbox, Dialog, Header, Input, Muted, TextButton, Title } from "./dialogParts";
 
@@ -14,8 +15,8 @@ import { Backdrop, Checkbox, Dialog, Header, Input, Muted, TextButton, Title } f
  */
 const SaveAndExitDialog: FunctionComponent<{
     onClose: () => void;
-    /** Leaves, once the draft has been saved. */
-    onSaved: () => void | Promise<void>;
+    /** Leaves, once the draft has been saved, signing the customer out if they chose to be. */
+    onSaved: (options: { signOut: boolean }) => void | Promise<void>;
 }> = ({ onClose, onSaved }) => {
     const bundle = useBundle();
     const { customer } = useAccount();
@@ -24,9 +25,13 @@ const SaveAndExitDialog: FunctionComponent<{
     // Whether the bundle already belongs to someone, which isn't known until it has been asked.
     const [owned, setOwned] = useState<boolean | undefined>(undefined);
     const [saveTemplate, setSaveTemplate] = useState(false);
-    const [templateName, setTemplateName] = useState("");
     // Kept so that trying again after a failure doesn't make a second template.
     const [templateSaved, setTemplateSaved] = useState(false);
+    // Whether a signed in customer chooses to be signed out as they leave. They stay signed in unless they say
+    // otherwise, unless the theme says they're always signed out (for shared screens).
+    const { portalAllowStaySignedIn } = useThemeConfiguration();
+    const alwaysSignOut = portalAllowStaySignedIn === false;
+    const [signOutOnExit, setSignOutOnExit] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | undefined>(undefined);
 
@@ -51,8 +56,7 @@ const SaveAndExitDialog: FunctionComponent<{
     // Branding is the shared options, which only some activations have. A template belongs to a signed in customer: core
     // won't make one for a guest who has only given their email address.
     const templateAvailable = !!customer && !!bundle.getGlobalPropertyConfiguration();
-    const ready =
-        owned !== undefined && (!needsEmail || isEmail(email)) && (!saveTemplate || templateName.trim() !== "");
+    const ready = owned !== undefined && (!needsEmail || isEmail(email)) && (!saveTemplate || name.trim() !== "");
 
     const save = async () => {
         setSaving(true);
@@ -65,10 +69,11 @@ const SaveAndExitDialog: FunctionComponent<{
                 setOwned(true);
             }
             if (saveTemplate && !templateSaved) {
-                await bundle.convertToTemplate(templateName.trim());
+                // Saved under the order's name, as templates are listed apart from orders.
+                await bundle.convertToTemplate(name.trim());
                 setTemplateSaved(true);
             }
-            await onSaved();
+            await onSaved({ signOut: !!customer && (alwaysSignOut || signOutOnExit) });
         } catch (caught) {
             console.error("Error saving the draft:", caught);
             setError(
@@ -130,14 +135,20 @@ const SaveAndExitDialog: FunctionComponent<{
                             Also save my branding as a template
                         </Checkbox>
                     )}
-                    {templateAvailable && saveTemplate && (
-                        <Input
-                            aria-label="Template name"
-                            placeholder="Name your branding"
-                            value={templateName}
-                            disabled={saving || templateSaved}
-                            onChange={(event) => setTemplateName(event.target.value)}
-                        />
+                    {templateAvailable && saveTemplate && name.trim() === "" && (
+                        <Muted>The template is saved under the order's name, so give it one above.</Muted>
+                    )}
+                    {customer && alwaysSignOut && <Muted>You'll be signed out when you exit.</Muted>}
+                    {customer && !alwaysSignOut && (
+                        <Checkbox>
+                            <input
+                                type="checkbox"
+                                checked={signOutOnExit}
+                                disabled={saving}
+                                onChange={(event) => setSignOutOnExit(event.target.checked)}
+                            />
+                            Sign me out when I exit
+                        </Checkbox>
                     )}
                     <Button type="submit" fullWidth disabled={saving || !ready}>
                         {saving ? "Saving..." : "Save and exit"}
