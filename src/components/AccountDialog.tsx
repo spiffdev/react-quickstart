@@ -22,6 +22,7 @@ import { bundleTitle, createdLabel, priceLabel, productCountLabel } from "../uti
 import useOrderDetailFields from "../hooks/useOrderDetails";
 import { EMPTY_ORDER_DETAILS } from "../utils/orderDetails";
 import OrderDetailsForm from "./OrderDetailsForm";
+import CustomerDetailsForm from "./CustomerDetailsForm";
 import {
     Backdrop,
     Chip,
@@ -521,7 +522,7 @@ const AssetList: FunctionComponent = () => {
     );
 };
 
-export type AccountPage = "menu" | "drafts" | "orders" | "templates" | "assets";
+export type AccountPage = "menu" | "drafts" | "orders" | "templates" | "assets" | "details";
 
 /**
  * The user portal. Customers sign in with a code sent to their email, then from the menu can pick a draft up where
@@ -534,7 +535,7 @@ const AccountDialog: FunctionComponent<{
     /** The page to open on once the customer is signed in. The menu when unset. */
     initialPage?: AccountPage;
 }> = ({ onClose, onTemplateApplied, initialPage = "menu" }) => {
-    const { customer, signOut, openDraft, duplicateBundle } = useAccount();
+    const { customer, signOut, openDraft, duplicateBundle, updateDetails } = useAccount();
     const bundle = useBundle();
     const orderDetailFields = useOrderDetailFields();
     // Branding is the shared options, which only some activations have.
@@ -616,12 +617,18 @@ const AccountDialog: FunctionComponent<{
                 return <TemplateList onApplied={onTemplateApplied} />;
             case "assets":
                 return <AssetList />;
+            case "details":
+                return customer ? <CustomerDetailsForm customer={customer} onSave={updateDetails} /> : null;
             default:
                 return (
                     <>
                         {signOutError && (
                             <ErrorBanner message={signOutError} onDismiss={() => setSignOutError(undefined)} />
                         )}
+                        <MenuItem type="button" onClick={() => setPage("details")}>
+                            <strong>Your details</strong>
+                            <span>Your name and phone number.</span>
+                        </MenuItem>
                         <MenuItem type="button" onClick={() => setPage("drafts")}>
                             <strong>Draft orders</strong>
                             <span>Pick up an order where you left it.</span>
@@ -661,7 +668,9 @@ const AccountDialog: FunctionComponent<{
               ? "Saved branding"
               : page === "assets"
                 ? "Saved assets"
-                : "My account";
+                : page === "details"
+                  ? "Your details"
+                  : "My account";
 
     return (
         <Backdrop>

@@ -5,13 +5,7 @@ import {
     ThemeContextBundle,
     themeInstallConfigurationFieldsToRecordObject,
 } from "@spiffcommerce/theme-bridge";
-import {
-    ActivationData,
-    Bundle,
-    CurrencyContext,
-    SpiffCommerceClient,
-    spiffCoreConfiguration,
-} from "@spiffcommerce/core";
+import { ActivationData, Bundle, CurrencyContext, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
 import { CurrencyProvider } from "./hooks/useCurrency";
 import { ThemeProvider } from "./hooks/useTheme";
@@ -51,20 +45,9 @@ const App: FunctionComponent<{
         const client = new SpiffCommerceClient({
             applicationKey: context.applicationKey,
         });
-        if (import.meta.env.DEV === true && import.meta.env.VITE_SERVER_URL) {
-            client.configure({
-                hubUrl: import.meta.env.VITE_HUB_URL,
-                serverUrl: import.meta.env.VITE_SERVER_URL,
-                servicesApiUrl: import.meta.env.VITE_SERVICES_URL,
-            });
-        } else {
-            const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
-            spiffThemeLoader.configureClient(client);
-        }
-        // Only overridden when provided, otherwise core's default editor is used.
-        if (import.meta.env.VITE_EDITOR_URL) {
-            spiffCoreConfiguration.setEditorUrl(import.meta.env.VITE_EDITOR_URL);
-        }
+        // In development the theme loader applies the server addresses and login settings of the VITE_SPIFF_REGION.
+        const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
+        spiffThemeLoader.configureClient(client);
         return client;
     });
 

@@ -16,6 +16,13 @@ import { applyOrderDetails, type OrderDetails } from "../utils/orderDetails";
 import useClient from "./useClient";
 import useThemeConfiguration from "./useThemeConfiguration";
 
+/** What a customer can change about themselves. Their email address is how they sign in, so it isn't here. */
+export interface CustomerDetails {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+}
+
 interface AccountContextType {
     /** Whether the user portal is switched on. When it is, the conversion configuration isn't used at all. */
     enabled: boolean;
@@ -26,6 +33,8 @@ interface AccountContextType {
     submitVerificationCode: (emailAddress: string, code: string) => Promise<boolean>;
     /** Signs out, and replaces the bundle with a new one so the next customer doesn't see this one's design. */
     signOut: () => Promise<void>;
+    /** Updates the signed in customer's own details. All of them are sent, as anything left out is cleared. */
+    updateDetails: (details: CustomerDetails) => Promise<void>;
     /** Starts over for the next customer: signs out if anyone is, and replaces the bundle with a new one. */
     resetSession: () => Promise<void>;
     /** Re-opens one of the customer's draft bundles in place of the current one. */
@@ -43,6 +52,7 @@ const AccountContext = createContext<AccountContextType>({
     sendVerificationCode: async () => {},
     submitVerificationCode: async () => false,
     signOut: async () => {},
+    updateDetails: async () => {},
     resetSession: async () => {},
     openDraft: async () => {},
     duplicateBundle: async () => {},
@@ -164,6 +174,19 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
         await startNewBundle();
     }, [client, startNewBundle]);
 
+    const updateDetails = useCallback(
+        async (details: CustomerDetails) => {
+            // A blank value is sent as nothing, which clears it.
+            const updated = await client.updateCustomer({
+                firstName: details.firstName.trim() || undefined,
+                lastName: details.lastName.trim() || undefined,
+                phoneNumber: details.phoneNumber.trim() || undefined,
+            });
+            setCustomer(updated);
+        },
+        [client],
+    );
+
     const resetSession = useCallback(async () => {
         if (customer) await signOut();
         else await startNewBundle();
@@ -195,6 +218,7 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
             sendVerificationCode,
             submitVerificationCode,
             signOut,
+            updateDetails,
             resetSession,
             openDraft,
             duplicateBundle,
@@ -208,6 +232,7 @@ export const AccountProvider: FunctionComponent<{ children: ReactNode }> = ({ ch
             sendVerificationCode,
             signOut,
             submitVerificationCode,
+            updateDetails,
         ],
     );
 

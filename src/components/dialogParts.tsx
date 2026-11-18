@@ -180,3 +180,12 @@ export const Thumbnail = styled.img`
     border-radius: 6px;
     background: #f0f0f0;
 `;
+
+export const Checkbox = styled.label`
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 4px 0 12px;
+    font-size: 14px;
+    cursor: pointer;
+`;

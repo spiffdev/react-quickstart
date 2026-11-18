@@ -5,11 +5,12 @@ import ErrorBanner from "./ErrorBanner";
 import useAccount from "../hooks/useAccount";
 import useBundle from "../hooks/useBundle";
 import { isEmail } from "../utils/email";
-import { Backdrop, Dialog, Header, Input, Muted, TextButton, Title } from "./dialogParts";
+import { Backdrop, Checkbox, Dialog, Header, Input, Muted, TextButton, Title } from "./dialogParts";
 
 /**
  * Keeps the design as a draft and leaves it. The customer can name it, and if nobody is signed in and the bundle has
- * no owner yet they give their email address, so the draft can be found again.
+ * no owner yet they give their email address, so the draft can be found again. When the design has shared options they
+ * can also keep them as saved branding, to use on another order.
  */
 const SaveAndExitDialog: FunctionComponent<{
     onClose: () => void;
@@ -22,6 +23,10 @@ const SaveAndExitDialog: FunctionComponent<{
     const [email, setEmail] = useState("");
     // Whether the bundle already belongs to someone, which isn't known until it has been asked.
     const [owned, setOwned] = useState<boolean | undefined>(undefined);
+    const [saveTemplate, setSaveTemplate] = useState(false);
+    const [templateName, setTemplateName] = useState("");
+    // Kept so that trying again after a failure doesn't make a second template.
+    const [templateSaved, setTemplateSaved] = useState(false);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | undefined>(undefined);
 
@@ -43,18 +48,34 @@ const SaveAndExitDialog: FunctionComponent<{
 
     // A signed in customer is attached to the bundle as they sign in, so only a guest has to give an email address.
     const needsEmail = !customer && owned === false;
-    const ready = owned !== undefined && (!needsEmail || isEmail(email));
+    // Branding is the shared options, which only some activations have. A template belongs to a signed in customer: core
+    // won't make one for a guest who has only given their email address.
+    const templateAvailable = !!customer && !!bundle.getGlobalPropertyConfiguration();
+    const ready =
+        owned !== undefined && (!needsEmail || isEmail(email)) && (!saveTemplate || templateName.trim() !== "");
 
     const save = async () => {
         setSaving(true);
         setError(undefined);
         try {
             if (name.trim() !== (bundle.getName() ?? "")) await bundle.setName(name.trim());
-            if (needsEmail) await bundle.addStakeholder({ emailAddress: email.trim() }, StakeholderType.Owner);
+            if (needsEmail) {
+                await bundle.addStakeholder({ emailAddress: email.trim() }, StakeholderType.Owner);
+                // So that trying again after a failure further on doesn't add them a second time.
+                setOwned(true);
+            }
+            if (saveTemplate && !templateSaved) {
+                await bundle.convertToTemplate(templateName.trim());
+                setTemplateSaved(true);
+            }
             await onSaved();
         } catch (caught) {
             console.error("Error saving the draft:", caught);
-            setError("We couldn't save your draft. Please try again.");
+            setError(
+                saveTemplate && !templateSaved
+                    ? "We couldn't save your branding as a template. Please try again, or leave it unticked to save the draft without it."
+                    : "We couldn't save your draft. Please try again.",
+            );
             setSaving(false);
         }
     };
@@ -96,6 +117,26 @@ const SaveAndExitDialog: FunctionComponent<{
                             value={email}
                             disabled={saving}
                             onChange={(event) => setEmail(event.target.value)}
+                        />
+                    )}
+                    {templateAvailable && (
+                        <Checkbox>
+                            <input
+                                type="checkbox"
+                                checked={saveTemplate}
+                                disabled={saving || templateSaved}
+                                onChange={(event) => setSaveTemplate(event.target.checked)}
+                            />
+                            Also save my branding as a template
+                        </Checkbox>
+                    )}
+                    {templateAvailable && saveTemplate && (
+                        <Input
+                            aria-label="Template name"
+                            placeholder="Name your branding"
+                            value={templateName}
+                            disabled={saving || templateSaved}
+                            onChange={(event) => setTemplateName(event.target.value)}
                         />
                     )}
                     <Button type="submit" fullWidth disabled={saving || !ready}>

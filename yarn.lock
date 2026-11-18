@@ -985,10 +985,10 @@
   dependencies:
     tslib "^2.6.2"
 
-"@spiffcommerce/core@44.21.0":
-  version "44.21.0"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.21.0.tgz#2ee92d615221318c25b6b7f3f60803a21a46882e"
-  integrity sha512-RHbVhDPyyEISE3z6kjFzOU2dr/PvUD1ucGWLqw0Ei+GItRjGNj0IMwm8OhLvBlKW25jDUR4/FjFkG+zHV7ne+A==
+"@spiffcommerce/core@44.21.1-alpha.2":
+  version "44.21.1-alpha.2"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/core/-/core-44.21.1-alpha.2.tgz#dcb0c53dad38353c936d6478853d12c3984589d7"
+  integrity sha512-OJ2PRf7gw9vZZ6au2itLZq3RLPIVCPMy1L9ae4B68H+DRn66IDFN+MQk7qjok5FB7+rSLj0k7+8CtFhaTPrnZQ==
   dependencies:
     "@adobe/css-tools" "^4.5.0"
     "@apollo/client" "^3.11.8"
@@ -1050,10 +1050,10 @@
     "@babylonjs/loaders" "8.53.0"
     babylonjs-gltf2interface "8.53.0"
 
-"@spiffcommerce/theme-bridge@1.29.1-alpha.0":
-  version "1.29.1-alpha.0"
-  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.29.1-alpha.0.tgz#61fb881adcdc0e3bfdc0e93a7b622bee9b0d1824"
-  integrity sha512-5YV1VYbobowtp3hlk9HcsAo6mmYZnkREeQrOloOBH4CXD35gM6gcWe1pQVdl2KD+ApHsyUtCsq5s+aZdW9O+aA==
+"@spiffcommerce/theme-bridge@1.29.1-alpha.5":
+  version "1.29.1-alpha.5"
+  resolved "https://registry.yarnpkg.com/@spiffcommerce/theme-bridge/-/theme-bridge-1.29.1-alpha.5.tgz#81a42af860fa7aae342178d7ecf3630a726a1846"
+  integrity sha512-LOOfMsf7dZvDh1xps1DQ46y7z0vqs+ycG1LQe3vfFMrBCzTSIuNlnHuS6K+9+EsqrwDl24jzpyfx9Qprw5X0eQ==
   dependencies:
     "@spiffcommerce/core" "^44.21.1-alpha.1"
 

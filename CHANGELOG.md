@@ -2,6 +2,20 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — Customers can update their own details
+
+- The account menu has a **Your details** page where a signed in customer can change their first name, last name and phone number, using `SpiffCommerceClient.updateCustomer` (core 44.21.1-alpha.2). Their email address is shown but can't be changed, as it's how they sign in. An update isn't partial in core, so all three are always sent, and one which has been emptied is cleared; the customer kept by the account (and shown in the form) is the one the server returns. The customer's default template is kept by core.
+
+## 2026-11-18 — Save branding as a template when saving and exiting
+
+- The **Save and exit** panel has an **Also save my branding as a template** option (off to begin with, and only for a signed in customer when the design has shared options, as saved branding does; core won't make a template for a guest who has only given their email address). Ticking it asks for a name, which is needed, and saves the design's shared options as saved branding after the draft's name, then leaves. If the template can't be saved the panel stays open with a message, and trying again doesn't make it twice; unticking it saves the draft without one.
+
+## 2026-11-18 — Server addresses come from the region
+
+- `@spiffcommerce/theme-bridge` now supplies the Spiff Commerce server, hub, services API and editor addresses itself, chosen by **`VITE_SPIFF_REGION`** (`au` or `us`), so `.env.sample` sets only that. `VITE_SERVER_URL`, `VITE_HUB_URL`, `VITE_SERVICES_URL` and `VITE_EDITOR_URL` are no longer advertised, as they're for internal use only; each is still read, and still wins over the region's default if it's set. This replaces the `VITE_EDITOR_URL` setting added in the mobile upload entry below.
+- `App` no longer configures the client from those variables itself in development. It always calls `SpiffThemeLoader.configureClient`, which applies the same addresses together with the login settings, and no longer sets the editor address either (the bridge does).
+- The region also supplies the login settings (`VITE_USER_POOL_CLIENT_ID` and `VITE_AWS_REGION` default from it), which the user portal's sign-in uses.
+
 ## 2026-11-18 — Local configuration is loaded by theme-bridge
 
 - Loading the local development configuration is now done by the theme plugin in `@spiffcommerce/theme-bridge` (updated to 1.29.1-alpha.0) rather than by this theme's own code. `vite.config.ts` no longer reads the file or sets `__LOCAL_DEV_CONFIGURATION__` itself, and no longer lists the files for `vite-plugin-restart` to watch. (`localConfiguration.ts`, the first version of this, has been removed.)

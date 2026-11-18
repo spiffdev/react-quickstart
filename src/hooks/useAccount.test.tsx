@@ -33,6 +33,7 @@ const makeClient = (overrides: Record<string, unknown> = {}) => {
         }),
         getExistingBundle: vi.fn(),
         duplicateBundle: vi.fn(),
+        updateCustomer: vi.fn(async (details: Record<string, string | undefined>) => ({ ...customer, ...details })),
         ...overrides,
     };
     return { client, signInOnLoad: () => (current.customer = customer) };
@@ -181,6 +182,56 @@ describe("signing in", () => {
         const { result } = setup(client, makeBundle());
         await act(() => result.current.sendVerificationCode("jo@example.com"));
         expect(client.generateVerificationCode).toHaveBeenCalledWith("jo@example.com");
+    });
+});
+
+describe("updating the customer's details", () => {
+    it("sends the whole set of details and shows what the server returns", async () => {
+        const { client, signInOnLoad } = makeClient();
+        signInOnLoad();
+        const { result } = setup(client, makeBundle({ owner: true }));
+        await waitFor(() => expect(result.current.customer).toBeDefined());
+        await act(() =>
+            result.current.updateDetails({ firstName: " Joanne ", lastName: "Smith", phoneNumber: " 0400 000 000 " }),
+        );
+        expect(client.updateCustomer).toHaveBeenCalledWith({
+            firstName: "Joanne",
+            lastName: "Smith",
+            phoneNumber: "0400 000 000",
+        });
+        expect(result.current.customer).toMatchObject({
+            emailAddress: "jo@example.com",
+            firstName: "Joanne",
+            lastName: "Smith",
+        });
+    });
+
+    it("clears a detail which has been emptied, as an update isn't partial", async () => {
+        const { client, signInOnLoad } = makeClient();
+        signInOnLoad();
+        const { result } = setup(client, makeBundle({ owner: true }));
+        await waitFor(() => expect(result.current.customer).toBeDefined());
+        await act(() => result.current.updateDetails({ firstName: "Jo", lastName: "  ", phoneNumber: "" }));
+        expect(client.updateCustomer).toHaveBeenCalledWith({
+            firstName: "Jo",
+            lastName: undefined,
+            phoneNumber: undefined,
+        });
+    });
+
+    it("keeps the customer as they were when the update fails", async () => {
+        const { client, signInOnLoad } = makeClient({
+            updateCustomer: vi.fn(async () => {
+                throw new Error("offline");
+            }),
+        });
+        signInOnLoad();
+        const { result } = setup(client, makeBundle({ owner: true }));
+        await waitFor(() => expect(result.current.customer).toBeDefined());
+        await expect(
+            act(() => result.current.updateDetails({ firstName: "Jo", lastName: "", phoneNumber: "" })),
+        ).rejects.toThrow("offline");
+        expect(result.current.customer).toEqual(customer);
     });
 });
 
