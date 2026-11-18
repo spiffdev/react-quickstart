@@ -33,7 +33,8 @@ import useThemeConfiguration, {
     useGroupPageKeys,
     usePageEnabled,
 } from "../hooks/useThemeConfiguration";
-import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
+import type { QuoteDetails } from "./Customization/components/QuoteForm";
+import { fieldId, missingConversionFields, prefillConversionDetails } from "../utils/conversionDetails";
 import ConversionDialog from "../components/ConversionDialog";
 import AccountDialog from "../components/AccountDialog";
 import GuestEmailDialog from "../components/GuestEmailDialog";
@@ -156,12 +157,16 @@ const PageHandler: FunctionComponent<{
         thankYouShowStartOver,
         thankYouStartOverLabel,
     } = useThemeConfiguration();
-    // The user portal completely replaces the conversion configuration, which is treated as if it was never set.
     const { enabled: portalEnabled, customer, resetSession } = useAccount();
     const startNewBundle = useStartNewBundle();
     const welcomeEnabled = usePageEnabled("welcome");
-    const conversionConfiguration = portalEnabled ? undefined : themeConversionConfiguration;
+    const conversionConfiguration = themeConversionConfiguration;
+    // With the user portal, the conversion configuration's details are asked for on the review page, or in a popup just
+    // before the design is finalised when there's no review page, instead of at the places the configuration lists.
+    const portalConversion = portalEnabled && (conversionConfiguration?.requestedDataItems?.length ?? 0) > 0;
     const [accountOpen, setAccountOpen] = useState(false);
+    // What the customer has typed into the details on the review page. Until they've typed, it's what's already known.
+    const [editedConversion, setEditedConversion] = useState<QuoteDetails | undefined>(undefined);
     // The page of the account dialog to open on, which depends on where it was opened from.
     const [accountPage, setAccountPage] = useState<AccountPage>("menu");
     const openAccount = useCallback((initialPage: AccountPage = "menu") => {
@@ -286,7 +291,14 @@ const PageHandler: FunctionComponent<{
     const skipReplaceConfirmation = useRef(false);
     // The conversion prompt currently shown, and the locations it has already been shown at.
     const [pendingConversion, setPendingConversion] = useState<
-        | { resolve: (completed: boolean) => void; manual?: boolean; quote?: boolean; initialValues?: QuoteDetails }
+        | {
+              resolve: (completed: boolean) => void;
+              manual?: boolean;
+              quote?: boolean;
+              /** Only gets the details, which are saved, whether it's for a quote or not. */
+              collect?: boolean;
+              initialValues?: QuoteDetails;
+          }
         | undefined
     >(undefined);
     // The bundle's owner, i.e. the customer whose details are already known.
@@ -310,6 +322,7 @@ const PageHandler: FunctionComponent<{
         preparation.current = undefined;
         // Anything which was open belonged to the previous bundle.
         setAccountOpen(false);
+        setEditedConversion(undefined);
 
         // A reloaded bundle already has products, so pick up where the customer left off.
         const experiences = bundle.getWorkflowExperiences();
@@ -684,6 +697,8 @@ const PageHandler: FunctionComponent<{
     // only asked once, and never when the bundle already has an owner. Resolves once the prompt has closed.
     const requestConversionIfRequired = useCallback(
         async (location: ConversionLocation) => {
+            // The user portal asks for the details when the design is finalised instead.
+            if (portalEnabled) return;
             if (!conversionConfiguration?.locations?.includes(location)) return;
             if (consumedConversionLocations.current.has(location)) return;
             const stakeholders = await bundle.getAllStakeholders();
@@ -691,30 +706,69 @@ const PageHandler: FunctionComponent<{
             consumedConversionLocations.current.add(location);
             await new Promise<void>((resolve) => setPendingConversion({ resolve: () => resolve() }));
         },
-        [bundle, conversionConfiguration],
+        [bundle, conversionConfiguration, portalEnabled],
     );
 
     // The customer can offer or update their details at any time when the configuration allows it.
     const manualConversionAvailable = !!conversionConfiguration?.locations?.includes(ConversionLocation.Manual);
 
     // What the customer has already entered, so it can be shown and changed. Details are stored under the
-    // configured identifier for each field, falling back to its type.
-    const existingDetails = useCallback((): QuoteDetails => {
-        const metadata = bundle.getMetadata();
-        const fromOwner: Partial<Record<ConversionDataType, string | undefined>> = {
-            [ConversionDataType.Email]: owner?.emailAddress,
-            [ConversionDataType.FirstName]: owner?.firstName,
-            [ConversionDataType.LastName]: owner?.lastName,
-            [ConversionDataType.Phone]: owner?.phoneNumber,
-        };
-        const values: QuoteDetails = {};
-        for (const item of conversionConfiguration?.requestedDataItems ?? []) {
-            const id = fieldId(item);
-            const value = metadata.get(id) ?? fromOwner[item.type];
-            if (value) values[id] = value;
-        }
-        return values;
-    }, [bundle, conversionConfiguration, owner]);
+    // configured identifier for each field, falling back to its type. What isn't saved on the bundle yet is filled in
+    // from the signed in customer, or failing that the bundle's owner.
+    const existingDetails = useCallback(
+        (): QuoteDetails =>
+            prefillConversionDetails(
+                conversionConfiguration?.requestedDataItems ?? [],
+                bundle.getMetadata(),
+                customer ?? owner,
+            ),
+        [bundle, conversionConfiguration, customer, owner],
+    );
+
+    const saveConversionDetails = useCallback(
+        async (details: QuoteDetails) => {
+            try {
+                await saveDetails(details);
+            } catch (error) {
+                console.error("Error saving the customer's details:", error);
+                throw new Error("We couldn't save your details. Please try again.");
+            }
+        },
+        [saveDetails],
+    );
+
+    // Gets the details the conversion configuration asks for, and saves them, before the design is finalised (or a quote
+    // is requested). With a review page they're already on it, and otherwise they're asked for in a popup. A customer
+    // can leave out the details of a design unless the configuration says they're mandatory, but not those of a quote.
+    // Throws a customer-readable message when the details are needed and aren't given.
+    const collectConversionDetails = useCallback(
+        async (quote: boolean) => {
+            if (!portalConversion) return;
+            const fields = conversionConfiguration?.requestedDataItems ?? [];
+            const required = quote || !!conversionConfiguration?.mandatory;
+            if (reviewPageEnabled && page === "review") {
+                const details = editedConversion ?? existingDetails();
+                if (required && missingConversionFields(fields, details).length > 0) {
+                    throw new Error("Please fill in your details to continue.");
+                }
+                await saveConversionDetails(details);
+                return;
+            }
+            const given = await new Promise<boolean>((resolve) =>
+                setPendingConversion({ resolve, quote, collect: true, initialValues: existingDetails() }),
+            );
+            if (!given && required) throw new Error("Please give your details to continue.");
+        },
+        [
+            conversionConfiguration,
+            editedConversion,
+            existingDetails,
+            page,
+            portalConversion,
+            reviewPageEnabled,
+            saveConversionDetails,
+        ],
+    );
 
     const closeConversion = (completed = true) => {
         pendingConversion?.resolve(completed);
@@ -909,6 +963,7 @@ const PageHandler: FunctionComponent<{
     // Completes the design. With a thank you page that page prepares the hand-off and the customer's exit performs
     // it, otherwise it all happens now. Throws a customer-readable message on failure.
     const completeDesign = useCallback(async () => {
+        await collectConversionDetails(false);
         await ensureOrderDetails();
         try {
             await requestConversionIfRequired(ConversionLocation.OnEnd);
@@ -924,7 +979,7 @@ const PageHandler: FunctionComponent<{
             // The finish step shows this message under its button.
             throw new Error("We couldn't add your design to the cart. Please try again.");
         }
-    }, [ensureOrderDetails, finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
+    }, [collectConversionDetails, ensureOrderDetails, finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
 
     // Prepares the hand-off for the thank you page. Only ever runs once per visit, however often it's asked for.
     const prepareHandOff = useCallback((): Promise<PreparedHandOff> => {
@@ -1004,12 +1059,14 @@ const PageHandler: FunctionComponent<{
                 setPendingConversion({ resolve, quote: true, initialValues: existingDetails() }),
             );
         }
-        if (!customer) {
+        // Without details of their own to give, the customer's quote is theirs by signing in.
+        if (!customer && !portalConversion) {
             openAccount();
             setErrorMessage("Please sign in to request a quote.");
             return false;
         }
         try {
+            await collectConversionDetails(true);
             await ensureOrderDetails();
             await confirmQuote({});
             return true;
@@ -1017,19 +1074,28 @@ const PageHandler: FunctionComponent<{
             setErrorMessage(error instanceof Error ? error.message : "We couldn't request your quote.");
             return false;
         }
-    }, [confirmQuote, customer, ensureOrderDetails, existingDetails, openAccount, portalEnabled]);
+    }, [
+        collectConversionDetails,
+        confirmQuote,
+        customer,
+        ensureOrderDetails,
+        existingDetails,
+        openAccount,
+        portalConversion,
+        portalEnabled,
+    ]);
 
-    const saveConversionDetails = useCallback(
-        async (details: QuoteDetails) => {
-            try {
-                await saveDetails(details);
-            } catch (error) {
-                console.error("Error saving the customer's details:", error);
-                throw new Error("We couldn't save your details. Please try again.");
-            }
-        },
-        [saveDetails],
-    );
+    // The details shown on the review page, and whether any which are required are still to be given.
+    const conversionValues = editedConversion ?? existingDetails();
+    const conversionMissing =
+        missingConversionFields(conversionConfiguration?.requestedDataItems ?? [], conversionValues).length > 0;
+    // A signed in customer's email address is who they are, so it can't be changed here.
+    const lockedConversionIds = useMemo(() => {
+        const email = conversionConfiguration?.requestedDataItems?.find(
+            (item) => item.type === ConversionDataType.Email,
+        );
+        return customer && email ? [fieldId(email)] : [];
+    }, [conversionConfiguration, customer]);
 
     // A page can be returned to once it has been reached, as long as what it needs still exists.
     const canVisit = (index: number) => {
@@ -1209,6 +1275,19 @@ const PageHandler: FunctionComponent<{
                 )}
                 {page === "review" && switcherExperiences.length > 0 && (
                     <ReviewPage
+                        conversion={
+                            portalConversion
+                                ? {
+                                      fields: conversionConfiguration?.requestedDataItems ?? [],
+                                      values: conversionValues,
+                                      lockedIds: lockedConversionIds,
+                                      onChange: (id, value) =>
+                                          setEditedConversion({ ...conversionValues, [id]: value }),
+                                      cartBlocked: !!conversionConfiguration?.mandatory && conversionMissing,
+                                      quoteBlocked: conversionMissing,
+                                  }
+                                : undefined
+                        }
                         experiences={switcherExperiences}
                         onConfirm={completeDesign}
                         confirmLabel={addToCartLabel}
@@ -1272,12 +1351,23 @@ const PageHandler: FunctionComponent<{
                         !pendingConversion.quote && !pendingConversion.manual && !!conversionConfiguration?.mandatory
                     }
                     initialValues={pendingConversion.initialValues}
+                    lockedIds={lockedConversionIds}
                     submitLabel={
-                        pendingConversion.quote ? "Confirm your quote" : pendingConversion.manual ? "Save" : undefined
+                        pendingConversion.collect
+                            ? undefined
+                            : pendingConversion.quote
+                              ? "Confirm your quote"
+                              : pendingConversion.manual
+                                ? "Save"
+                                : undefined
                     }
-                    submittingLabel={pendingConversion.quote ? "Requesting quote..." : undefined}
+                    submittingLabel={
+                        pendingConversion.quote && !pendingConversion.collect ? "Requesting quote..." : undefined
+                    }
                     onSubmit={async (details) => {
-                        await (pendingConversion.quote ? confirmQuote(details) : saveConversionDetails(details));
+                        await (pendingConversion.quote && !pendingConversion.collect
+                            ? confirmQuote(details)
+                            : saveConversionDetails(details));
                         closeConversion();
                     }}
                     onSkip={() => closeConversion(false)}

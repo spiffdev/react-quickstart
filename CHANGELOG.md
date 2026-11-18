@@ -2,6 +2,14 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — The conversion configuration with the user portal
+
+- The user portal no longer **completely** replaces the conversion configuration. With both on, the configuration's details are asked for **inline on the review page** (a "Your details" section above the terms and buttons), or, when the review page is off, in a **popup just before the design is finalised**. Its own locations (start, end and manual) don't apply with the portal, and there's no "Your details" button on the stepper bar.
+- **They start with what's known:** a value already saved on the bundle, then the signed in customer's email, first name, last name and phone number (or failing that the bundle owner's). A signed in customer's email address is shown but can't be changed. The details are saved to the bundle as before (its owner, its metadata and its organization), when the design is completed. They aren't written back to the customer's account; that's what **Your details** in the account menu is for.
+- **Required or not:** as the configuration says. Where it's marked mandatory the design can't be completed (the review page's button is disabled, or the popup can't be skipped) until the fields it marks as mandatory are filled in; otherwise they can be left out. A **quote** always needs them.
+- **Quotes** with the portal on now use these details too (so a guest can request one without signing in, as long as the configuration asks for details), and without a conversion configuration still ask a guest to sign in as before.
+- Changed: `QuoteForm`'s fields moved to `ConversionFields`, and `utils/conversionDetails` holds the pre-filling and the check for what's missing. The `enableUserPortal` setting's description and the conversion configuration's now say all this.
+
 ## 2026-11-18 — Customers can update their own details
 
 - The account menu has a **Your details** page where a signed in customer can change their first name, last name and phone number, using `SpiffCommerceClient.updateCustomer` (core 44.21.1-alpha.2). Their email address is shown but can't be changed, as it's how they sign in. An update isn't partial in core, so all three are always sent, and one which has been emptied is cleared; the customer kept by the account (and shown in the form) is the one the server returns. The customer's default template is kept by core.

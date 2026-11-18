@@ -70,7 +70,8 @@ export interface ThemeConfiguration {
     allowCartRequests?: boolean;
     /**
      * Turns on the user portal: customers sign in with an email code, their bundle is attached to them, and they
-     * can re-open their drafts or duplicate their previous orders. Completely replaces the conversion configuration.
+     * can re-open their drafts or duplicate their previous orders. This changes where the conversion configuration asks
+     * for details: see `conversionConfiguration`.
      */
     enableUserPortal?: boolean;
     /**
@@ -93,7 +94,9 @@ export interface ThemeConfiguration {
     portalDispatchDate?: OrderDetailMode;
     /**
      * The details asked of the customer when they request a quote. Only an email is asked for when unset.
-     * Ignored when the user portal is enabled.
+     * With the user portal enabled, the configuration's locations are ignored: the details are shown on the review page,
+     * or in a popup just before the design is finalised when the review page is off, and start with what's known of the
+     * signed in customer.
      */
     conversionConfiguration?: ConversionConfiguration;
     /**
@@ -234,7 +237,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
             title: "Enable User Portal",
             defaultValue: "false",
             description:
-                "When true, customers sign in with an email code and can continue their drafts or duplicate previous orders. This completely replaces the conversion configuration.",
+                "When true, customers sign in with an email code and can continue their drafts or duplicate previous orders. The conversion configuration's details are then asked for on the review page (or in a popup before the design is finalised, without one) rather than at its own locations.",
         },
         {
             type: FieldType.Boolean,
@@ -383,7 +386,7 @@ export const configurationSchema: ThemeConfigurationSchema = {
             key: "conversionConfiguration",
             title: "Conversion Configuration",
             description:
-                "The details asked of the customer when they request a quote. Ignored when the user portal is enabled.",
+                "The details asked of the customer when they request a quote. With the user portal enabled they're also asked for when the design is completed: on the review page, or in a popup before finalising when the review page is off. The locations below don't apply then.",
         },
         {
             type: FieldType.Text,
