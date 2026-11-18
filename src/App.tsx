@@ -1,23 +1,18 @@
-import { FunctionComponent, ReactNode, useEffect, useMemo, useState } from "react";
+import { FunctionComponent, ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import {
     SpiffThemeLoader,
     ThemeContext,
     ThemeContextBundle,
     themeInstallConfigurationFieldsToRecordObject,
 } from "@spiffcommerce/theme-bridge";
-import {
-    ActivationData,
-    Bundle,
-    CurrencyContext,
-    SpiffCommerceClient,
-    spiffCoreConfiguration,
-} from "@spiffcommerce/core";
+import { ActivationData, Bundle, CurrencyContext, SpiffCommerceClient } from "@spiffcommerce/core";
 import { BundleProvider } from "./hooks/useBundle";
 import { CurrencyProvider } from "./hooks/useCurrency";
 import { ThemeProvider } from "./hooks/useTheme";
 import { ThemeConfigurationProvider } from "./hooks/useThemeConfiguration";
 import PageHandler from "./Pages/PageHandler";
 import { ActivationProvider } from "./hooks/useActivation";
+import { AccountProvider } from "./hooks/useAccount";
 import type { ThemeConfiguration } from "./configurationSchema";
 import { ClientProvider } from "./hooks/useClient";
 import LoadingOverlay from "./Pages/components/LoadingOverlay";
@@ -50,20 +45,9 @@ const App: FunctionComponent<{
         const client = new SpiffCommerceClient({
             applicationKey: context.applicationKey,
         });
-        if (import.meta.env.DEV === true && import.meta.env.VITE_SERVER_URL) {
-            client.configure({
-                hubUrl: import.meta.env.VITE_HUB_URL,
-                serverUrl: import.meta.env.VITE_SERVER_URL,
-                servicesApiUrl: import.meta.env.VITE_SERVICES_URL,
-            });
-        } else {
-            const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
-            spiffThemeLoader.configureClient(client);
-        }
-        // Only overridden when provided, otherwise core's default editor is used.
-        if (import.meta.env.VITE_EDITOR_URL) {
-            spiffCoreConfiguration.setEditorUrl(import.meta.env.VITE_EDITOR_URL);
-        }
+        // In development the theme loader applies the server addresses and login settings of the VITE_SPIFF_REGION.
+        const spiffThemeLoader = (window as any).SpiffThemeLoader as SpiffThemeLoader;
+        spiffThemeLoader.configureClient(client);
         return client;
     });
 
@@ -93,6 +77,16 @@ const App: FunctionComponent<{
         [context.configuration],
     );
 
+    const createNewBundle = useCallback(() => {
+        const collectionId = getProductCollectionForNewBundle(context);
+        // Passing the activation lets the bundle pick up the activation's Global Property Configuration.
+        const activationId = ((context as ThemeContextBundle).activation as ActivationData | undefined)?.id;
+        return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders }, activationId);
+    }, [client, context, enableTestOrders]);
+
+    // Starts over, such as when the customer signs out and the next customer shouldn't see their design.
+    const startNewBundle = useCallback(async () => setBundle(await createNewBundle()), [createNewBundle]);
+
     useEffect(() => {
         let canceled = false;
         setLoadFailed(false);
@@ -104,10 +98,7 @@ const App: FunctionComponent<{
                     test: enableTestOrders || undefined,
                 });
             }
-            const collectionId = getProductCollectionForNewBundle(context);
-            // Passing the activation lets the bundle pick up the activation's Global Property Configuration.
-            const activationId = (c.activation as ActivationData | undefined)?.id;
-            return client.getNewBundle(collectionId || undefined, undefined, { test: enableTestOrders }, activationId);
+            return createNewBundle();
         };
 
         loadBundle()
@@ -122,7 +113,7 @@ const App: FunctionComponent<{
         return () => {
             canceled = true;
         };
-    }, [client, context, enableTestOrders, loadAttempt]);
+    }, [client, context, createNewBundle, enableTestOrders, loadAttempt]);
 
     // In single product mode the product may already be chosen, such as by the e-commerce product page.
     const bundleOptions = (context as ThemeContextBundle).bundleOptions;
@@ -145,10 +136,12 @@ const App: FunctionComponent<{
         content = (
             <ClientProvider client={client}>
                 <ActivationProvider activation={context.activation}>
-                    <BundleProvider bundle={bundle}>
-                        <CurrencyProvider currencyContext={currencyContext}>
-                            <PageHandler collectionProduct={presetProduct} />
-                        </CurrencyProvider>
+                    <BundleProvider bundle={bundle} setBundle={setBundle} startNewBundle={startNewBundle}>
+                        <AccountProvider>
+                            <CurrencyProvider currencyContext={currencyContext}>
+                                <PageHandler collectionProduct={presetProduct} />
+                            </CurrencyProvider>
+                        </AccountProvider>
                     </BundleProvider>
                 </ActivationProvider>
             </ClientProvider>

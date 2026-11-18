@@ -1,6 +1,6 @@
 import { FunctionComponent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import styled from "styled-components";
-import { UserRound } from "lucide-react";
+import { CircleUserRound, ClipboardList, LogOut, UserRound } from "lucide-react";
 import useBundle from "../hooks/useBundle";
 import ProductCollectionSelector from "./ProductCollectionSelector";
 import {
@@ -33,8 +33,20 @@ import useThemeConfiguration, {
     useGroupPageKeys,
     usePageEnabled,
 } from "../hooks/useThemeConfiguration";
-import { fieldId, type QuoteDetails } from "./Customization/components/QuoteForm";
+import type { QuoteDetails } from "./Customization/components/QuoteForm";
+import { fieldId, missingConversionFields, prefillConversionDetails } from "../utils/conversionDetails";
 import ConversionDialog from "../components/ConversionDialog";
+import AccountDialog from "../components/AccountDialog";
+import GuestEmailDialog from "../components/GuestEmailDialog";
+import SaveAndExitDialog from "../components/SaveAndExitDialog";
+import OrderDetailsDialog from "../components/OrderDetailsDialog";
+import WelcomePage from "./Welcome";
+import useInactivityTimeout from "../hooks/useInactivityTimeout";
+import type { AccountPage } from "../components/AccountDialog";
+import { useStartNewBundle } from "../hooks/useBundle";
+import useOrderDetailFields from "../hooks/useOrderDetails";
+import { missingOrderDetails, readOrderDetails } from "../utils/orderDetails";
+import useAccount from "../hooks/useAccount";
 
 // A text button for the stepper bar, so it reads as a link rather than a call to action.
 const DetailsButton = styled.button`
@@ -65,12 +77,17 @@ const DetailsButton = styled.button`
     }
 `;
 
-type PageType = "collection" | "product" | "workflow" | "experience" | "shared" | "review" | "thankyou";
+type PageType = "welcome" | "collection" | "product" | "workflow" | "experience" | "shared" | "review" | "thankyou";
 
 /** What the thank you page waits for before the customer can leave. */
 export type PreparedHandOff = {
     /** Hands the design off, which ends the experience. */
     leave: () => void;
+    /**
+     * Whatever of the hand-off is still to do when the customer starts a new order instead of leaving, which doesn't
+     * end the experience. Nothing when the design has already been placed (test orders) or is only a quote.
+     */
+    complete?: () => void;
     /** The number of the order that was placed, if the theme placed one. */
     orderNumber?: string;
 };
@@ -128,7 +145,53 @@ const PageHandler: FunctionComponent<{
     const client = useClient();
     const bundle = useBundle();
     const activation = useActivation();
-    const { conversionConfiguration, thankYouMessage, thankYouCloseLabel, addToCartLabel } = useThemeConfiguration();
+    const {
+        conversionConfiguration: themeConversionConfiguration,
+        thankYouMessage,
+        thankYouCloseLabel,
+        addToCartLabel,
+        portalPromptEmail,
+        portalEnforceLogin,
+        portalInactivitySeconds,
+        portalSaveAndExit,
+        portalAllowStaySignedIn,
+        thankYouShowStartOver,
+        thankYouStartOverLabel,
+    } = useThemeConfiguration();
+    const { enabled: portalEnabled, customer, resetSession, signOut } = useAccount();
+    const startNewBundle = useStartNewBundle();
+    const welcomeEnabled = usePageEnabled("welcome");
+    const conversionConfiguration = themeConversionConfiguration;
+    // With the user portal, the conversion configuration's details are asked for on the review page, or in a popup just
+    // before the design is finalised when there's no review page, instead of at the places the configuration lists.
+    const portalConversion = portalEnabled && (conversionConfiguration?.requestedDataItems?.length ?? 0) > 0;
+    const [accountOpen, setAccountOpen] = useState(false);
+    // What the customer has typed into the details on the review page. Until they've typed, it's what's already known.
+    const [editedConversion, setEditedConversion] = useState<QuoteDetails | undefined>(undefined);
+    // The page of the account dialog to open on, which depends on where it was opened from.
+    const [accountPage, setAccountPage] = useState<AccountPage>("menu");
+    const openAccount = useCallback((initialPage: AccountPage = "menu") => {
+        setAccountPage(initialPage);
+        setAccountOpen(true);
+    }, []);
+    // The order details dialog, and what is waiting on it.
+    const orderDetailFields = useOrderDetailFields();
+    const [pendingOrderDetails, setPendingOrderDetails] = useState<{ resolve: (saved: boolean) => void } | undefined>(
+        undefined,
+    );
+    // Applying a saved branding template changes the shared options, so the shared page is shown afresh.
+    const [templateRevision, setTemplateRevision] = useState(0);
+    // Whether the guest email prompt is showing, and the bundles it has already been shown for.
+    const [guestPromptOpen, setGuestPromptOpen] = useState(false);
+    const guestPromptedBundles = useRef(new WeakSet<object>());
+    // Settles whatever is waiting on the prompt.
+    const guestPromptResolve = useRef<(() => void) | undefined>(undefined);
+    const closeGuestPrompt = useCallback(() => {
+        guestPromptResolve.current?.();
+        guestPromptResolve.current = undefined;
+        setGuestPromptOpen(false);
+    }, []);
+    const [saveAndExitOpen, setSaveAndExitOpen] = useState(false);
     const { allowCart, allowQuote } = useCheckoutOptions();
     const reviewPageEnabled = usePageEnabled("review");
     const thankYouPageEnabled = usePageEnabled("thank-you");
@@ -144,8 +207,8 @@ const PageHandler: FunctionComponent<{
     // The page where the customer starts personalising.
     const firstPersonalizePage: PageType = sharedFirst ? "shared" : "experience";
     // Read by the effect which starts a bundle off, which mustn't run again just because these change.
-    const startingPoint = useRef({ firstPersonalizePage, pageRank });
-    startingPoint.current = { firstPersonalizePage, pageRank };
+    const startingPoint = useRef({ firstPersonalizePage, pageRank, welcomeEnabled });
+    startingPoint.current = { firstPersonalizePage, pageRank, welcomeEnabled };
     // In single product mode the customer works on one design at a time: they choose a product (and a workflow, if it
     // has several) and that replaces the previous choice. Otherwise they build a cart of any number of designs.
     const singleMode = !!activation.singleProductMode;
@@ -229,7 +292,14 @@ const PageHandler: FunctionComponent<{
     const skipReplaceConfirmation = useRef(false);
     // The conversion prompt currently shown, and the locations it has already been shown at.
     const [pendingConversion, setPendingConversion] = useState<
-        | { resolve: (completed: boolean) => void; manual?: boolean; quote?: boolean; initialValues?: QuoteDetails }
+        | {
+              resolve: (completed: boolean) => void;
+              manual?: boolean;
+              quote?: boolean;
+              /** Only gets the details, which are saved, whether it's for a quote or not. */
+              collect?: boolean;
+              initialValues?: QuoteDetails;
+          }
         | undefined
     >(undefined);
     // The bundle's owner, i.e. the customer whose details are already known.
@@ -251,6 +321,9 @@ const PageHandler: FunctionComponent<{
         setPresetStartFailed(false);
         setCompletion(undefined);
         preparation.current = undefined;
+        // Anything which was open belonged to the previous bundle.
+        setAccountOpen(false);
+        setEditedConversion(undefined);
 
         // A reloaded bundle already has products, so pick up where the customer left off.
         const experiences = bundle.getWorkflowExperiences();
@@ -258,6 +331,11 @@ const PageHandler: FunctionComponent<{
             setExperience(experiences[0]);
             setPage(startingPoint.current.firstPersonalizePage);
             setReachedRank(startingPoint.current.pageRank(startingPoint.current.firstPersonalizePage));
+        } else if (startingPoint.current.welcomeEnabled) {
+            // Where the customer goes from there is worked out when they leave, as it can change meanwhile.
+            setExperience(undefined);
+            setPage("welcome");
+            setReachedRank(0);
         } else {
             setExperience(undefined);
             if (presetProduct) {
@@ -620,6 +698,8 @@ const PageHandler: FunctionComponent<{
     // only asked once, and never when the bundle already has an owner. Resolves once the prompt has closed.
     const requestConversionIfRequired = useCallback(
         async (location: ConversionLocation) => {
+            // The user portal asks for the details when the design is finalised instead.
+            if (portalEnabled) return;
             if (!conversionConfiguration?.locations?.includes(location)) return;
             if (consumedConversionLocations.current.has(location)) return;
             const stakeholders = await bundle.getAllStakeholders();
@@ -627,30 +707,69 @@ const PageHandler: FunctionComponent<{
             consumedConversionLocations.current.add(location);
             await new Promise<void>((resolve) => setPendingConversion({ resolve: () => resolve() }));
         },
-        [bundle, conversionConfiguration],
+        [bundle, conversionConfiguration, portalEnabled],
     );
 
     // The customer can offer or update their details at any time when the configuration allows it.
     const manualConversionAvailable = !!conversionConfiguration?.locations?.includes(ConversionLocation.Manual);
 
     // What the customer has already entered, so it can be shown and changed. Details are stored under the
-    // configured identifier for each field, falling back to its type.
-    const existingDetails = useCallback((): QuoteDetails => {
-        const metadata = bundle.getMetadata();
-        const fromOwner: Partial<Record<ConversionDataType, string | undefined>> = {
-            [ConversionDataType.Email]: owner?.emailAddress,
-            [ConversionDataType.FirstName]: owner?.firstName,
-            [ConversionDataType.LastName]: owner?.lastName,
-            [ConversionDataType.Phone]: owner?.phoneNumber,
-        };
-        const values: QuoteDetails = {};
-        for (const item of conversionConfiguration?.requestedDataItems ?? []) {
-            const id = fieldId(item);
-            const value = metadata.get(id) ?? fromOwner[item.type];
-            if (value) values[id] = value;
-        }
-        return values;
-    }, [bundle, conversionConfiguration, owner]);
+    // configured identifier for each field, falling back to its type. What isn't saved on the bundle yet is filled in
+    // from the signed in customer, or failing that the bundle's owner.
+    const existingDetails = useCallback(
+        (): QuoteDetails =>
+            prefillConversionDetails(
+                conversionConfiguration?.requestedDataItems ?? [],
+                bundle.getMetadata(),
+                customer ?? owner,
+            ),
+        [bundle, conversionConfiguration, customer, owner],
+    );
+
+    const saveConversionDetails = useCallback(
+        async (details: QuoteDetails) => {
+            try {
+                await saveDetails(details);
+            } catch (error) {
+                console.error("Error saving the customer's details:", error);
+                throw new Error("We couldn't save your details. Please try again.");
+            }
+        },
+        [saveDetails],
+    );
+
+    // Gets the details the conversion configuration asks for, and saves them, before the design is finalised (or a quote
+    // is requested). With a review page they're already on it, and otherwise they're asked for in a popup. A customer
+    // can leave out the details of a design unless the configuration says they're mandatory, but not those of a quote.
+    // Throws a customer-readable message when the details are needed and aren't given.
+    const collectConversionDetails = useCallback(
+        async (quote: boolean) => {
+            if (!portalConversion) return;
+            const fields = conversionConfiguration?.requestedDataItems ?? [];
+            const required = quote || !!conversionConfiguration?.mandatory;
+            if (reviewPageEnabled && page === "review") {
+                const details = editedConversion ?? existingDetails();
+                if (required && missingConversionFields(fields, details).length > 0) {
+                    throw new Error("Please fill in your details to continue.");
+                }
+                await saveConversionDetails(details);
+                return;
+            }
+            const given = await new Promise<boolean>((resolve) =>
+                setPendingConversion({ resolve, quote, collect: true, initialValues: existingDetails() }),
+            );
+            if (!given && required) throw new Error("Please give your details to continue.");
+        },
+        [
+            conversionConfiguration,
+            editedConversion,
+            existingDetails,
+            page,
+            portalConversion,
+            reviewPageEnabled,
+            saveConversionDetails,
+        ],
+    );
 
     const closeConversion = (completed = true) => {
         pendingConversion?.resolve(completed);
@@ -723,10 +842,93 @@ const PageHandler: FunctionComponent<{
         setReachedRank((reached) => Math.max(reached, pageRank(firstPersonalizePage)));
         setPage(firstPersonalizePage);
     }, [experienceToOpen, firstPersonalizePage, pageRank]);
+    // Moves on from the welcome page to wherever a new order starts. This is decided now, rather than when the bundle
+    // was loaded, as the only collection may have been selected for the customer in the meantime.
+    const startFromWelcome = useCallback(() => {
+        const target: PageType = presetProduct ? "workflow" : collection ? "product" : "collection";
+        setReachedRank((reached) => Math.max(reached, pageRank(target)));
+        setPage(target);
+    }, [collection, pageRank, presetProduct]);
+
+    // With a timeout set, a screen left alone starts over for the next customer: whoever is signed in is signed out and
+    // their design is cleared. A screen with nothing to clear is only taken back to the welcome page.
+    useInactivityTimeout(portalInactivitySeconds, portalEnabled && !(page === "welcome" && !customer), () => {
+        if (customer || bundle.getWorkflowExperiences().length > 0) {
+            resetSession().catch((error) => console.error("Error starting over after inactivity:", error));
+        } else if (welcomeEnabled) {
+            setPage("welcome");
+            setReachedRank(0);
+        }
+    });
+
     const onExperiencePage = (page === "experience" || page === "shared") && !!experience;
     useEffect(() => {
         if (onExperiencePage) void requestConversionIfRequired(ConversionLocation.OnStart);
     }, [onExperiencePage, requestConversionIfRequired]);
+
+    // With the user portal, a customer who hasn't signed in can be asked for their email as they start, either on
+    // leaving the welcome page or on first reaching the personalise page. Each bundle is only asked once, and never when
+    // it already has an owner. Resolves once the prompt has been dealt with (at once when there's nothing to ask).
+    const promptForEmailIfRequired = useCallback(async () => {
+        if (!portalEnabled || !portalPromptEmail || customer || guestPromptedBundles.current.has(bundle)) return;
+        guestPromptedBundles.current.add(bundle);
+        const stakeholders = await bundle.getAllStakeholders();
+        if (stakeholders.some((stakeholder) => stakeholder.type === StakeholderType.Owner)) return;
+        await new Promise<void>((resolve) => {
+            guestPromptResolve.current = resolve;
+            setGuestPromptOpen(true);
+        });
+    }, [bundle, customer, portalEnabled, portalPromptEmail]);
+    useEffect(() => {
+        if (onExperiencePage) {
+            promptForEmailIfRequired().catch((error) => console.error("Error checking the customer's details:", error));
+        }
+    }, [onExperiencePage, promptForEmailIfRequired]);
+    // Signing in answers the prompt, as does the bundle being swapped for another.
+    useEffect(() => {
+        if (customer) closeGuestPrompt();
+    }, [closeGuestPrompt, customer]);
+    useEffect(() => closeGuestPrompt(), [bundle, closeGuestPrompt]);
+    useEffect(() => setSaveAndExitOpen(false), [bundle]);
+
+    // Leaving the welcome page asks for the customer's email first, when that's what the partner wants.
+    const currentBundle = useRef(bundle);
+    currentBundle.current = bundle;
+    const handleWelcomeStart = useCallback(async () => {
+        const startedWith = bundle;
+        try {
+            await promptForEmailIfRequired();
+        } catch (error) {
+            console.error("Error checking the customer's details:", error);
+        }
+        // The bundle was replaced meanwhile (such as by signing out), so this start is no longer wanted.
+        if (currentBundle.current === startedWith) startFromWelcome();
+    }, [bundle, promptForEmailIfRequired, startFromWelcome]);
+
+    // Starts a new order from the thank you page. The customer stays signed in, unless the theme says they're always
+    // signed out as they leave (for shared screens).
+    const startOverAfterThanks = useCallback(
+        () => (portalAllowStaySignedIn === false ? resetSession() : startNewBundle()),
+        [portalAllowStaySignedIn, resetSession, startNewBundle],
+    );
+
+    // Leaves the experience once the draft is saved: closes it when it's in a frame, otherwise starts over with a new
+    // bundle, as there's nowhere else to go. The customer is only signed out if they chose to be.
+    const exitAfterSaving = useCallback(
+        async ({ signOut: signOutToo }: { signOut: boolean }) => {
+            setSaveAndExitOpen(false);
+            if (window.self !== window.top) {
+                // The experience is closing, so there's no use starting a new bundle.
+                if (signOutToo) await signOut({ startNewBundle: false });
+                ((window as any).SpiffThemeLoader as SpiffThemeLoader).close();
+            } else if (signOutToo) {
+                await resetSession();
+            } else {
+                await startNewBundle();
+            }
+        },
+        [resetSession, signOut, startNewBundle],
+    );
 
     // A preview image is only needed for the first experience. It comes from the 3D scene when the workflow is set up
     // for that, which `finishBundle` makes sure is loaded.
@@ -759,12 +961,25 @@ const PageHandler: FunctionComponent<{
             const order = await bundle.placeOrder();
             return { leave: () => spiffThemeLoader.close(), orderNumber: String(order.internalId) };
         }
-        return { leave: () => spiffThemeLoader.addToEcommerceCart(result) };
+        return {
+            leave: () => spiffThemeLoader.addToEcommerceCart(result),
+            complete: () => spiffThemeLoader.addToEcommerceCart(result),
+        };
     }, [bundle, takeScreenshot]);
+
+    // The design can't be completed (or a quote requested) until the order details the partner requires are filled in.
+    // They're asked for if they aren't, and this throws a customer-readable message if the customer doesn't give them.
+    const ensureOrderDetails = useCallback(async () => {
+        if (missingOrderDetails(orderDetailFields, readOrderDetails(bundle)).length === 0) return;
+        const saved = await new Promise<boolean>((resolve) => setPendingOrderDetails({ resolve }));
+        if (!saved) throw new Error("Please fill in the order details to continue.");
+    }, [bundle, orderDetailFields]);
 
     // Completes the design. With a thank you page that page prepares the hand-off and the customer's exit performs
     // it, otherwise it all happens now. Throws a customer-readable message on failure.
     const completeDesign = useCallback(async () => {
+        await collectConversionDetails(false);
+        await ensureOrderDetails();
         try {
             await requestConversionIfRequired(ConversionLocation.OnEnd);
             if (thankYouPageEnabled) {
@@ -779,7 +994,7 @@ const PageHandler: FunctionComponent<{
             // The finish step shows this message under its button.
             throw new Error("We couldn't add your design to the cart. Please try again.");
         }
-    }, [finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
+    }, [collectConversionDetails, ensureOrderDetails, finishBundle, requestConversionIfRequired, thankYouPageEnabled]);
 
     // Prepares the hand-off for the thank you page. Only ever runs once per visit, however often it's asked for.
     const prepareHandOff = useCallback((): Promise<PreparedHandOff> => {
@@ -825,20 +1040,11 @@ const PageHandler: FunctionComponent<{
         return next === "review" || next === "shared" ? next : undefined;
     };
 
-    // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
-    // This resolves with whether the quote was requested, which is false when the customer cancels.
-    const handleRequestQuote = useCallback(
-        () =>
-            new Promise<boolean>((resolve) =>
-                setPendingConversion({ resolve, quote: true, initialValues: existingDetails() }),
-            ),
-        [existingDetails],
-    );
-
     const confirmQuote = useCallback(
         async (details: QuoteDetails) => {
             try {
-                await saveDetails(details);
+                // With the user portal the customer is already attached to the bundle by signing in.
+                if (!portalEnabled) await saveDetails(details);
                 const quoteId = await bundle.generateQuoteId();
                 if (thankYouPageEnabled) {
                     // The thank you page takes over from here. Quotes aren't handed off yet.
@@ -856,20 +1062,55 @@ const PageHandler: FunctionComponent<{
                 throw new Error("We couldn't request your quote. Please try again.");
             }
         },
-        [bundle, saveDetails, thankYouPageEnabled],
+        [bundle, portalEnabled, saveDetails, thankYouPageEnabled],
     );
 
-    const saveConversionDetails = useCallback(
-        async (details: QuoteDetails) => {
-            try {
-                await saveDetails(details);
-            } catch (error) {
-                console.error("Error saving the customer's details:", error);
-                throw new Error("We couldn't save your details. Please try again.");
-            }
-        },
-        [saveDetails],
-    );
+    // Confirming a quote asks for the customer's details in the dialog, starting from those already on the bundle.
+    // This resolves with whether the quote was requested, which is false when the customer cancels.
+    // With the user portal the customer's details are those of their account, so they sign in instead.
+    const handleRequestQuote = useCallback(async () => {
+        if (!portalEnabled) {
+            return new Promise<boolean>((resolve) =>
+                setPendingConversion({ resolve, quote: true, initialValues: existingDetails() }),
+            );
+        }
+        // Without details of their own to give, the customer's quote is theirs by signing in.
+        if (!customer && !portalConversion) {
+            openAccount();
+            setErrorMessage("Please sign in to request a quote.");
+            return false;
+        }
+        try {
+            await collectConversionDetails(true);
+            await ensureOrderDetails();
+            await confirmQuote({});
+            return true;
+        } catch (error) {
+            setErrorMessage(error instanceof Error ? error.message : "We couldn't request your quote.");
+            return false;
+        }
+    }, [
+        collectConversionDetails,
+        confirmQuote,
+        customer,
+        ensureOrderDetails,
+        existingDetails,
+        openAccount,
+        portalConversion,
+        portalEnabled,
+    ]);
+
+    // The details shown on the review page, and whether any which are required are still to be given.
+    const conversionValues = editedConversion ?? existingDetails();
+    const conversionMissing =
+        missingConversionFields(conversionConfiguration?.requestedDataItems ?? [], conversionValues).length > 0;
+    // A signed in customer's email address is who they are, so it can't be changed here.
+    const lockedConversionIds = useMemo(() => {
+        const email = conversionConfiguration?.requestedDataItems?.find(
+            (item) => item.type === ConversionDataType.Email,
+        );
+        return customer && email ? [fieldId(email)] : [];
+    }, [conversionConfiguration, customer]);
 
     // A page can be returned to once it has been reached, as long as what it needs still exists.
     const canVisit = (index: number) => {
@@ -901,41 +1142,72 @@ const PageHandler: FunctionComponent<{
                 position: "relative",
             }}
         >
-            <PageStepper
-                steps={steps.map((pageStep) => pageStep.label)}
-                currentIndex={stepIndex(page)}
-                enabledSteps={steps.map((_, index) => canVisit(index))}
-                onStepSelected={(index) => {
-                    setErrorMessage(undefined);
-                    const target = steps[index].page;
-                    if (target === "experience" || target === "shared" || target === "review") {
-                        setExperience(experienceToOpen());
+            {page !== "welcome" && (
+                <PageStepper
+                    steps={steps.map((pageStep) => pageStep.label)}
+                    currentIndex={stepIndex(page)}
+                    enabledSteps={steps.map((_, index) => canVisit(index))}
+                    onStepSelected={(index) => {
+                        setErrorMessage(undefined);
+                        const target = steps[index].page;
+                        if (target === "experience" || target === "shared" || target === "review") {
+                            setExperience(experienceToOpen());
+                        }
+                        setPage(target);
+                    }}
+                    actions={
+                        portalEnabled ? (
+                            <>
+                                {portalSaveAndExit !== false && switcherExperiences.length > 0 && (
+                                    <DetailsButton disabled={saveAndExitOpen} onClick={() => setSaveAndExitOpen(true)}>
+                                        Save and exit
+                                        <LogOut size={16} aria-hidden="true" />
+                                    </DetailsButton>
+                                )}
+                                {orderDetailFields.length > 0 && (
+                                    <DetailsButton
+                                        disabled={!!pendingOrderDetails}
+                                        onClick={() => setPendingOrderDetails({ resolve: () => {} })}
+                                    >
+                                        Order details
+                                        <ClipboardList size={16} aria-hidden="true" />
+                                    </DetailsButton>
+                                )}
+                                <DetailsButton disabled={accountOpen} onClick={() => openAccount()}>
+                                    {customer ? customer.emailAddress : "Sign in"}
+                                    <CircleUserRound size={16} aria-hidden="true" />
+                                </DetailsButton>
+                            </>
+                        ) : manualConversionAvailable ? (
+                            <DetailsButton
+                                disabled={!!pendingConversion}
+                                onClick={() =>
+                                    void new Promise<void>((resolve) =>
+                                        setPendingConversion({
+                                            resolve: () => resolve(),
+                                            manual: true,
+                                            initialValues: existingDetails(),
+                                        }),
+                                    )
+                                }
+                            >
+                                Your details
+                                <UserRound size={16} aria-hidden="true" />
+                            </DetailsButton>
+                        ) : undefined
                     }
-                    setPage(target);
-                }}
-                actions={
-                    manualConversionAvailable ? (
-                        <DetailsButton
-                            disabled={!!pendingConversion}
-                            onClick={() =>
-                                void new Promise<void>((resolve) =>
-                                    setPendingConversion({
-                                        resolve: () => resolve(),
-                                        manual: true,
-                                        initialValues: existingDetails(),
-                                    }),
-                                )
-                            }
-                        >
-                            Your details
-                            <UserRound size={16} aria-hidden="true" />
-                        </DetailsButton>
-                    ) : undefined
-                }
-            />
+                />
+            )}
             {bundle.getTest() && <TestOrderBanner />}
             {errorMessage && <ErrorBanner message={errorMessage} onDismiss={() => setErrorMessage(undefined)} />}
             <div style={{ flex: "1 1 0", minHeight: 0, overflow: "hidden", position: "relative" }}>
+                {page === "welcome" && (
+                    <WelcomePage
+                        onStart={handleWelcomeStart}
+                        onOpenAccount={openAccount}
+                        brandingAvailable={!!bundle.getGlobalPropertyConfiguration()}
+                    />
+                )}
                 {page === "collection" &&
                     (autoSelectCollection ? (
                         <LoadingOverlay />
@@ -997,6 +1269,7 @@ const PageHandler: FunctionComponent<{
                 )}
                 {page === "shared" && experience && (
                     <SharedPersonalization
+                        key={templateRevision}
                         experience={experience}
                         experiences={switcherExperiences}
                         groupChildren={!singleMode}
@@ -1017,6 +1290,19 @@ const PageHandler: FunctionComponent<{
                 )}
                 {page === "review" && switcherExperiences.length > 0 && (
                     <ReviewPage
+                        conversion={
+                            portalConversion
+                                ? {
+                                      fields: conversionConfiguration?.requestedDataItems ?? [],
+                                      values: conversionValues,
+                                      lockedIds: lockedConversionIds,
+                                      onChange: (id, value) =>
+                                          setEditedConversion({ ...conversionValues, [id]: value }),
+                                      cartBlocked: !!conversionConfiguration?.mandatory && conversionMissing,
+                                      quoteBlocked: conversionMissing,
+                                  }
+                                : undefined
+                        }
                         experiences={switcherExperiences}
                         onConfirm={completeDesign}
                         confirmLabel={addToCartLabel}
@@ -1031,9 +1317,48 @@ const PageHandler: FunctionComponent<{
                         closeLabel={thankYouCloseLabel}
                         quoteId={completion.kind === "quote" ? completion.quoteId : undefined}
                         onPrepare={prepareHandOff}
+                        onStartOver={thankYouShowStartOver === false ? undefined : startOverAfterThanks}
+                        startOverLabel={thankYouStartOverLabel}
                     />
                 )}
             </div>
+            {pendingOrderDetails && (
+                <OrderDetailsDialog
+                    onClose={(saved) => {
+                        pendingOrderDetails.resolve(saved);
+                        setPendingOrderDetails(undefined);
+                    }}
+                />
+            )}
+            {accountOpen && (
+                <AccountDialog
+                    initialPage={accountPage}
+                    onClose={() => setAccountOpen(false)}
+                    onTemplateApplied={() => {
+                        setTemplateRevision((revision) => revision + 1);
+                        if (page === "welcome") {
+                            // Branding is applied to start an order with, so carry on once it has been seen to apply.
+                            setTimeout(() => {
+                                setAccountOpen(false);
+                                void handleWelcomeStart();
+                            }, 1200);
+                        }
+                    }}
+                />
+            )}
+            {saveAndExitOpen && (
+                <SaveAndExitDialog onClose={() => setSaveAndExitOpen(false)} onSaved={exitAfterSaving} />
+            )}
+            {guestPromptOpen && !accountOpen && (
+                <GuestEmailDialog
+                    enforceLogin={!!portalEnforceLogin}
+                    onEmailProvided={async (email) => {
+                        await bundle.addStakeholder({ emailAddress: email }, StakeholderType.Owner);
+                        closeGuestPrompt();
+                    }}
+                    onContinueAsGuest={closeGuestPrompt}
+                />
+            )}
             {pendingConversion && (
                 <ConversionDialog
                     // A quote can be cancelled, but it can't go ahead without the customer's details.
@@ -1041,12 +1366,23 @@ const PageHandler: FunctionComponent<{
                         !pendingConversion.quote && !pendingConversion.manual && !!conversionConfiguration?.mandatory
                     }
                     initialValues={pendingConversion.initialValues}
+                    lockedIds={lockedConversionIds}
                     submitLabel={
-                        pendingConversion.quote ? "Confirm your quote" : pendingConversion.manual ? "Save" : undefined
+                        pendingConversion.collect
+                            ? undefined
+                            : pendingConversion.quote
+                              ? "Confirm your quote"
+                              : pendingConversion.manual
+                                ? "Save"
+                                : undefined
                     }
-                    submittingLabel={pendingConversion.quote ? "Requesting quote..." : undefined}
+                    submittingLabel={
+                        pendingConversion.quote && !pendingConversion.collect ? "Requesting quote..." : undefined
+                    }
                     onSubmit={async (details) => {
-                        await (pendingConversion.quote ? confirmQuote(details) : saveConversionDetails(details));
+                        await (pendingConversion.quote && !pendingConversion.collect
+                            ? confirmQuote(details)
+                            : saveConversionDetails(details));
                         closeConversion();
                     }}
                     onSkip={() => closeConversion(false)}

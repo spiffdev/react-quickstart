@@ -1,25 +1,20 @@
 import { defineConfig } from "vite";
 import svgr from "vite-plugin-svgr";
-import ViteRestart from "vite-plugin-restart";
 // @ts-expect-error - spiffThemePlugin export may not be in type definitions yet
 import { spiffThemePlugin } from "@spiffcommerce/theme-bridge/plugin";
 import { configurationSchema, pageSettings } from "./src/configurationSchema";
-import { existsSync, readFileSync } from "fs";
 
 // https://vitejs.dev/config/
-export default defineConfig((env) => {
-    const configurationPath = `./.env.${env.mode}.json`;
-    const themeConfiguration = existsSync(configurationPath) ? readFileSync(configurationPath, "utf-8") : undefined;
+export default defineConfig(() => {
     return {
         base: "",
         define: {
-            __LOCAL_DEV_CONFIGURATION__: themeConfiguration,
             "globalThis.__DEV__": JSON.stringify(false),
         },
         plugins: [
             svgr(),
-            // The local configuration file is read when the config loads, so editing it needs a server restart.
-            ViteRestart({ restart: [".env.*.json"] }),
+            // Also loads the local configuration (.env.<mode>.jsonc, or failing that .env.<mode>.json) into
+            // __LOCAL_DEV_CONFIGURATION__, and restarts the dev server when it changes.
             spiffThemePlugin({ configurationSchema, pageSettings, includePreloadChunks: false }),
         ],
         build: {

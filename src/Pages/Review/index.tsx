@@ -8,6 +8,9 @@ import Typography from "../../components/typography";
 import { createDesignPreviewImage, withScreenshotPreview } from "../Customization/previewScreenshot";
 import useCurrency from "../../hooks/useCurrency";
 import TermsAgreement from "../Customization/components/TermsAgreement";
+import ConversionFields from "../Customization/components/ConversionFields";
+import type { ConversionData } from "@spiffcommerce/theme-bridge";
+import type { QuoteDetails } from "../../utils/conversionDetails";
 
 const PREVIEW_RESOLUTION = 512;
 
@@ -195,6 +198,22 @@ const Totals = styled.div`
     background: #f5f5f5;
     font-size: 18px;
     font-weight: 700;
+`;
+
+const DetailsSection = styled.section`
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 16px;
+    border-radius: 8px;
+    background: #f5f5f5;
+`;
+
+const DetailsHeading = styled(Typography)`
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
 `;
 
 const QuoteButton = styled(Button)`
@@ -392,7 +411,18 @@ const ReviewPage: FunctionComponent<{
     allowQuote?: boolean;
     /** Resolves false when the customer backs out of the quote, so they can carry on. */
     onRequestQuote?: () => void | boolean | Promise<void | boolean>;
-}> = ({ experiences, onConfirm, confirmLabel, allowCart = true, allowQuote = false, onRequestQuote }) => {
+    /** The customer's details, asked for here when the theme's conversion configuration calls for them. */
+    conversion?: {
+        fields: ConversionData[];
+        values: QuoteDetails;
+        onChange: (id: string, value: string) => void;
+        /** The fields which can't be changed, such as a signed in customer's email address. */
+        lockedIds: string[];
+        /** Whether the design can't be completed until the required details are in, and likewise a quote. */
+        cartBlocked: boolean;
+        quoteBlocked: boolean;
+    };
+}> = ({ experiences, onConfirm, confirmLabel, allowCart = true, allowQuote = false, onRequestQuote, conversion }) => {
     const currencyFormatter = useCurrency();
     const [details, setDetails] = useState<Map<string, ItemDetailsData> | undefined>(undefined);
     const [confirming, setConfirming] = useState(false);
@@ -505,13 +535,27 @@ const ReviewPage: FunctionComponent<{
                         <Typography variant="span">{currencyFormatter(total)}</Typography>
                     </Totals>
                 )}
+                {conversion && (
+                    <DetailsSection aria-labelledby="review-details-heading">
+                        <DetailsHeading variant="h3" id="review-details-heading">
+                            Your details
+                        </DetailsHeading>
+                        <ConversionFields
+                            fields={conversion.fields}
+                            values={conversion.values}
+                            lockedIds={conversion.lockedIds}
+                            disabled={confirming}
+                            onChange={conversion.onChange}
+                        />
+                    </DetailsSection>
+                )}
                 {terms && (
                     <TermsAgreement id="confirm-order" markdown={terms} agreed={agreed} onAgreedChange={setAgreed} />
                 )}
                 {allowCart && (
                     <Button
                         fullWidth
-                        disabled={confirming || !ready || needsAgreement}
+                        disabled={confirming || !ready || needsAgreement || !!conversion?.cartBlocked}
                         icon={confirming && !quoting ? undefined : <ShoppingCart size={18} aria-hidden="true" />}
                         onClick={handleConfirm}
                     >
@@ -521,7 +565,7 @@ const ReviewPage: FunctionComponent<{
                 {allowQuote && (
                     <QuoteButton
                         fullWidth
-                        disabled={confirming || !ready || needsAgreement}
+                        disabled={confirming || !ready || needsAgreement || !!conversion?.quoteBlocked}
                         icon={<FileText size={18} aria-hidden="true" />}
                         onClick={handleQuote}
                     >

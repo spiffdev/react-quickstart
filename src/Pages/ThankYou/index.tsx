@@ -32,6 +32,15 @@ const Message = styled(Typography)`
     white-space: pre-line;
 `;
 
+const SecondaryButton = styled(Button)`
+    color: var(--theme-primary-color);
+    background-color: transparent;
+
+    &:hover:not(:disabled) {
+        color: var(--theme-primary-contrast-color);
+    }
+`;
+
 const ErrorText = styled(Message)`
     font-size: 13px;
     color: #d32f2f;
@@ -51,7 +60,10 @@ const ThankYouPage: FunctionComponent<{
     quoteId?: string;
     /** Prepares the hand-off, resolving with what to do when the customer leaves. */
     onPrepare: () => Promise<PreparedHandOff>;
-}> = ({ message, closeLabel, quoteId, onPrepare }) => {
+    /** Starts a new order. Not offered when it's left out. */
+    onStartOver?: () => Promise<void>;
+    startOverLabel?: string;
+}> = ({ message, closeLabel, quoteId, onPrepare, onStartOver, startOverLabel }) => {
     const [state, setState] = useState<"preparing" | "ready" | "failed" | "leaving">("preparing");
     const [handOff, setHandOff] = useState<PreparedHandOff | undefined>(undefined);
     const [attempt, setAttempt] = useState(0);
@@ -81,6 +93,18 @@ const ThankYouPage: FunctionComponent<{
         }
     }, [handOff]);
 
+    // Hands the design off if that's still to be done, which doesn't end the experience, then starts again.
+    const startOver = useCallback(async () => {
+        setState("leaving");
+        try {
+            handOff?.complete?.();
+            await onStartOver?.();
+        } catch (error) {
+            console.error("Error starting a new order:", error);
+            setState("ready");
+        }
+    }, [handOff, onStartOver]);
+
     return (
         <Page>
             <CircleCheck size={48} color="var(--theme-primary-color)" aria-hidden="true" />
@@ -98,6 +122,11 @@ const ThankYouPage: FunctionComponent<{
                 <Button disabled={state !== "ready"} onClick={leave}>
                     {closeLabel || "Close"}
                 </Button>
+            )}
+            {onStartOver && state !== "failed" && (
+                <SecondaryButton disabled={state !== "ready"} onClick={() => void startOver()}>
+                    {startOverLabel || "Start a new order"}
+                </SecondaryButton>
             )}
         </Page>
     );

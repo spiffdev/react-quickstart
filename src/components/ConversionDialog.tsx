@@ -52,6 +52,8 @@ const ConversionDialog: FunctionComponent<{
     onSkip: () => void;
     /** Details the customer has already entered, which they can change. */
     initialValues?: QuoteDetails;
+    /** The identifiers of the fields which can't be changed, such as the email address of a signed in customer. */
+    lockedIds?: string[];
     submitLabel?: string;
     submittingLabel?: string;
     /** Overrides the label of the button that closes the dialog without saving. */
@@ -61,6 +63,7 @@ const ConversionDialog: FunctionComponent<{
     onSubmit,
     onSkip,
     initialValues,
+    lockedIds,
     submitLabel = "Continue",
     submittingLabel = "Saving...",
     skipLabel,
@@ -89,6 +92,7 @@ const ConversionDialog: FunctionComponent<{
                     submitting={submitting}
                     onSubmit={handleSubmit}
                     initialValues={initialValues}
+                    lockedIds={lockedIds}
                     submitLabel={submitLabel}
                     submittingLabel={submittingLabel}
                 />

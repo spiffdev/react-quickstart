@@ -2,6 +2,101 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-18 — The sidebar closes when you click away from it
+
+- The portal's sidebars (account, order details, guest email, save and exit) close when the customer presses anywhere outside them, or presses **Escape**. It's the press that counts, so selecting text in a sidebar and letting go outside doesn't close it. The same as their Close or Cancel button each time, except for the guest email prompt, where leaving is the same as **Continue as guest**. Save and exit, and the guest email prompt, can't be dismissed while they're saving. (`Backdrop` takes an `onDismiss`.)
+
+## 2026-11-18 — Drafts and orders list every bundle
+
+- **Draft orders** and **Previous orders** no longer leave out bundles with no designs in them. They hid anything whose `transactionsCount` wasn't above zero, which emptied the list when the server didn't report it for a real draft. The lists now show everything the server returns for the customer, so empty bundles (every new visit, sign-out or start over makes one) will show too, as "0 products" with the name "Unnamed order" if they have none. The bundle which is open is still listed, with its button disabled.
+
+## 2026-11-18 — Signing out when saving and exiting is optional
+
+- A signed in customer saving and exiting chooses whether to be signed out, with a **Sign me out when I exit** option in the panel. It's **unticked to begin with**, so they stay signed in unless they say otherwise, and it isn't shown to guests, who have nothing to sign out of. Unticked, and when the theme isn't in a frame, the next design starts on a new bundle under their account; in a frame the experience closes either way, without starting a bundle that nobody would use.
+- New **User Portal: Allow Staying Signed In** setting (on by default). Turned off, customers are **always** signed out as they leave, which suits shared screens such as kiosks: the panel just says "You'll be signed out when you exit." instead of offering the choice, and starting a new order from the thank you page signs them out as well (it leaves them signed in when the setting is on). Signing out from the account menu and the inactivity timeout always sign out and start over, whatever this is set to.
+- `useAccount().signOut` takes `{ startNewBundle: false }` for the case where the experience is about to close.
+
+## 2026-11-18 — The conversion configuration with the user portal
+
+- The user portal no longer **completely** replaces the conversion configuration. With both on, the configuration's details are asked for **inline on the review page** (a "Your details" section above the terms and buttons), or, when the review page is off, in a **popup just before the design is finalised**. Its own locations (start, end and manual) don't apply with the portal, and there's no "Your details" button on the stepper bar.
+- **They start with what's known:** a value already saved on the bundle, then the signed in customer's email, first name, last name and phone number (or failing that the bundle owner's). A signed in customer's email address is shown but can't be changed. The details are saved to the bundle as before (its owner, its metadata and its organization), when the design is completed. They aren't written back to the customer's account; that's what **Your details** in the account menu is for.
+- **Required or not:** as the configuration says. Where it's marked mandatory the design can't be completed (the review page's button is disabled, or the popup can't be skipped) until the fields it marks as mandatory are filled in; otherwise they can be left out. A **quote** always needs them.
+- **Quotes** with the portal on now use these details too (so a guest can request one without signing in, as long as the configuration asks for details), and without a conversion configuration still ask a guest to sign in as before.
+- Changed: `QuoteForm`'s fields moved to `ConversionFields`, and `utils/conversionDetails` holds the pre-filling and the check for what's missing. The `enableUserPortal` setting's description and the conversion configuration's now say all this.
+
+## 2026-11-18 — Customers can update their own details
+
+- The account menu has a **Your details** page where a signed in customer can change their first name, last name and phone number, using `SpiffCommerceClient.updateCustomer` (core 44.21.1-alpha.2). Their email address is shown but can't be changed, as it's how they sign in. An update isn't partial in core, so all three are always sent, and one which has been emptied is cleared; the customer kept by the account (and shown in the form) is the one the server returns. The customer's default template is kept by core.
+
+## 2026-11-18 — Save branding as a template when saving and exiting
+
+- The **Save and exit** panel has an **Also save my branding as a template** option (off to begin with, and only for a signed in customer when the design has shared options, as saved branding does; core won't make a template for a guest who has only given their email address). The template is saved under the **order's name** (there's no separate name for it, as templates are listed apart from orders), so ticking it needs the order to have one, and the panel says so while it doesn't. It saves the design's shared options as saved branding after the draft's name, then leaves. If the template can't be saved the panel stays open with a message, and trying again doesn't make it twice; unticking it saves the draft without one.
+
+## 2026-11-18 — Server addresses come from the region
+
+- `@spiffcommerce/theme-bridge` now supplies the Spiff Commerce server, hub, services API and editor addresses itself, chosen by **`VITE_SPIFF_REGION`** (`au` or `us`), so `.env.sample` sets only that. `VITE_SERVER_URL`, `VITE_HUB_URL`, `VITE_SERVICES_URL` and `VITE_EDITOR_URL` are no longer advertised, as they're for internal use only; each is still read, and still wins over the region's default if it's set. This replaces the `VITE_EDITOR_URL` setting added in the mobile upload entry below.
+- `App` no longer configures the client from those variables itself in development. It always calls `SpiffThemeLoader.configureClient`, which applies the same addresses together with the login settings, and no longer sets the editor address either (the bridge does).
+- The region also supplies the login settings (`VITE_USER_POOL_CLIENT_ID` and `VITE_AWS_REGION` default from it), which the user portal's sign-in uses.
+
+## 2026-11-18 — Local configuration is loaded by theme-bridge
+
+- Loading the local development configuration is now done by the theme plugin in `@spiffcommerce/theme-bridge` (updated to 1.29.1-alpha.0) rather than by this theme's own code. `vite.config.ts` no longer reads the file or sets `__LOCAL_DEV_CONFIGURATION__` itself, and no longer lists the files for `vite-plugin-restart` to watch. (`localConfiguration.ts`, the first version of this, has been removed.)
+- The behaviour is the same, and JSONC is supported: **`.env.<mode>.jsonc`** (comments and trailing commas allowed) is used first, and failing that `.env.<mode>.json`. A file which can't be parsed stops the dev server with "Failed to parse development configuration" and the file's path, and the dev server restarts when either kind of file is added, changed or removed in the project's root folder.
+- The plugin only sets `__LOCAL_DEV_CONFIGURATION__` if `vite.config.ts` hasn't defined it, and loading can be switched off with the plugin's `loadDevelopmentConfiguration: false` option.
+
+## 2026-11-18 — "Corporate portal" is now the "user portal"
+
+- Renamed everywhere it's shown or named: the settings now read **Enable User Portal** and **User Portal: …**, and the setting's key is `enableUserPortal` (was `enableCorporatePortal`), with `useUserPortalEnabled` for the hook. The other portal settings keep their `portal…` keys. Earlier entries below were updated to match. Anything which refers to the corporate *theme* (which this was modelled on) is unchanged.
+- **A partner who had already switched the portal on under the old key will need to switch it on again**, as nothing reads `enableCorporatePortal` any more.
+
+## 2026-11-18 — Portal as a sidebar, save and exit, richer rows
+
+- **Sidebar:** the portal's dialogs (account, order details, guest email, save and exit) are now a panel on the right of larger screens, so the experience stays in view beside them, and the whole view on phones (compact width). The panel slides in, unless the customer prefers reduced motion.
+- **Email prompt on the welcome page:** with **User Portal: Ask for Email** on, leaving the welcome page (with **Start a new order**, or after applying saved branding) asks for the email first. The prompt is still asked on first reaching the personalise page when there's no welcome page, and each bundle is only asked once.
+- **Save and exit:** new **User Portal: Save and Exit** setting (on by default) adds a button to the stepper bar once there are designs. It names the draft (blank is fine), asks a guest for the email address which makes them its owner (a signed in customer, or a bundle which has an owner, isn't asked), then leaves: it closes the experience when it's in a frame, and otherwise starts over for the next customer.
+- **Richer rows:** orders and drafts show the order or quote number before the name (falling back to the collection's name), when they were created, how many **products** they have (not designs or recipients) and their total, where there's a presentment currency.
+- Not done by choice: localization of the portal's text, and a separate landing page. Invalid dispatch dates are left for something more first-class than a theme setting.
+
+## 2026-11-18 — Tests
+
+- `yarn test` runs the first tests (Vitest, with jsdom and Testing Library; config in `vitest.config.ts`, not `vite.config.ts`, so the theme plugin isn't loaded). Covered: the order details helpers (`utils/orderDetails`), the account logic (`hooks/useAccount`: session restore, attaching the bundle, sign-in, sign-out and reset, drafts, duplicating, the default template), the order details form, the inactivity timer, and the configuration schema and page settings (unique keys, every configured field exists, the welcome page's place).
+- The inactivity timer moved out of `PageHandler` into `hooks/useInactivityTimeout` so it can be tested. It now uses the latest callback without restarting the wait whenever the page re-renders.
+
+## 2026-11-17 — Welcome page, saved assets, default template, timeout and start over
+
+- **Welcome page:** a new optional page (Welcome, off until switched on) in a group of its own, so it can't be moved: it's always first. Title, description, background image and every button's text are settings. It starts a new order, and with the user portal also offers **saved branding**, **duplicate a previous order** and **continue a draft / sign in**, which open the account dialog on that page (the customer signs in first if they haven't). Applying branding from it carries straight on to the order. A bundle that already has designs (a draft, a duplicate) skips it, and it comes back whenever the bundle is replaced (sign-out, timeout, start over).
+- **Saved assets:** new **Saved assets** page in the account menu listing the customer's asset configurations (thumbnail, name, colour channels) with remove, as in the corporate theme. Assets a signed-in customer creates (e.g. uploading in a frame step) will be linked to them automatically, so they'll appear here with nothing more to do.
+- **Default template:** a signed-in customer with a default template has it applied to their new bundle (its shared options, and its name in the bundle's `template` metadata). Bundles with designs or branding already are left alone. The corporate theme starts the new bundle as a copy; here the bundle already exists, so its options are set instead.
+- **Inactivity timeout:** new **User Portal: Inactivity Timeout (seconds)** setting. After that long without a click, touch, key press or movement, the customer is signed out and the bundle replaced (or, with nothing to clear, the welcome page is shown again).
+- **Start over:** the thank you page has a **Start a new order** button (**Show Start Over Button** / **Start Over Button Text** settings). It does whatever of the hand-off is left (adding the design to the e-commerce cart; nothing for test orders and quotes, which are already done) and then starts a new bundle.
+- **Collection badges:** saved branding shows the collections it's available in when the activation's collections use different shared options, and is disabled with a reason if it was made for a different configuration than the current bundle's. Applying it now shows "Applied ✓".
+
+## 2026-11-17 — User portal: menu, sign-out and order details
+
+- **Menu:** the account dialog now opens on a menu (Draft orders, Previous orders, Saved branding, Sign out) in place of tabs, with a "← Menu" link back from each page.
+- **Sign out** also replaces the bundle with a new empty one (`startNewBundle`, shared with the first load in `App`), so the next person at the screen doesn't see the last customer's design. Their drafts are still saved against their account.
+- **Order details:** three new settings, **User Portal: Order Name / Purchase Order / Dispatch Date**, each *Not asked* (the default), *Asked, optional* or *Asked, required*. They're recorded on the bundle's own `name`, `purchaseOrder` and `dispatchDate` fields (not its metadata), and only those which have changed are sent.
+  - Whichever are switched on are asked in an **Order details** button on the stepper bar, at any time, and when **duplicating** a previous order (before the copy is made).
+  - Required ones must be filled in before a design can be completed or a quote requested; the dialog opens for them if they aren't.
+  - The dispatch date is saved as the corporate theme does: the chosen day at the current local time, as an ISO instant, and read back as a local day.
+  - The dispatch date can't be in the past, and is kept within the product collection's dispatch dates when it has them.
+- New: `utils/orderDetails.ts`, `hooks/useOrderDetails.ts`, `components/OrderDetailsForm.tsx`, `components/OrderDetailsDialog.tsx`.
+
+## 2026-11-17 — User portal: saved branding and guest email
+
+- **Saved branding:** with the portal on and an activation that has shared options (a Global Property Configuration), the account dialog gains a **Saved branding** tab. It lists the signed-in customer's templates for that configuration, and **Apply** puts one on the bundle (recording its name in the bundle's `template` metadata) and shows the shared page afresh. The tab can also save the current shared options as a new template, and remove one.
+- **Guest email prompt:** new **User Portal: Ask for Email** setting. When on, a customer who isn't signed in is asked for their email as they first reach the personalise page (once per bundle, never when the bundle already has an owner). The email becomes the bundle's owner. **Continue as guest** closes it. With **User Portal: Enforce Sign-in** the prompt is the sign-in form (email and code) instead.
+- New: `components/GuestEmailDialog.tsx`, `components/dialogParts.tsx` (the dialogs' shared styling).
+
+## 2026-11-17 — User portal
+
+- New **Enable User Portal** setting (Personalise > Checkout), modelled on the corporate theme's portal. When it's on it **completely replaces the conversion configuration**: the details dialog, its start/end/manual locations, the "Your details" button, the recipient's conversion configuration id and the details saved to the bundle's metadata are all skipped.
+- **Sign-in:** the stepper bar's button opens an account dialog where the customer enters their email and the code sent to it (`generateVerificationCode` / `verifyCode`). A session from a previous visit is restored (and dropped if the customer belongs to another partner). Signing in attaches the current bundle to the customer as its owner, unless it already has one.
+- **Re-open drafts:** the **Drafts** tab lists the customer's unordered bundles which have designs in them, and **Continue** loads one in place of the current bundle, picking up at the personalise page.
+- **Duplicate orders:** the **Previous orders** tab lists their ordered bundles, and **Duplicate** copies one (designs included) and works on the copy.
+- Requesting a quote uses the signed-in customer instead of asking for details, and asks them to sign in first if they haven't.
+- New: `hooks/useAccount.tsx`, `components/AccountDialog.tsx`; `BundleProvider` now also takes `setBundle`, so `App` can swap the bundle.
+
 ## 2026-11-16 — Moving between designs
 
 - The **shared personalise page** has the experience switcher (when the bundle has more than one design), which only changes the design shown in the 3D preview; the options on the page are shared, so nothing else depends on it.

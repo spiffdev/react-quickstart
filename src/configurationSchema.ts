@@ -7,6 +7,20 @@ import {
     ThemeConfigurationSchema,
 } from "@spiffcommerce/theme-bridge";
 
+/*
+ * A note on how this configuration is shaped.
+ *
+ * Earlier themes put much of their configuration in nested objects (a "startPage" object holding the start page's
+ * fields, and so on). That is no longer the standard approach. Keep the configuration in flat structures: one field
+ * per setting, at the top level, with the page it appears on decided by `pageSettings` below. A field's place in
+ * the configuration editor is then only a matter of which page lists it, so pages can be reorganised, split or merged
+ * without moving any stored data, and a partner's existing values are never lost by doing so.
+ *
+ * Object fields and custom schema types are all still supported. Use them only when they really make sense, such as
+ * a list of repeated entries or a value which is meaningless without its siblings, and not simply to group fields
+ * which belong to the same page.
+ */
+
 export interface ThemeConfiguration {
     /**
      * A custom font used for all text. Falls back to the platform's font.
@@ -55,7 +69,34 @@ export interface ThemeConfiguration {
      */
     allowCartRequests?: boolean;
     /**
+     * Turns on the user portal: customers sign in with an email code, their bundle is attached to them, and they
+     * can re-open their drafts or duplicate their previous orders. This changes where the conversion configuration asks
+     * for details: see `conversionConfiguration`.
+     */
+    enableUserPortal?: boolean;
+    /**
+     * With the user portal, asks customers who haven't signed in for their email address when they start
+     * personalising. They can always continue as a guest instead.
+     */
+    portalPromptEmail?: boolean;
+    /**
+     * With the user portal's email prompt, customers sign in with a code rather than only giving their email.
+     */
+    portalEnforceLogin?: boolean;
+    /**
+     * With the user portal, whether customers are asked to name their order: "off" (the default), "optional" or
+     * "required". Also asked when duplicating a previous order.
+     */
+    portalOrderName?: OrderDetailMode;
+    /** As `portalOrderName`, for the order's purchase order number. */
+    portalPurchaseOrder?: OrderDetailMode;
+    /** As `portalOrderName`, for the order's dispatch date. */
+    portalDispatchDate?: OrderDetailMode;
+    /**
      * The details asked of the customer when they request a quote. Only an email is asked for when unset.
+     * With the user portal enabled, the configuration's locations are ignored: the details are shown on the review page,
+     * or in a popup just before the design is finalised when the review page is off, and start with what's known of the
+     * signed in customer.
      */
     conversionConfiguration?: ConversionConfiguration;
     /**
@@ -70,7 +111,46 @@ export interface ThemeConfiguration {
      * The text of the button that closes the experience from the thank you page.
      */
     thankYouCloseLabel?: string;
+    /** Whether the thank you page has a button which hands the design off and starts a new order. On by default. */
+    thankYouShowStartOver?: boolean;
+    /** The text of the thank you page's start over button. */
+    thankYouStartOverLabel?: string;
+    /**
+     * With the user portal, the seconds without any activity after which the experience starts over: the
+     * customer is signed out and their design is cleared. Never when unset or zero.
+     */
+    portalInactivitySeconds?: number;
+    /**
+     * With the user portal, whether customers can save their design as a draft and leave, from a button on the
+     * stepper bar. On by default.
+     */
+    portalSaveAndExit?: boolean;
+    /**
+     * With the user portal, whether a signed in customer can stay signed in when they leave (saving and exiting, or
+     * starting a new order from the thank you page). On by default. When off they're always signed out, which suits
+     * shared screens such as kiosks.
+     */
+    portalAllowStaySignedIn?: boolean;
+    /** An image shown behind the welcome page. */
+    welcomeBackgroundImage?: AssetResource;
+    /** The welcome page's heading. */
+    welcomeTitle?: string;
+    /** The text under the welcome page's heading. */
+    welcomeDescription?: string;
+    /** The text of the button that starts a new order. */
+    welcomeStartLabel?: string;
+    /** The text of the button that applies saved branding (user portal only). */
+    welcomeBrandingLabel?: string;
+    /** The text of the button that duplicates a previous order (user portal only). */
+    welcomeDuplicateLabel?: string;
+    /** The text of the button that re-opens a draft (user portal only). */
+    welcomeContinueLabel?: string;
+    /** The text of the button that signs in (user portal only). */
+    welcomeSignInLabel?: string;
 }
+
+/** Whether an order detail is asked of the customer. */
+export type OrderDetailMode = "off" | "optional" | "required";
 
 export const configurationSchema: ThemeConfigurationSchema = {
     fields: [
@@ -158,10 +238,169 @@ export const configurationSchema: ThemeConfigurationSchema = {
                 "When true, the customer will be allowed to add items to their cart and proceed to checkout immediately.",
         },
         {
+            type: FieldType.Boolean,
+            key: "enableUserPortal",
+            title: "Enable User Portal",
+            defaultValue: "false",
+            description:
+                "When true, customers sign in with an email code and can continue their drafts or duplicate previous orders. The conversion configuration's details are then asked for on the review page (or in a popup before the design is finalised, without one) rather than at its own locations.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalPromptEmail",
+            title: "User Portal: Ask for Email",
+            defaultValue: "false",
+            description:
+                "When the user portal is enabled, asks customers who haven't signed in for their email address when they start personalising. They can continue as a guest.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalEnforceLogin",
+            title: "User Portal: Enforce Sign-in",
+            defaultValue: "false",
+            description:
+                "When the email prompt is shown, customers are asked to sign in with a code instead of only entering their email. They can still continue as a guest.",
+        },
+        {
+            type: FieldType.Select,
+            key: "portalOrderName",
+            title: "User Portal: Order Name",
+            defaultValue: "off",
+            description:
+                "Whether customers can name their order. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
+            options: [
+                { key: "off", value: "Not asked" },
+                { key: "optional", value: "Asked, optional" },
+                { key: "required", value: "Asked, required" },
+            ],
+        },
+        {
+            type: FieldType.Select,
+            key: "portalPurchaseOrder",
+            title: "User Portal: Purchase Order",
+            defaultValue: "off",
+            description:
+                "Whether customers can enter a purchase order number. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
+            options: [
+                { key: "off", value: "Not asked" },
+                { key: "optional", value: "Asked, optional" },
+                { key: "required", value: "Asked, required" },
+            ],
+        },
+        {
+            type: FieldType.Select,
+            key: "portalDispatchDate",
+            title: "User Portal: Dispatch Date",
+            defaultValue: "off",
+            description:
+                "Whether customers can choose a dispatch date, within the product collection's dispatch dates when it has them. When required, the design can't be completed without it. Also asked when duplicating a previous order.",
+            options: [
+                { key: "off", value: "Not asked" },
+                { key: "optional", value: "Asked, optional" },
+                { key: "required", value: "Asked, required" },
+            ],
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalSaveAndExit",
+            title: "User Portal: Save and Exit",
+            defaultValue: "true",
+            description:
+                "When true, customers can save their design as a draft and leave, using a button on the stepper bar. They can pick it up again from their drafts.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "portalAllowStaySignedIn",
+            title: "User Portal: Allow Staying Signed In",
+            defaultValue: "true",
+            description:
+                "When true, customers can choose to stay signed in when they save and exit, and stay signed in when they start a new order from the thank you page. When false they're always signed out as they leave, which is for shared screens such as kiosks.",
+        },
+        {
+            type: FieldType.Number,
+            key: "portalInactivitySeconds",
+            title: "User Portal: Inactivity Timeout (seconds)",
+            description:
+                "When set, the experience starts over after this many seconds without any activity: the customer is signed out and their design is cleared. Leave empty to never time out. Useful for shared screens.",
+        },
+        {
+            type: FieldType.Asset,
+            assetType: AssetType.Image,
+            key: "welcomeBackgroundImage",
+            title: "Welcome Page Background",
+            description: "An image shown behind the welcome page.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeTitle",
+            title: "Welcome Page Title",
+            defaultValue: "Welcome",
+            description: "The heading on the welcome page.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeDescription",
+            title: "Welcome Page Description",
+            defaultValue: "Start a new order, or pick up where you left off.",
+            description: "The text under the heading on the welcome page.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeStartLabel",
+            title: "Start Button Text",
+            defaultValue: "Start a new order",
+            description: "The text of the button that starts a new order.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeBrandingLabel",
+            title: "Saved Branding Button Text",
+            defaultValue: "Use saved branding",
+            description:
+                "The text of the button that applies the customer's saved branding. Only shown with the user portal.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeDuplicateLabel",
+            title: "Duplicate Button Text",
+            defaultValue: "Duplicate a previous order",
+            description: "The text of the button that starts from a previous order. Only shown with the user portal.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeContinueLabel",
+            title: "Continue Draft Button Text",
+            defaultValue: "Continue a draft",
+            description:
+                "The text of the button that re-opens a draft, when the customer is signed in. Only shown with the user portal.",
+        },
+        {
+            type: FieldType.Text,
+            key: "welcomeSignInLabel",
+            title: "Sign In Button Text",
+            defaultValue: "Sign in",
+            description: "The text of the button that signs the customer in. Only shown with the user portal.",
+        },
+        {
+            type: FieldType.Boolean,
+            key: "thankYouShowStartOver",
+            title: "Show Start Over Button",
+            defaultValue: "true",
+            description: "When true, the thank you page has a button that hands the design off and starts a new order.",
+        },
+        {
+            type: FieldType.Text,
+            key: "thankYouStartOverLabel",
+            title: "Start Over Button Text",
+            defaultValue: "Start a new order",
+            description: "The text of the thank you page's button that starts a new order.",
+        },
+        {
             type: FieldType.ConversionConfiguration,
             key: "conversionConfiguration",
             title: "Conversion Configuration",
-            description: "The details asked of the customer when they request a quote.",
+            description:
+                "The details asked of the customer when they request a quote. With the user portal enabled they're also asked for when the design is completed: on the review page, or in a popup before finalising when the review page is off. The locations below don't apply then.",
         },
         {
             type: FieldType.Text,
@@ -195,6 +434,13 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             key: "appearance",
             title: "Appearance",
             pageKeys: ["styling"],
+            reorderable: false,
+        },
+        {
+            // The welcome page is always first, so it's in a group of its own which can't be reordered.
+            key: "welcome",
+            title: "Welcome",
+            pageKeys: ["welcome"],
             reorderable: false,
         },
         {
@@ -261,6 +507,32 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             `,
         },
         {
+            key: "welcome",
+            title: "Welcome",
+            subtitle:
+                "An optional landing page shown before anything else. With the user portal it also offers saved branding, previous orders and drafts.",
+            icon: "play",
+            // Whether the page is shown is set by the page's toggle, and the page is off until it is switched on.
+            toggleable: true,
+            disabled: true,
+            sections: [
+                {
+                    title: "Content",
+                    fields: ["welcomeTitle", "welcomeDescription", "welcomeBackgroundImage"],
+                },
+                {
+                    title: "Buttons",
+                    fields: [
+                        "welcomeStartLabel",
+                        "welcomeBrandingLabel",
+                        "welcomeDuplicateLabel",
+                        "welcomeContinueLabel",
+                        "welcomeSignInLabel",
+                    ],
+                },
+            ],
+        },
+        {
             key: "personalize",
             title: "Personalise",
             subtitle: "How the design editor is laid out and what it offers customers.",
@@ -277,7 +549,21 @@ export const pageSettings: ThemeConfigurationPageSettings = {
                 },
                 {
                     title: "Checkout",
-                    fields: ["addToCartLabel", "allowCartRequests", "allowQuoteRequests", "conversionConfiguration"],
+                    fields: [
+                        "addToCartLabel",
+                        "allowCartRequests",
+                        "allowQuoteRequests",
+                        "enableUserPortal",
+                        "portalPromptEmail",
+                        "portalEnforceLogin",
+                        "portalOrderName",
+                        "portalPurchaseOrder",
+                        "portalDispatchDate",
+                        "portalSaveAndExit",
+                        "portalAllowStaySignedIn",
+                        "portalInactivitySeconds",
+                        "conversionConfiguration",
+                    ],
                 },
                 {
                     title: "Testing",
@@ -317,7 +603,12 @@ export const pageSettings: ThemeConfigurationPageSettings = {
             sections: [
                 {
                     title: "Thank You Page",
-                    fields: ["thankYouMessage", "thankYouCloseLabel"],
+                    fields: [
+                        "thankYouMessage",
+                        "thankYouCloseLabel",
+                        "thankYouShowStartOver",
+                        "thankYouStartOverLabel",
+                    ],
                 },
             ],
         },
