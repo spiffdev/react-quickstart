@@ -115,6 +115,14 @@ const App: FunctionComponent<{
         };
     }, [client, context, createNewBundle, enableTestOrders, loadAttempt]);
 
+    // Tells the platform to drop its loading indicator once there's something to show: the experience, or the error
+    // screen. Repeat calls are ignored by the theme loader, so a later bundle swap or retry does no harm.
+    const ready = loadFailed || !!bundle;
+    useEffect(() => {
+        if (!ready) return;
+        ((window as any).SpiffThemeLoader as SpiffThemeLoader).themeLoaded();
+    }, [ready]);
+
     // In single product mode the product may already be chosen, such as by the e-commerce product page.
     const bundleOptions = (context as ThemeContextBundle).bundleOptions;
     const presetProduct =
