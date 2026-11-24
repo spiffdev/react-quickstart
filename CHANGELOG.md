@@ -2,6 +2,11 @@
 
 Every notable change to this theme, newest first.
 
+## 2026-11-24 — The theme leaves its loading state
+
+- The theme now calls `themeLoaded()` on the theme bridge's `SpiffThemeLoader`, so the platform's loading indicator is hidden and the customer can interact with it. Before, it was never called and the theme stayed in the loading state. It's called once the bundle has loaded, or the load has failed (so the retry screen shows rather than the loader). Further calls, such as after a retry or a new bundle, are ignored by the theme loader. (`App.tsx`)
+- `@spiffcommerce/core` is updated from 44.22.0 to 44.23.0.
+
 ## 2026-11-18 — The sidebar closes when you click away from it
 
 - The portal's sidebars (account, order details, guest email, save and exit) close when the customer presses anywhere outside them, or presses **Escape**. It's the press that counts, so selecting text in a sidebar and letting go outside doesn't close it. The same as their Close or Cancel button each time, except for the guest email prompt, where leaving is the same as **Continue as guest**. Save and exit, and the guest email prompt, can't be dismissed while they're saving. (`Backdrop` takes an `onDismiss`.)
